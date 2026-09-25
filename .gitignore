@@ -1,0 +1,44 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Environment / secrets ---
+.env
+.env.*
+
+# --- Whisper / VAD models (large, download separately — see README) ---
+models/*.bin
+models/*.gguf
+
+# --- Audio / video inputs (large files, may contain patient data) ---
+*.m4a
+*.mp3
+*.wav
+*.mp4
+*.ogg
+*.flac
+*.webm
+*.aac
+
+# --- Transcription outputs ---
+*_transcript.txt
+*.srt
+*.vtt
+
+# --- Tools ---
+.omc/
+.claude/settings.local.json
+
+# --- OS / editors ---
+.DS_Store
+.idea/
+.vscode/
+*.swp
