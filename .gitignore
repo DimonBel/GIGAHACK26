@@ -30,6 +30,8 @@ models/*.gguf
 
 # --- Transcription outputs ---
 *_transcript.txt
+*_dialog.txt
+/*.json
 *.srt
 *.vtt
 
