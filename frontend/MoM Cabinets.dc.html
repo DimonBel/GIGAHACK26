@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#F4F3EF;color:#17201E;font-family:'Instrument Sans',system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+a{color:#1F5F55}a:hover{color:#17201E}
+input,select,textarea,button{font:inherit;color:inherit}
+textarea{resize:vertical}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+</style>
+</helmet>
+
+<sc-if value="{{ showLogin }}" hint-placeholder-val="{{ false }}">
+<div style="min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);background:#F4F3EF">
+  <div style="background:#17201E;color:#E9ECE8;padding:56px;display:flex;flex-direction:column;justify-content:space-between">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div style="font-family:'Source Serif 4',serif;font-size:30px;letter-spacing:-0.01em">Verbal</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9AA6A1;letter-spacing:.06em">MEDPARK · ON-PREMISE MINUTES</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px;max-width:440px">
+      <div style="font-family:'Source Serif 4',serif;font-size:40px;line-height:1.1;text-wrap:pretty">Audio in. Minutes out. Nothing leaves the hospital network.</div>
+      <div style="color:#B7C0BC;line-height:1.55">Whisper, pyannote and a local LLM run on the internal server. Delivery goes through n8n to the internal mail relay.</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:#9AA6A1"><span style="width:7px;height:7px;border-radius:50%;background:#6FC2A8"></span>LAN 10.20.0.0/16 · EGRESS BLOCKED</div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center;padding:40px">
+    <div style="width:100%;max-width:380px;display:flex;flex-direction:column;gap:22px">
+      <div style="display:flex;justify-content:flex-end;gap:4px">
+        <sc-for list="{{ langs }}" as="l" hint-placeholder-count="3"><button onClick="{{ l.onClick }}" style="border:1px solid #D9D6CD;background:{{ l.bg }};color:{{ l.fg }};padding:4px 9px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">{{ l.label }}</button></sc-for>
+      </div>
+      <sc-if value="{{ stepCreds }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:24px;font-weight:600">{{ t.signIn }}</div><div style="color:#5E6763">Use your hospital directory account.</div></div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Account
+            <select value="{{ role }}" onChange="{{ onPickAccount }}" style="padding:11px 12px;border:1px solid #D9D6CD;border-radius:8px;background:#fff;font-size:14px;font-weight:400;color:#17201E">
+              <option value="admin">ion.bivol@medpark.md — Admin</option>
+              <option value="moderator">elena.rusu@medpark.md — Moderator</option>
+              <option value="participant">natalia.popescu@medpark.md — Participant</option>
+            </select>
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Password
+            <input type="password" value="••••••••••" readOnly style="padding:11px 12px;border:1px solid #D9D6CD;border-radius:8px;background:#fff;font-size:14px"></input>
+          </label>
+          <button onClick="{{ toTwoFa }}" style="padding:12px;border:none;border-radius:8px;background:#1F5F55;color:#fff;font-weight:600;cursor:pointer">{{ t.continue }}</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{ stepTwoFa }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:24px;font-weight:600">{{ t.twoFa }}</div><div style="color:#5E6763;line-height:1.5">Enter the 6-digit code from your authenticator app (TOTP). Codes are validated locally.</div></div>
+          <input value="{{ code }}" onChange="{{ onCode }}" maxLength="6" placeholder="000000" style="padding:14px;border:1px solid #D9D6CD;border-radius:8px;background:#fff;font-family:'JetBrains Mono',monospace;font-size:28px;letter-spacing:.5em;text-align:center"></input>
+          <label style="display:flex;gap:8px;align-items:center;color:#5E6763;font-size:13px"><input type="checkbox" defaultChecked></input>Trust this workstation for 12 hours</label>
+          <button onClick="{{ verify }}" style="padding:12px;border:none;border-radius:8px;background:{{ verifyBg }};color:#fff;font-weight:600;cursor:pointer">{{ t.verify }}</button>
+          <button onClick="{{ backToCreds }}" style="background:none;border:none;color:#5E6763;cursor:pointer;font-size:13px">← Back</button>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showApp }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;min-height:100vh">
+  <aside style="width:236px;flex-shrink:0;background:#17201E;color:#E9ECE8;display:flex;flex-direction:column;padding:22px 14px;gap:26px;position:sticky;top:0;height:100vh">
+    <div style="display:flex;flex-direction:column;gap:3px;padding:0 8px">
+      <div style="font-family:'Source Serif 4',serif;font-size:24px">Verbal</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#9AA6A1;letter-spacing:.06em">MEDPARK · ON-PREMISE</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="padding:0 8px 8px;font-size:11px;color:#9AA6A1;letter-spacing:.06em;text-transform:uppercase">{{ roleLabel }}</div>
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+        <button onClick="{{ n.onClick }}" style="display:flex;justify-content:space-between;align-items:center;text-align:left;border:none;background:{{ n.bg }};color:{{ n.fg }};padding:9px 10px;border-radius:7px;cursor:pointer;font-size:14px;font-weight:500">{{ n.label }}<span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#9AA6A1">{{ n.count }}</span></button>
+      </sc-for>
+    </div>
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:6px;padding:0 8px">
+        <div style="font-size:11px;color:#9AA6A1;letter-spacing:.06em;text-transform:uppercase">Demo · switch cabinet</div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;background:#243029;padding:3px;border-radius:7px">
+          <sc-for list="{{ roleSwitch }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.onClick }}" style="border:none;background:{{ r.bg }};color:{{ r.fg }};padding:6px 0;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer">{{ r.label }}</button></sc-for>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;padding:12px 8px 0;border-top:1px solid #2C3833">
+        <div style="width:32px;height:32px;border-radius:50%;background:#2F4A43;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">{{ me.initials }}</div>
+        <div style="display:flex;flex-direction:column;min-width:0;flex:1"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ me.name }}</div><div style="font-size:11px;color:#9AA6A1">{{ me.dept }}</div></div>
+        <button onClick="{{ signOut }}" title="Sign out" style="border:none;background:none;color:#9AA6A1;cursor:pointer;font-size:12px">{{ t.signOut }}</button>
+      </div>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 32px;border-bottom:1px solid #E3E1DA;background:#F4F3EF;position:sticky;top:0;z-index:5">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <div style="font-size:12px;color:#5E6763">{{ roleLabel }} / {{ title }}</div>
+        <div style="font-size:20px;font-weight:600">{{ title }}</div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div style="display:flex;gap:7px;align-items:center;padding:6px 10px;border-radius:999px;background:#E3EEEA;color:#1F5F55;font-size:12px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:#1F8F6F"></span>Offline · LAN only</div>
+        <div style="display:flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;border:1px solid #D9D6CD;font-size:12px;font-weight:600;color:#5E6763">2FA ✓</div>
+        <div style="display:flex;gap:2px;background:#E8E6DF;padding:3px;border-radius:7px">
+          <sc-for list="{{ langs }}" as="l" hint-placeholder-count="3"><button onClick="{{ l.onClick }}" style="border:none;background:{{ l.bg }};color:{{ l.fg }};padding:4px 9px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">{{ l.label }}</button></sc-for>
+        </div>
+      </div>
+    </header>
+
+    <div style="padding:28px 32px 60px;display:flex;flex-direction:column;gap:24px">
+
+<!-- ============ MODERATOR · MEETINGS ============ -->
+<sc-if value="{{ is.meetings }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <sc-for list="{{ typeFilters }}" as="f" hint-placeholder-count="4"><button onClick="{{ f.onClick }}" style="border:1px solid #D9D6CD;background:{{ f.bg }};color:{{ f.fg }};padding:7px 12px;border-radius:999px;font-size:13px;font-weight:500;cursor:pointer">{{ f.label }}</button></sc-for>
+    </div>
+    <button onClick="{{ goNew }}" style="border:none;background:#1F5F55;color:#fff;padding:10px 16px;border-radius:8px;font-weight:600;cursor:pointer">+ {{ t.new }}</button>
+  </div>
+  <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:minmax(0,2.6fr) 130px 120px 90px minmax(0,1.3fr) 110px;gap:16px;padding:12px 20px;font-size:12px;color:#5E6763;font-weight:600;border-bottom:1px solid #E3E1DA;background:#FAF9F6">
+      <div>Meeting</div><div>Type</div><div>Date</div><div>Length</div><div>Status</div><div></div>
+    </div>
+    <sc-for list="{{ meetingsShown }}" as="m" hint-placeholder-count="6">
+      <div style="display:grid;grid-template-columns:minmax(0,2.6fr) 130px 120px 90px minmax(0,1.3fr) 110px;gap:16px;padding:14px 20px;align-items:center;border-bottom:1px solid #EFEDE7">
+        <div style="display:flex;flex-direction:column;gap:3px;min-width:0"><div style="font-weight:600">{{ m.title }}</div><div style="font-size:12px;color:#5E6763">{{ m.people }} participants · {{ m.langs }}</div></div>
+        <div><span style="padding:3px 9px;border-radius:999px;background:{{ m.tagBg }};color:{{ m.tagFg }};font-size:12px;font-weight:600">{{ m.type }}</span></div>
+        <div style="font-size:13px">{{ m.date }}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:12px">{{ m.len }}</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="font-size:13px;font-weight:500;color:{{ m.stColor }}">{{ m.status }}</div>
+          <div style="height:4px;background:#EFEDE7;border-radius:2px;overflow:hidden;width:120px"><div style="height:100%;width:{{ m.pct }};background:{{ m.stColor }}"></div></div>
+        </div>
+        <div style="text-align:right"><button onClick="{{ goEditor }}" style="border:1px solid #D9D6CD;background:#fff;padding:6px 12px;border-radius:7px;font-size:13px;cursor:pointer">Open</button></div>
+      </div>
+    </sc-for>
+  </div>
+</sc-if>
+
+<!-- ============ MODERATOR · NEW ============ -->
+<sc-if value="{{ is.new }}" hint-placeholder-val="{{ false }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:24px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px">
+        <div style="background:#fff;border:1.5px dashed #C9C5BA;border-radius:12px;padding:34px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+          <div style="font-weight:600;font-size:16px">Upload audio</div>
+          <div style="color:#5E6763;font-size:13px">.wav .mp3 .m4a · up to 3 h</div>
+          <button onClick="{{ startUpload }}" style="margin-top:6px;border:1px solid #D9D6CD;background:#FAF9F6;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:500">Choose file</button>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763">{{ fileName }}</div>
+        </div>
+        <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:34px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center">
+          <button onClick="{{ toggleRec }}" style="width:64px;height:64px;border-radius:50%;border:4px solid #F6E4E0;background:#A23B2A;color:#fff;font-weight:700;cursor:pointer;font-size:13px">{{ recLabel }}</button>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px">{{ recTime }}</div>
+          <div style="color:#5E6763;font-size:13px">{{ recHint }}</div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:12px;font-weight:600;color:#5E6763">Meeting type · routing tag</div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+            <sc-for list="{{ newTypes }}" as="nt" hint-placeholder-count="3"><button onClick="{{ nt.onClick }}" style="border:1.5px solid {{ nt.border }};background:{{ nt.bg }};padding:12px;border-radius:9px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px"><span style="font-weight:600;color:{{ nt.fg }}">{{ nt.label }}</span><span style="font-size:12px;color:#5E6763">{{ nt.list }}</span></button></sc-for>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px">
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Title
+            <input defaultValue="Consiliu medical — Cardiologie, caz clinic" style="padding:10px 12px;border:1px solid #D9D6CD;border-radius:8px;font-size:14px;font-weight:400;color:#17201E"></input></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">MoM template
+            <select style="padding:10px 12px;border:1px solid #D9D6CD;border-radius:8px;font-size:14px;font-weight:400;background:#fff;color:#17201E"><option>{{ newTemplate }}</option></select></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Spoken languages
+            <div style="display:flex;gap:6px"><span style="padding:8px 10px;border-radius:7px;background:#E3EEEA;color:#1F5F55;font-weight:600">RO</span><span style="padding:8px 10px;border-radius:7px;background:#E3EEEA;color:#1F5F55;font-weight:600">RU</span><span style="padding:8px 10px;border-radius:7px;background:#E3EEEA;color:#1F5F55;font-weight:600">EN</span><span style="padding:8px 4px;font-weight:400;color:#5E6763">code-switching on</span></div></label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Document language
+            <select style="padding:10px 12px;border:1px solid #D9D6CD;border-radius:8px;font-size:14px;font-weight:400;background:#fff;color:#17201E"><option>Română</option><option>Русский</option><option>English</option></select></label>
+        </div>
+        <label style="display:flex;gap:10px;align-items:center;font-size:13px"><input type="checkbox" defaultChecked></input>Send to distribution list only after moderator approval</label>
+        <button onClick="{{ startUpload }}" style="border:none;background:#1F5F55;color:#fff;padding:12px;border-radius:8px;font-weight:600;cursor:pointer">Process meeting</button>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:12px"><div style="font-weight:600;font-size:16px">Pipeline</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ pipeEta }}</div></div>
+      <sc-for list="{{ pipeline }}" as="p" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;align-items:start;padding:10px 0;border-top:1px solid #EFEDE7">
+          <div style="width:20px;height:20px;border-radius:50%;background:{{ p.dotBg }};color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700;margin-top:1px">{{ p.mark }}</div>
+          <div style="display:flex;flex-direction:column;gap:2px"><div style="font-weight:600;color:{{ p.fg }}">{{ p.name }}</div><div style="font-size:12px;color:#5E6763">{{ p.detail }}</div></div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ p.time }}</div>
+        </div>
+      </sc-for>
+      <sc-if value="{{ pipeDone }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ goEditor }}" style="margin-top:10px;border:none;background:#17201E;color:#fff;padding:11px;border-radius:8px;font-weight:600;cursor:pointer">Review draft MoM →</button>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ============ MODERATOR · EDITOR ============ -->
+<sc-if value="{{ is.editor }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span style="padding:3px 9px;border-radius:999px;background:#E3EEEA;color:#1F5F55;font-size:12px;font-weight:600">Medical</span>
+      <span style="font-size:13px;color:#5E6763">24 Sep 2026 · 14:00 · 58 min · v3 draft · auto-saved</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <select style="padding:9px 10px;border:1px solid #D9D6CD;border-radius:8px;background:#fff;font-size:13px"><option>Document: Română</option><option>Документ: Русский</option><option>Document: English</option></select>
+      <button onClick="{{ goPreview }}" style="border:1px solid #D9D6CD;background:#fff;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:500">Preview PDF</button>
+      <button onClick="{{ send }}" style="border:none;background:{{ sendBg }};color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:600">{{ sendLabel }}</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ sentToast }}" hint-placeholder-val="{{ false }}">
+    <div style="background:#17201E;color:#E9ECE8;border-radius:10px;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;font-size:13px"><span>Approved. n8n routed tag <b>Medical</b> → “Consiliu medical” list · 9 recipients · delivered via smtp://mail.medpark.local:1025</span><span style="font-family:'JetBrains Mono',monospace;color:#9AA6A1">14:52:08</span></div>
+  </sc-if>
+
+  <sc-if value="{{ suggestionPending }}" hint-placeholder-val="{{ true }}">
+    <div style="background:#FFF;border:1px solid #E3C88F;border-radius:12px;padding:14px 16px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <div style="font-size:12px;font-weight:600;color:#8A5A12">Participant contribution · pending review</div>
+        <div><b>Dr. Natalia Popescu</b> (ATI) proposes adding diagnosis <span style="font-family:'JetBrains Mono',monospace;background:#F5ECDC;padding:1px 6px;border-radius:4px">N18.3</span> Chronic kidney disease, stage 3 and an attention point on contrast nephropathy.</div>
+      </div>
+      <div style="display:flex;gap:8px"><button onClick="{{ rejectSug }}" style="border:1px solid #D9D6CD;background:#fff;padding:8px 12px;border-radius:7px;cursor:pointer">Decline</button><button onClick="{{ acceptSug }}" style="border:none;background:#8A5A12;color:#fff;padding:8px 12px;border-radius:7px;cursor:pointer;font-weight:600">Add to MoM</button></div>
+    </div>
+  </sc-if>
+
+  <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+    <article style="flex:1 1 560px;min-width:0;background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:clamp(18px,3vw,40px);display:flex;flex-direction:column;gap:30px">
+      <div style="display:flex;flex-direction:column;gap:10px;padding-bottom:22px;border-bottom:1px solid #E3E1DA">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763;letter-spacing:.06em">PROCES-VERBAL NR. 214 / 2026 · ȘABLON: CONSILIU MEDICAL v2</div>
+        <input defaultValue="Consiliu medical — Cardiologie, caz clinic pacient 64 ani, NSTEMI" style="border:none;border-bottom:1px dashed transparent;font-family:'Source Serif 4',serif;font-size:28px;padding:0;outline:none;width:100%"></input>
+        <div style="display:flex;gap:22px;flex-wrap:wrap;font-size:13px;color:#5E6763"><span>24.09.2026, 14:00–14:58</span><span>Sala de consilii, bloc B</span><span>Moderator: Dr. Elena Rusu</span></div>
+      </div>
+
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">1 · PARTICIPANȚI</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <sc-for list="{{ people }}" as="p" hint-placeholder-count="7"><span style="border:1px solid #E3E1DA;border-radius:999px;padding:5px 10px;font-size:13px;display:flex;gap:6px"><b style="font-weight:600">{{ p.name }}</b><span style="color:#5E6763">{{ p.dept }}</span></span></sc-for>
+        </div>
+      </section>
+
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">2 · SUBIECT ȘI REZUMAT</div>
+        <textarea rows="4" defaultValue="Evaluarea pacientului M., 64 ani, internat cu NSTEMI confirmat (troponină în creștere). Coronarografia a evidențiat stenoză de 80% pe LAD. Consiliul a discutat oportunitatea PCI cu stent, riscul renal (ClCr 48 ml/min) și schema de dublă antiagregare." style="border:1px solid #EFEDE7;border-radius:8px;padding:12px;font-family:'Source Serif 4',serif;font-size:15px;line-height:1.6;background:#FCFBF8"></textarea>
+      </section>
+
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">3 · PUNCTE DE VEDERE</div>
+        <sc-for list="{{ views }}" as="v" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:4px 14px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:2px;padding-top:9px"><div style="font-weight:600;font-size:13px">{{ v.name }}</div><div style="font-size:12px;color:#5E6763">{{ v.dept }}</div></div>
+            <textarea rows="2" defaultValue="{{ v.text }}" style="border:1px solid #EFEDE7;border-radius:8px;padding:9px 12px;font-family:'Source Serif 4',serif;font-size:15px;line-height:1.5;background:#FCFBF8"></textarea>
+          </div>
+        </sc-for>
+      </section>
+
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">4 · DECIZII ȘI SARCINI</div><span style="font-size:12px;color:#5E6763">Extracted by LLM · edit freely</span></div>
+        <div style="border:1px solid #E3E1DA;border-radius:10px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:28px minmax(120px,1fr) minmax(0,170px) minmax(0,140px) 24px;gap:10px;padding:9px 12px;background:#FAF9F6;font-size:12px;font-weight:600;color:#5E6763"><div>#</div><div>Action</div><div>Owner</div><div>Deadline</div><div></div></div>
+          <sc-for list="{{ actionRows }}" as="a" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:28px minmax(120px,1fr) minmax(0,170px) minmax(0,140px) 24px;gap:10px;padding:8px 12px;border-top:1px solid #EFEDE7;align-items:center">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ a.n }}</div>
+              <input value="{{ a.text }}" onChange="{{ a.onText }}" style="border:1px solid transparent;border-radius:6px;padding:7px 8px;font-size:14px;background:#FCFBF8"></input>
+              <select value="{{ a.owner }}" onChange="{{ a.onOwner }}" style="border:1px solid #EFEDE7;border-radius:6px;padding:7px 6px;font-size:13px;background:#fff">
+                <sc-for list="{{ ownerOptions }}" as="o" hint-placeholder-count="7"><option value="{{ o }}">{{ o }}</option></sc-for>
+              </select>
+              <input type="date" value="{{ a.due }}" onChange="{{ a.onDue }}" style="border:1px solid #EFEDE7;border-radius:6px;padding:6px;font-size:13px;color:{{ a.dueColor }}"></input>
+              <button onClick="{{ a.onRemove }}" style="border:none;background:none;color:#8E9692;cursor:pointer;font-size:16px">×</button>
+            </div>
+          </sc-for>
+        </div>
+        <button onClick="{{ addAction }}" style="align-self:flex-start;border:1px dashed #C9C5BA;background:none;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:13px;color:#5E6763">+ Add action item</button>
+      </section>
+
+      <section style="display:flex;flex-direction:column;gap:14px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">5 · DIAGNOSTIC, PROCEDURI, DRG</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:12px;font-weight:600;color:#5E6763">Diagnoses · ICD-10</div>
+          <sc-for list="{{ diagRows }}" as="d" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:minmax(0,78px) minmax(0,1fr) minmax(0,90px) 24px;gap:10px;align-items:center;padding:8px 10px;border:1px solid #EFEDE7;border-radius:8px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:#1F5F55">{{ d.code }}</span><span>{{ d.label }}</span><span style="font-size:12px;color:#5E6763">{{ d.kind }}</span><button onClick="{{ d.onRemove }}" style="border:none;background:none;color:#8E9692;cursor:pointer">×</button>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="font-size:12px;font-weight:600;color:#5E6763">Procedures · ACHI</div>
+          <sc-for list="{{ procs }}" as="d" hint-placeholder-count="2">
+            <div style="display:grid;grid-template-columns:minmax(0,78px) minmax(0,1fr) minmax(0,90px);gap:10px;align-items:center;padding:8px 10px;border:1px solid #EFEDE7;border-radius:8px">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:#3B4A8C">{{ d.code }}</span><span>{{ d.label }}</span><span style="font-size:12px;color:#5E6763">{{ d.kind }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 16px;background:#F4F3EF;border-radius:10px">
+          <div style="display:flex;flex-direction:column;gap:3px"><div style="font-size:12px;font-weight:600;color:#5E6763">DRG group (AR-DRG) · suggested from codes above</div><div style="display:flex;gap:10px;align-items:baseline"><span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:500">F10A</span><span>Interventional coronary procedures with AMI, major complexity</span></div></div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#5E6763">{{ drgWeight }}</div>
+        </div>
+      </section>
+
+      <section style="display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">6 · DE URMĂRIT / ATENȚIE</div>
+        <sc-for list="{{ attention }}" as="x" hint-placeholder-count="2">
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:#F6E4E0;border-radius:8px;color:#6E2519"><span style="font-weight:700">!</span><span style="font-family:'Source Serif 4',serif;font-size:15px">{{ x }}</span></div>
+        </sc-for>
+      </section>
+
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">7 · URMĂTOAREA ȘEDINȚĂ</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
+          <input type="date" defaultValue="2026-10-02" style="border:1px solid #EFEDE7;border-radius:8px;padding:9px"></input>
+          <input type="time" defaultValue="14:00" style="border:1px solid #EFEDE7;border-radius:8px;padding:9px"></input>
+          <input defaultValue="Sala de consilii, bloc B" style="border:1px solid #EFEDE7;border-radius:8px;padding:9px 12px"></input>
+        </div>
+        <textarea rows="2" defaultValue="Evaluare post-PCI: ecocardiografie de control, funcție renală, toleranța la DAPT." style="border:1px solid #EFEDE7;border-radius:8px;padding:10px 12px;font-family:'Source Serif 4',serif;font-size:15px;background:#FCFBF8"></textarea>
+      </section>
+    </article>
+
+    <aside style="flex:1 1 340px;min-width:0;position:sticky;top:96px;background:#fff;border:1px solid #E3E1DA;border-radius:12px;display:flex;flex-direction:column;max-height:calc(100vh - 120px);overflow:hidden">
+      <div style="display:flex;gap:2px;padding:6px;border-bottom:1px solid #E3E1DA">
+        <sc-for list="{{ rightTabs }}" as="rt" hint-placeholder-count="3"><button onClick="{{ rt.onClick }}" style="flex:1;border:none;background:{{ rt.bg }};color:{{ rt.fg }};padding:8px;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer">{{ rt.label }}</button></sc-for>
+      </div>
+      <sc-if value="{{ tabTranscript }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:12px 16px;border-bottom:1px solid #EFEDE7;display:flex;gap:10px;align-items:center">
+          <button style="width:30px;height:30px;border-radius:50%;border:none;background:#17201E;color:#fff;cursor:pointer;font-size:11px">▶</button>
+          <div style="flex:1;height:4px;background:#EFEDE7;border-radius:2px"><div style="width:38%;height:100%;background:#1F5F55;border-radius:2px"></div></div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763">22:14 / 58:03</span>
+        </div>
+        <div style="overflow:auto;padding:6px 16px 16px;display:flex;flex-direction:column">
+          <sc-for list="{{ transcript }}" as="s" hint-placeholder-count="6">
+            <div style="display:flex;flex-direction:column;gap:5px;padding:12px 0;border-bottom:1px solid #F1EFE9">
+              <div style="display:flex;gap:8px;align-items:center;font-size:12px"><b>{{ s.who }}</b><span style="font-family:'JetBrains Mono',monospace;color:#5E6763">{{ s.ts }}</span><span style="margin-left:auto;display:flex;gap:3px"><sc-for list="{{ s.langs }}" as="lg"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:1px 5px;border-radius:3px;background:#EFEDE7;color:#3E4744">{{ lg }}</span></sc-for></span></div>
+              <div style="line-height:1.55;font-size:13.5px"><sc-for list="{{ s.parts }}" as="pt"><span style="background:{{ pt.bg }};color:{{ pt.fg }};border-radius:3px">{{ pt.t }}</span></sc-for></div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ tabCodes }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;overflow:auto">
+          <input value="{{ icdQuery }}" onChange="{{ onIcdQuery }}" placeholder="Search ICD-10 code or term (RO/RU/EN)…" style="padding:10px 12px;border:1px solid #D9D6CD;border-radius:8px"></input>
+          <div style="font-size:12px;color:#5E6763">Local ICD-10 catalogue · MS RM edition</div>
+          <sc-for list="{{ icdResults }}" as="c" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #F1EFE9">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#1F5F55">{{ c.code }}</span>
+              <div style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px">{{ c.label }}</span><span style="font-size:12px;color:#5E6763">{{ c.ro }}</span></div>
+              <button onClick="{{ c.onAdd }}" style="border:1px solid #D9D6CD;background:{{ c.btnBg }};padding:4px 9px;border-radius:6px;cursor:pointer;font-size:12px">{{ c.btn }}</button>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ tabVersions }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:8px 16px;display:flex;flex-direction:column">
+          <sc-for list="{{ versions }}" as="v" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;gap:2px;padding:12px 0;border-bottom:1px solid #F1EFE9"><div style="display:flex;justify-content:space-between"><b style="font-size:13px">{{ v.v }}</b><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763">{{ v.at }}</span></div><div style="font-size:13px;color:#5E6763">{{ v.what }}</div></div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </aside>
+  </div>
+</sc-if>
+
+<!-- ============ PARTICIPANT · MY MEETINGS ============ -->
+<sc-if value="{{ is.mine }}" hint-placeholder-val="{{ false }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+    <sc-for list="{{ myMeetings }}" as="m" hint-placeholder-count="4">
+      <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="padding:3px 9px;border-radius:999px;background:{{ m.tagBg }};color:{{ m.tagFg }};font-size:12px;font-weight:600">{{ m.type }}</span><span style="font-size:12px;color:#5E6763">{{ m.date }}</span></div>
+        <div style="font-weight:600;font-size:16px;line-height:1.3">{{ m.title }}</div>
+        <div style="font-size:13px;color:#5E6763">{{ m.status }} · {{ m.mine }}</div>
+        <button onClick="{{ goView }}" style="align-self:flex-start;border:1px solid #D9D6CD;background:#fff;padding:7px 12px;border-radius:7px;cursor:pointer;font-size:13px">Open MoM</button>
+      </div>
+    </sc-for>
+  </div>
+</sc-if>
+
+<!-- ============ PARTICIPANT · MY ACTIONS ============ -->
+<sc-if value="{{ is.actions }}" hint-placeholder-val="{{ false }}">
+  <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;overflow:hidden;max-width:980px">
+    <sc-for list="{{ myActions }}" as="a" hint-placeholder-count="4">
+      <div style="display:grid;grid-template-columns:28px minmax(0,1fr) 150px 120px;gap:14px;padding:16px 20px;border-bottom:1px solid #EFEDE7;align-items:center">
+        <input type="checkbox" checked="{{ a.done }}" onChange="{{ a.onToggle }}" style="width:18px;height:18px;accent-color:#1F5F55"></input>
+        <div style="display:flex;flex-direction:column;gap:3px"><div style="font-weight:500;text-decoration:{{ a.deco }};color:{{ a.fg }}">{{ a.text }}</div><div style="font-size:12px;color:#5E6763">From: {{ a.from }}</div></div>
+        <div style="font-size:13px;color:{{ a.dueColor }};font-weight:500">{{ a.dueLabel }}</div>
+        <div style="font-size:12px;color:#5E6763;text-align:right">{{ a.state }}</div>
+      </div>
+    </sc-for>
+  </div>
+</sc-if>
+
+<!-- ============ PARTICIPANT · VIEW + CONTRIBUTE ============ -->
+<sc-if value="{{ is.view }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+    <article style="flex:1 1 560px;min-width:0;background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:clamp(20px,3.5vw,48px);display:flex;flex-direction:column;gap:24px;font-family:'Source Serif 4',serif;font-size:15.5px;line-height:1.6">
+      <div style="display:flex;flex-direction:column;gap:8px;padding-bottom:18px;border-bottom:1px solid #E3E1DA">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763;letter-spacing:.06em">PROCES-VERBAL NR. 214 / 2026 · APROBAT 24.09.2026</div>
+        <div style="font-size:28px;line-height:1.2">Consiliu medical — Cardiologie, caz clinic pacient 64 ani, NSTEMI</div>
+        <div style="font-family:'Instrument Sans',sans-serif;font-size:13px;color:#5E6763">24.09.2026 · Sala de consilii, bloc B · Moderator: Dr. Elena Rusu</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px"><div style="font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">REZUMAT</div><div>Evaluarea pacientului M., 64 ani, internat cu NSTEMI confirmat. Coronarografia a evidențiat stenoză de 80% pe LAD. Consiliul a decis PCI cu stent, cu protecție renală și dublă antiagregare.</div></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><div style="font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">DECIZII ȘI SARCINI</div>
+        <sc-for list="{{ actionRows }}" as="a" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;padding:8px 0;border-bottom:1px solid #F1EFE9"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ a.n }}</span><span>{{ a.text }} — <i>{{ a.owner }}</i></span><span style="font-family:'Instrument Sans',sans-serif;font-size:13px;color:{{ a.dueColor }}">{{ a.dueLabel }}</span></div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px"><div style="font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">DIAGNOSTIC · PROCEDURI · DRG</div>
+        <sc-for list="{{ diagRows }}" as="d" hint-placeholder-count="2"><div><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#1F5F55">{{ d.code }}</span> {{ d.label }}</div></sc-for>
+        <sc-for list="{{ procs }}" as="d" hint-placeholder-count="2"><div><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#3B4A8C">{{ d.code }}</span> {{ d.label }}</div></sc-for>
+        <div><span style="font-family:'JetBrains Mono',monospace;font-size:13px">F10A</span> Interventional coronary procedures with AMI, major complexity</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px"><div style="font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">URMĂTOAREA ȘEDINȚĂ</div><div>02.10.2026, 14:00 · Evaluare post-PCI: ecocardiografie de control, funcție renală, toleranța la DAPT.</div></div>
+    </article>
+
+    <aside style="flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:14px">
+      <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:3px"><div style="font-weight:600;font-size:16px">Add to MoM</div><div style="font-size:13px;color:#5E6763">Sent to the moderator for approval before it appears in the document.</div></div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px">
+          <sc-for list="{{ contribTypes }}" as="ct" hint-placeholder-count="4"><button onClick="{{ ct.onClick }}" style="border:1px solid {{ ct.border }};background:{{ ct.bg }};color:{{ ct.fg }};padding:8px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer">{{ ct.label }}</button></sc-for>
+        </div>
+        <sc-if value="{{ contribIsCode }}" hint-placeholder-val="{{ true }}">
+          <input value="{{ icdQuery }}" onChange="{{ onIcdQuery }}" placeholder="ICD-10 code or term" style="padding:10px 12px;border:1px solid #D9D6CD;border-radius:8px;font-family:'JetBrains Mono',monospace"></input>
+        </sc-if>
+        <textarea rows="4" value="{{ contribText }}" onChange="{{ onContribText }}" placeholder="{{ contribPlaceholder }}" style="padding:10px 12px;border:1px solid #D9D6CD;border-radius:8px;line-height:1.5"></textarea>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Section
+          <select style="padding:9px 10px;border:1px solid #D9D6CD;border-radius:8px;background:#fff;font-weight:400;color:#17201E"><option>{{ contribSection }}</option></select></label>
+        <button onClick="{{ submitContrib }}" style="border:none;background:#1F5F55;color:#fff;padding:11px;border-radius:8px;font-weight:600;cursor:pointer">Submit for review</button>
+      </div>
+      <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:6px 18px">
+        <sc-for list="{{ myContribs }}" as="c" hint-placeholder-count="2">
+          <div style="display:flex;flex-direction:column;gap:3px;padding:12px 0;border-bottom:1px solid #F1EFE9"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-size:13px">{{ c.kind }}</b><span style="font-size:12px;font-weight:600;color:{{ c.color }}">{{ c.status }}</span></div><div style="font-size:13px;color:#3E4744">{{ c.text }}</div></div>
+        </sc-for>
+      </div>
+    </aside>
+  </div>
+</sc-if>
+
+<!-- ============ ADMIN · USERS ============ -->
+<sc-if value="{{ is.users }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+    <label style="display:flex;gap:10px;align-items:center;font-size:13px;padding:10px 14px;background:#fff;border:1px solid #E3E1DA;border-radius:9px"><input type="checkbox" checked="{{ enforce2fa }}" onChange="{{ toggleEnforce }}" style="accent-color:#1F5F55"></input>Require 2FA (TOTP) for every role</label>
+    <button style="border:none;background:#1F5F55;color:#fff;padding:10px 16px;border-radius:8px;font-weight:600;cursor:pointer">+ Invite user</button>
+  </div>
+  <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) 160px 120px 140px;gap:16px;padding:12px 20px;font-size:12px;color:#5E6763;font-weight:600;border-bottom:1px solid #E3E1DA;background:#FAF9F6"><div>User</div><div>Department</div><div>Role</div><div>2FA</div><div>Last sign-in</div></div>
+    <sc-for list="{{ userRows }}" as="u" hint-placeholder-count="8">
+      <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.3fr) 160px 120px 140px;gap:16px;padding:12px 20px;align-items:center;border-bottom:1px solid #EFEDE7">
+        <div style="display:flex;gap:10px;align-items:center;min-width:0"><div style="width:30px;height:30px;border-radius:50%;background:#E3EEEA;color:#1F5F55;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ u.ini }}</div><div style="display:flex;flex-direction:column;min-width:0"><span style="font-weight:600">{{ u.name }}</span><span style="font-size:12px;color:#5E6763;overflow:hidden;text-overflow:ellipsis">{{ u.email }}</span></div></div>
+        <div style="font-size:13px">{{ u.dept }}</div>
+        <select value="{{ u.role }}" onChange="{{ u.onRole }}" style="border:1px solid #D9D6CD;border-radius:7px;padding:6px 8px;background:#fff;font-size:13px"><option value="Admin">Admin</option><option value="Moderator">Moderator</option><option value="Participant">Participant</option></select>
+        <div style="font-size:13px;font-weight:600;color:{{ u.faColor }}">{{ u.fa }}</div>
+        <div style="font-size:12px;color:#5E6763;font-family:'JetBrains Mono',monospace">{{ u.last }}</div>
+      </div>
+    </sc-for>
+  </div>
+</sc-if>
+
+<!-- ============ ADMIN · TEMPLATES ============ -->
+<sc-if value="{{ is.templates }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;gap:6px">
+    <sc-for list="{{ tplTabs }}" as="f" hint-placeholder-count="3"><button onClick="{{ f.onClick }}" style="border:1px solid #D9D6CD;background:{{ f.bg }};color:{{ f.fg }};padding:8px 14px;border-radius:999px;font-size:13px;font-weight:500;cursor:pointer">{{ f.label }}</button></sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;align-items:start">
+    <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:8px 20px">
+      <sc-for list="{{ tplRows }}" as="s" hint-placeholder-count="8">
+        <div style="display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #F1EFE9">
+          <span style="color:#A8AEAA;cursor:grab">⋮⋮</span>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;color:{{ s.fg }}">{{ s.name }}</span><span style="font-size:12px;color:#5E6763">{{ s.hint }}</span></div>
+          <button onClick="{{ s.onToggle }}" style="width:38px;height:22px;border-radius:11px;border:none;background:{{ s.trackBg }};position:relative;cursor:pointer;padding:0"><span style="position:absolute;top:3px;left:{{ s.knob }};width:16px;height:16px;border-radius:50%;background:#fff"></span></button>
+        </div>
+      </sc-for>
+    </div>
+    <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:28px 32px;display:flex;flex-direction:column;gap:14px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763;letter-spacing:.06em">PREVIEW · {{ tplName }}</div>
+      <sc-for list="{{ tplPreview }}" as="s" hint-placeholder-count="6">
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#1F5F55">{{ s.label }}</div><div style="height:8px;background:#EFEDE7;border-radius:4px;width:92%"></div><div style="height:8px;background:#EFEDE7;border-radius:4px;width:64%"></div></div>
+      </sc-for>
+      <div style="font-size:12px;color:#5E6763;padding-top:8px;border-top:1px solid #EFEDE7">LLM prompt uses these sections as the output schema (JSON → DOCX/PDF).</div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ============ ADMIN · ROUTING ============ -->
+<sc-if value="{{ is.routing }}" hint-placeholder-val="{{ false }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+    <sc-for list="{{ routes }}" as="r" hint-placeholder-count="3">
+      <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="padding:3px 9px;border-radius:999px;background:{{ r.tagBg }};color:{{ r.tagFg }};font-size:12px;font-weight:600">tag = {{ r.type }}</span><span style="font-size:12px;color:#5E6763">{{ r.count }} recipients</span></div>
+        <div style="font-weight:600;font-size:16px">{{ r.list }}</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <sc-for list="{{ r.emails }}" as="e"><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#3E4744">{{ e }}</div></sc-for>
+        </div>
+        <div style="font-size:12px;color:#5E6763;padding-top:10px;border-top:1px solid #EFEDE7">{{ r.rule }}</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px">
+    <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-weight:600">Mail relay</div>
+      <div style="display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px;font-size:13px"><span style="color:#5E6763">Host</span><span style="font-family:'JetBrains Mono',monospace">mail.medpark.local</span><span style="color:#5E6763">Port</span><span style="font-family:'JetBrains Mono',monospace">1025 (Mailpit, demo)</span><span style="color:#5E6763">From</span><span style="font-family:'JetBrains Mono',monospace">mom-bot@medpark.local</span><span style="color:#5E6763">External SMTP</span><span style="color:#A23B2A;font-weight:600">Blocked by policy</span></div>
+    </div>
+    <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-weight:600">n8n workflow · mom-routing</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;font-family:'JetBrains Mono',monospace">
+        <span style="padding:6px 9px;border:1px solid #D9D6CD;border-radius:6px">Webhook</span>→<span style="padding:6px 9px;border:1px solid #D9D6CD;border-radius:6px">Switch: tag</span>→<span style="padding:6px 9px;border:1px solid #D9D6CD;border-radius:6px">Render PDF</span>→<span style="padding:6px 9px;border:1px solid #D9D6CD;border-radius:6px">SMTP</span>→<span style="padding:6px 9px;border:1px solid #D9D6CD;border-radius:6px">Audit log</span>
+      </div>
+      <div style="font-size:12px;color:#5E6763">Last run 14:52:08 · success · 1.8 s</div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ============ ADMIN · SYSTEM ============ -->
+<sc-if value="{{ is.system }}" hint-placeholder-val="{{ false }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">
+    <sc-for list="{{ meters }}" as="m" hint-placeholder-count="4">
+      <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:12px;color:#5E6763;font-weight:600">{{ m.label }}</div>
+        <div style="font-size:22px;font-weight:600;font-family:'JetBrains Mono',monospace">{{ m.value }}</div>
+        <div style="height:5px;background:#EFEDE7;border-radius:3px;overflow:hidden"><div style="height:100%;width:{{ m.pct }};background:#1F5F55"></div></div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;align-items:start">
+    <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;overflow:hidden">
+      <div style="padding:14px 18px;font-weight:600;border-bottom:1px solid #E3E1DA">Local services</div>
+      <sc-for list="{{ services }}" as="s" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:12px;padding:12px 18px;border-bottom:1px solid #F1EFE9;align-items:center">
+          <span style="width:8px;height:8px;border-radius:50%;background:#1F8F6F"></span>
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">{{ s.name }}</span><span style="font-size:12px;color:#5E6763">{{ s.detail }}</span></div>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ s.addr }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="background:#fff;border:1px solid #E3E1DA;border-radius:12px;overflow:hidden">
+      <div style="padding:14px 18px;font-weight:600;border-bottom:1px solid #E3E1DA">Audit log</div>
+      <sc-for list="{{ audit }}" as="a" hint-placeholder-count="7">
+        <div style="display:grid;grid-template-columns:62px minmax(0,1fr);gap:12px;padding:10px 18px;border-bottom:1px solid #F1EFE9;font-size:13px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ a.t }}</span><span>{{ a.e }}</span></div>
+      </sc-for>
+    </div>
+  </div>
+</sc-if>
+
+    </div>
+  </main>
+</div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    auth: true, loginStep: 'creds', code: '', role: 'moderator', screen: 'editor', lang: 'en',
+    filter: 'All', newType: 'Medical', stage: -1, rec: false, recSec: 0, fileName: 'No file selected',
+    rightTab: 'transcript', icdQuery: '', suggestion: 'pending', sent: false,
+    actions: [
+      { text: 'Efectuare PCI cu stent farmacologic pe LAD', owner: 'Dr. Andrei Cebotari', due: '2026-09-28' },
+      { text: 'Hidratare pre-procedurală, monitorizare creatinină 48 h', owner: 'Dr. Natalia Popescu', due: '2026-09-27' },
+      { text: 'Încărcare raport ecocardiografic în SIA', owner: 'Dr. Igor Munteanu', due: '2026-09-25' },
+      { text: 'Verificare interacțiuni DAPT (aspirină + ticagrelor)', owner: 'Olga Sîrbu', due: '2026-09-26' }
+    ],
+    diags: [
+      { code: 'I21.4', label: 'Acute subendocardial myocardial infarction (NSTEMI)', kind: 'Principal' },
+      { code: 'I25.1', label: 'Atherosclerotic heart disease', kind: 'Secondary' }
+    ],
+    attention: ['Clearance creatinină 48 ml/min — risc de nefropatie de contrast; volum minim de contrast.', 'Confirmați alergia la iod înainte de procedură (anamneză incompletă).'],
+    myDone: [false, true, false],
+    contribType: 'Diagnosis', contribText: '',
+    contribs: [{ kind: 'Diagnosis · N18.3', text: 'Chronic kidney disease, stage 3 — relevant for contrast volume.', status: 'Pending review', color: '#8A5A12' }],
+    enforce2fa: true, tplType: 'Medical',
+    tpl: {
+      Medical: [1,1,1,1,1,1,1,1], Executive: [1,1,1,1,0,1,1,1], Administrative: [1,1,0,1,0,1,1,0]
+    },
+    users: [
+      ['Ion Bivol','ion.bivol@medpark.md','IT & Securitate','Admin','On','26.09 08:12'],
+      ['Dr. Elena Rusu','elena.rusu@medpark.md','Cardiologie','Moderator','On','26.09 09:40'],
+      ['Victor Ciobanu','victor.ciobanu@medpark.md','Direcția medicală','Moderator','On','25.09 17:03'],
+      ['Dr. Andrei Cebotari','andrei.cebotari@medpark.md','Chirurgie cardiovasculară','Participant','On','26.09 07:55'],
+      ['Dr. Natalia Popescu','natalia.popescu@medpark.md','ATI','Participant','On','26.09 10:21'],
+      ['Dr. Igor Munteanu','igor.munteanu@medpark.md','Imagistică','Participant','Pending','—'],
+      ['Maria Lungu','maria.lungu@medpark.md','Asistență medicală','Participant','On','24.09 15:10'],
+      ['Olga Sîrbu','olga.sirbu@medpark.md','Farmacie clinică','Participant','On','26.09 08:47']
+    ]
+  };
+
+  I18N = {
+    en: { admin:'Admin', moderator:'Moderator', participant:'Participant', users:'Users & roles', templates:'MoM templates', routing:'Routing & email', system:'System & audit', meetings:'Meetings', new:'New meeting', editor:'MoM editor', mine:'My meetings', actions:'My action items', view:'MoM & contributions', signIn:'Sign in', continue:'Continue', twoFa:'Two-factor verification', verify:'Verify', signOut:'Sign out', cabinet:'cabinet' },
+    ro: { admin:'Administrator', moderator:'Moderator', participant:'Participant', users:'Utilizatori și roluri', templates:'Șabloane MoM', routing:'Rutare și e-mail', system:'Sistem și audit', meetings:'Ședințe', new:'Ședință nouă', editor:'Editor MoM', mine:'Ședințele mele', actions:'Sarcinile mele', view:'MoM și contribuții', signIn:'Autentificare', continue:'Continuă', twoFa:'Verificare în doi pași', verify:'Verifică', signOut:'Ieșire', cabinet:'cabinet' },
+    ru: { admin:'Администратор', moderator:'Модератор', participant:'Участник', users:'Пользователи и роли', templates:'Шаблоны MoM', routing:'Маршрутизация и почта', system:'Система и аудит', meetings:'Совещания', new:'Новое совещание', editor:'Редактор MoM', mine:'Мои совещания', actions:'Мои задачи', view:'MoM и дополнения', signIn:'Вход', continue:'Продолжить', twoFa:'Двухфакторная проверка', verify:'Подтвердить', signOut:'Выйти', cabinet:'кабинет' }
+  };
+  NAV = { admin: ['users','templates','routing','system'], moderator: ['meetings','new','editor'], participant: ['mine','actions','view'] };
+  TYPES = { Medical: ['#E3EEEA','#1F5F55'], Executive: ['#E6E9F5','#3B4A8C'], Administrative: ['#F5ECDC','#8A5A12'] };
+  PEOPLE = [['Dr. Elena Rusu','Cardiologie'],['Dr. Andrei Cebotari','Chirurgie CV'],['Dr. Natalia Popescu','ATI'],['Dr. Igor Munteanu','Imagistică'],['Victor Ciobanu','Dir. medical'],['Olga Sîrbu','Farmacie'],['Maria Lungu','Asistentă șefă']];
+  ICD = [
+    ['I21.4','Acute subendocardial myocardial infarction','Infarct miocardic acut subendocardic · NSTEMI'],
+    ['I25.1','Atherosclerotic heart disease','Cardiopatie aterosclerotică'],
+    ['N18.3','Chronic kidney disease, stage 3','Boală cronică de rinichi, stadiul 3'],
+    ['I50.1','Left ventricular failure','Insuficiență ventriculară stângă'],
+    ['E11.9','Type 2 diabetes mellitus without complications','Diabet zaharat tip 2 · сахарный диабет 2 типа'],
+    ['I10','Essential (primary) hypertension','Hipertensiune arterială esențială · гипертензия'],
+    ['N14.1','Nephropathy induced by other drugs','Nefropatie indusă de medicamente (contrast)'],
+    ['Z95.5','Presence of coronary angioplasty implant and graft','Prezența stentului coronarian'],
+    ['I48.9','Atrial fibrillation, unspecified','Fibrilație atrială · фибрилляция предсердий']
+  ];
+  PIPE = [
+    ['Upload','Audio stored on nas.medpark.local, AES-256','0:04'],
+    ['ASR · Whisper large-v3','int8 · per-segment language ID RO/RU/EN · medical prompt','6:10'],
+    ['Diarization · pyannote 3.1','7 speakers matched to attendee list','1:35'],
+    ['Summarize · Mistral 7B Q4','Decisions, owners, deadlines, ICD-10 → template JSON','3:20'],
+    ['Route · n8n','tag = Medical → Consiliu medical list','0:02'],
+    ['Draft ready','Waiting for moderator approval','—']
+  ];
+
+  seg(opts, cur, fn, dark) {
+    return opts.map(o => { const v = Array.isArray(o) ? o[0] : o, l = Array.isArray(o) ? o[1] : o, on = v === cur;
+      return { label: l, bg: on ? (dark ? '#17201E' : '#fff') : 'transparent', fg: on ? (dark ? '#fff' : '#17201E') : '#5E6763', onClick: () => fn(v) }; });
+  }
+  fmt(d) { const [y,m,dd] = d.split('-'); return dd + '.' + m + '.' + y; }
+  dueColor(d) { return d < '2026-09-26' ? '#A23B2A' : d === '2026-09-26' ? '#8A5A12' : '#17201E'; }
+  go(screen) { this.setState({ screen }); }
+  setRole(role) { this.setState({ role, screen: this.NAV[role][this.NAV[role].length - 1] === 'editor' ? 'editor' : this.NAV[role][0] }); }
+  updAction(i, k, v) { this.setState(s => ({ actions: s.actions.map((a, j) => j === i ? { ...a, [k]: v } : a) })); }
+  startPipe = () => {
+    clearInterval(this.pt);
+    this.setState({ stage: 0, fileName: 'consiliu_cardio_2409.m4a · 58:03' });
+    this.pt = setInterval(() => this.setState(s => { if (s.stage >= 5) { clearInterval(this.pt); return null; } return { stage: s.stage + 1 }; }), 1100);
+  };
+  toggleRec = () => {
+    if (this.state.rec) { clearInterval(this.rt); this.setState({ rec: false }); this.startPipe(); return; }
+    this.setState({ rec: true, recSec: 0 });
+    this.rt = setInterval(() => this.setState(s => ({ recSec: s.recSec + 1 })), 1000);
+  };
+  componentWillUnmount() { clearInterval(this.pt); clearInterval(this.rt); }
+
+  renderVals() {
+    const s = this.state, t = this.I18N[s.lang], T = this.TYPES;
+    const is = {}; ['users','templates','routing','system','meetings','new','editor','mine','actions','view'].forEach(k => is[k] = s.screen === k);
+    const me = { admin: ['IB','Ion Bivol','IT & Securitate'], moderator: ['ER','Dr. Elena Rusu','Cardiologie'], participant: ['NP','Dr. Natalia Popescu','ATI'] }[s.role];
+    const counts = { meetings: '6', actions: '2', view: '', mine: '4', users: '8' };
+    const nav = this.NAV[s.role].map(k => ({ label: t[k], count: counts[k] || '', bg: s.screen === k ? '#2C3A35' : 'transparent', fg: s.screen === k ? '#fff' : '#C3CBC7', onClick: () => this.go(k) }));
+
+    const meetings = [
+      ['Consiliu medical — Cardiologie, caz clinic','Medical','24 Sep 2026','58:03','Awaiting approval · v3','#8A5A12','100%',7,'RO · RU · EN'],
+      ['Comitet executiv — buget T4, achiziții RMN','Executive','26 Sep 2026','72:40','Transcribing · 42%','#3B4A8C','42%',9,'RO · EN'],
+      ['Ședință administrativă — ture ATI, octombrie','Administrative','25 Sep 2026','31:15','Sent · 14 recipients','#1F5F55','100%',6,'RO · RU'],
+      ['Consiliu medical — Oncologie, tumor board','Medical','23 Sep 2026','64:52','Sent · 11 recipients','#1F5F55','100%',8,'RO · EN'],
+      ['Comitet executiv — acreditare JCI','Executive','22 Sep 2026','45:08','Sent · 9 recipients','#1F5F55','100%',7,'RO · RU · EN'],
+      ['Ședință administrativă — circuit deșeuri','Administrative','19 Sep 2026','22:37','Sent · 12 recipients','#1F5F55','100%',5,'RO']
+    ].map(m => ({ title: m[0], type: m[1], tagBg: T[m[1]][0], tagFg: T[m[1]][1], date: m[2], len: m[3], status: m[4], stColor: m[5], pct: m[6], people: m[7], langs: m[8] }));
+
+    const icdQ = s.icdQuery.trim().toLowerCase();
+    const have = new Set(s.diags.map(d => d.code));
+    const icdResults = this.ICD.filter(c => !icdQ || (c.join(' ').toLowerCase().includes(icdQ))).map(c => ({
+      code: c[0], label: c[1], ro: c[2], btn: have.has(c[0]) ? 'Added' : 'Add', btnBg: have.has(c[0]) ? '#E3EEEA' : '#fff',
+      onAdd: () => { if (!have.has(c[0])) this.setState(st => ({ diags: [...st.diags, { code: c[0], label: c[1], kind: 'Secondary' }] })); }
+    }));
+
+    const M = (t) => ({ t, bg: '#E3EEEA', fg: '#17201E' }), N = (t) => ({ t, bg: 'transparent', fg: '#17201E' }), E = (t) => ({ t, bg: '#E6E9F5', fg: '#17201E' }), R = (t) => ({ t, bg: 'transparent', fg: '#3B4A8C' });
+    const transcript = [
+      { who: 'E. Rusu', ts: '00:02:14', langs: ['RO','EN'], parts: [N('Deci, pacientul de 64 de ani, '), M('NSTEMI'), N(' confirmat, '), M('troponina'), N(' a crescut, și avem '), E('follow-up'), N(' după '), M('angiografie'), N('.')] },
+      { who: 'A. Cebotari', ts: '00:03:05', langs: ['RO','RU'], parts: [M('Coronarografia'), N(' arată '), M('stenoză 80% pe LAD'), N(', '), R('честно говоря, я бы не откладывал'), N(', recomand '), M('PCI cu stent'), N('.')] },
+      { who: 'N. Popescu', ts: '00:04:41', langs: ['RU','RO'], parts: [R('По анестезии рисков нет, '), N('dar '), M('clearance-ul la creatinină'), N(' e 48, trebuie hidratare.')] },
+      { who: 'I. Munteanu', ts: '00:06:20', langs: ['RO','EN'], parts: [M('Ecocardiografia'), N(': '), M('FEVS 45%'), N(', '), M('hipokinezie anterioară'), N('. '), E("I'll upload the report by Friday.")] },
+      { who: 'O. Sîrbu', ts: '00:08:02', langs: ['RO'], parts: [M('Dublă antiagregare'), N(': '), M('aspirină'), N(' plus '), M('ticagrelor'), N(', verific interacțiunile până mâine.')] },
+      { who: 'V. Ciobanu', ts: '00:09:37', langs: ['RO','EN'], parts: [N('Ok, '), E('deadline'), N(' pentru PCI — luni, 28 septembrie. '), E('Budget'), N('-ul e aprobat pe '), M('DRG F10A'), N('.')] }
+    ];
+
+    const stage = s.stage;
+    const pipeline = this.PIPE.map((p, i) => ({ name: p[0], detail: p[1], time: stage > i || (stage === 5 && i === 5) ? p[2] : stage === i ? '…' : '',
+      mark: stage > i || (stage === 5 && i === 5) ? '✓' : String(i + 1), dotBg: stage > i || (stage === 5 && i === 5) ? '#1F5F55' : stage === i ? '#8A5A12' : '#C9C5BA', fg: stage >= i ? '#17201E' : '#8E9692' }));
+
+    const mm = String(Math.floor(s.recSec / 60)).padStart(2, '0') + ':' + String(s.recSec % 60).padStart(2, '0');
+
+    const SECTIONS = [['Participants','From directory + diarization'],['Topic & summary','LLM abstract, 80–150 words'],['Points of view','One per speaker, attributed'],['Decisions & action items','Owner, deadline, status'],['Diagnosis, procedures, DRG','ICD-10, ACHI, AR-DRG suggestion'],['Attention points','Risks and open questions'],['Next meeting','Date, place, agenda'],['Budget impact','Amounts and cost centers']];
+    const tplArr = s.tpl[s.tplType];
+
+    const myActions = [
+      ['Hidratare pre-procedurală, monitorizare creatinină 48 h','Consiliu medical — Cardiologie · 24.09','2026-09-27'],
+      ['Actualizare protocol sedare pentru RMN pediatric','Consiliu medical — Oncologie · 23.09','2026-09-22'],
+      ['Propunere grafic ture ATI, octombrie','Ședință administrativă · 25.09','2026-09-30']
+    ].map((a, i) => { const done = s.myDone[i]; return { text: a[0], from: a[1], done, deco: done ? 'line-through' : 'none', fg: done ? '#8E9692' : '#17201E',
+      dueLabel: 'Due ' + this.fmt(a[2]), dueColor: done ? '#8E9692' : this.dueColor(a[2]), state: done ? 'Done' : a[2] < '2026-09-26' ? 'Overdue' : 'Open',
+      onToggle: () => this.setState(st => ({ myDone: st.myDone.map((d, j) => j === i ? !d : d) })) }; });
+
+    const cTypes = ['Diagnosis','Procedure','Point of view','Attention point'];
+    const secMap = { Diagnosis: '5 · Diagnostic (ICD-10)', Procedure: '5 · Proceduri (ACHI)', 'Point of view': '3 · Puncte de vedere', 'Attention point': '6 · De urmărit' };
+
+    return {
+      t, is, me: { initials: me[0], name: me[1], dept: me[2] }, role: s.role,
+      showLogin: !s.auth, showApp: s.auth, stepCreds: s.loginStep === 'creds', stepTwoFa: s.loginStep === '2fa',
+      code: s.code, onCode: e => this.setState({ code: e.target.value.replace(/\D/g, '').slice(0, 6) }),
+      verifyBg: s.code.length === 6 ? '#1F5F55' : '#8E9692',
+      onPickAccount: e => this.setState({ role: e.target.value }),
+      toTwoFa: () => this.setState({ loginStep: '2fa', code: '' }), backToCreds: () => this.setState({ loginStep: 'creds' }),
+      verify: () => { if (s.code.length === 6) { this.setRole(s.role); this.setState({ auth: true, loginStep: 'creds' }); } },
+      signOut: () => this.setState({ auth: false, loginStep: 'creds' }),
+      langs: this.seg([['en','EN'],['ro','RO'],['ru','RU']], s.lang, v => this.setState({ lang: v })),
+      roleLabel: t[s.role] + ' · ' + t.cabinet, title: t[s.screen],
+      nav, roleSwitch: this.seg([['admin','Admin'],['moderator','Mod'],['participant','Part']], s.role, v => this.setRole(v), true).map(r => ({ ...r, bg: r.fg === '#fff' ? '#3E5A52' : 'transparent', fg: r.fg === '#fff' ? '#fff' : '#9AA6A1' })),
+      typeFilters: this.seg(['All','Medical','Executive','Administrative'], s.filter, v => this.setState({ filter: v }), true),
+      meetingsShown: meetings.filter(m => s.filter === 'All' || m.type === s.filter),
+      goNew: () => this.go('new'), goEditor: () => this.go('editor'), goView: () => this.go('view'), goPreview: () => this.setState({ role: 'participant', screen: 'view' }),
+      newTypes: Object.keys(T).map(k => ({ label: k, list: { Medical: 'Consiliu medical · 9', Executive: 'Comitet executiv · 7', Administrative: 'Administrație · 14' }[k], bg: s.newType === k ? T[k][0] : '#fff', fg: T[k][1], border: s.newType === k ? T[k][1] : '#E3E1DA', onClick: () => this.setState({ newType: k }) })),
+      newTemplate: { Medical: 'Consiliu medical v2', Executive: 'Comitet executiv v1', Administrative: 'Administrativ v3' }[s.newType],
+      startUpload: this.startPipe, toggleRec: this.toggleRec, recLabel: s.rec ? 'STOP' : 'REC', recTime: mm,
+      recHint: s.rec ? 'Recording from room microphone…' : 'Record live in the meeting room', fileName: s.fileName,
+      pipeline, pipeDone: stage === 5, pipeEta: stage < 0 ? 'est. 11–13 min / 60 min audio' : stage === 5 ? 'total 11:11' : 'running…',
+      sendBg: s.sent ? '#5E6763' : '#1F5F55', sendLabel: s.sent ? 'Sent ✓' : 'Approve & send',
+      send: () => this.setState({ sent: true }), sentToast: s.sent,
+      suggestionPending: s.suggestion === 'pending',
+      acceptSug: () => this.setState(st => ({ suggestion: 'accepted', diags: st.diags.some(d => d.code === 'N18.3') ? st.diags : [...st.diags, { code: 'N18.3', label: 'Chronic kidney disease, stage 3', kind: 'Secondary' }], attention: [...st.attention, 'Nefropatie de contrast: hidratare IV 12 h pre- și post-procedură (propus de Dr. N. Popescu).'], contribs: st.contribs.map(c => ({ ...c, status: 'Added to MoM', color: '#1F5F55' })) })),
+      rejectSug: () => this.setState(st => ({ suggestion: 'rejected', contribs: st.contribs.map(c => ({ ...c, status: 'Declined', color: '#A23B2A' })) })),
+      people: this.PEOPLE.map(p => ({ name: p[0], dept: p[1] })),
+      views: [
+        ['Dr. Andrei Cebotari','Chirurgie CV','PCI fără amânare; leziunea LAD este semnificativă hemodinamic.'],
+        ['Dr. Natalia Popescu','ATI','Fără contraindicații anestezice; necesară protecție renală.'],
+        ['Dr. Igor Munteanu','Imagistică','FEVS 45%, hipokinezie anterioară; ecocardiografie de control post-PCI.'],
+        ['Olga Sîrbu','Farmacie clinică','DAPT aspirină + ticagrelor, cu verificarea interacțiunilor.']
+      ].map(v => ({ name: v[0], dept: v[1], text: v[2] })),
+      ownerOptions: this.PEOPLE.map(p => p[0]),
+      actionRows: s.actions.map((a, i) => ({ n: String(i + 1).padStart(2, '0'), ...a, dueLabel: this.fmt(a.due), dueColor: this.dueColor(a.due),
+        onText: e => this.updAction(i, 'text', e.target.value), onOwner: e => this.updAction(i, 'owner', e.target.value), onDue: e => this.updAction(i, 'due', e.target.value),
+        onRemove: () => this.setState(st => ({ actions: st.actions.filter((_, j) => j !== i) })) })),
+      addAction: () => this.setState(st => ({ actions: [...st.actions, { text: '', owner: 'Dr. Elena Rusu', due: '2026-10-02' }] })),
+      diagRows: s.diags.map((d, i) => ({ ...d, onRemove: () => this.setState(st => ({ diags: st.diags.filter((_, j) => j !== i) })) })),
+      procs: [{ code: '38218-00', label: 'Coronary angiography', kind: 'Performed' }, { code: '38306-00', label: 'Percutaneous insertion of coronary stent', kind: 'Planned' }],
+      drgWeight: 'RW ' + (2.84 + (s.diags.length - 2) * 0.12).toFixed(2), attention: s.attention,
+      rightTabs: this.seg([['transcript','Transcript'],['codes','ICD-10'],['versions','Versions']], s.rightTab, v => this.setState({ rightTab: v }), true),
+      tabTranscript: s.rightTab === 'transcript', tabCodes: s.rightTab === 'codes', tabVersions: s.rightTab === 'versions',
+      transcript, icdQuery: s.icdQuery, onIcdQuery: e => this.setState({ icdQuery: e.target.value }), icdResults,
+      versions: [{ v: 'v3 · Dr. Elena Rusu', at: '26.09 10:05', what: 'Edited deadline for item 01; added I25.1' }, { v: 'v2 · Dr. Elena Rusu', at: '25.09 09:12', what: 'Rewrote summary; removed duplicate action' }, { v: 'v1 · Mistral 7B', at: '24.09 15:09', what: 'Generated from transcript (11 min 11 s)' }, { v: 'Transcript · Whisper large-v3', at: '24.09 15:06', what: '7 speakers · RO 71% · RU 18% · EN 11%' }],
+      myMeetings: meetings.filter((_, i) => i !== 1 && i !== 4).map((m, i) => ({ ...m, status: m.status.startsWith('Sent') ? 'MoM received' : 'Draft in review', mine: ['1 action item','1 action item','1 action item','No items'][i] })),
+      myActions,
+      contribTypes: cTypes.map(c => ({ label: c, bg: s.contribType === c ? '#E3EEEA' : '#fff', fg: s.contribType === c ? '#1F5F55' : '#3E4744', border: s.contribType === c ? '#1F5F55' : '#D9D6CD', onClick: () => this.setState({ contribType: c }) })),
+      contribIsCode: s.contribType === 'Diagnosis' || s.contribType === 'Procedure',
+      contribText: s.contribText, onContribText: e => this.setState({ contribText: e.target.value }),
+      contribPlaceholder: s.contribType === 'Point of view' ? 'Your position on the case…' : 'Clinical justification…', contribSection: secMap[s.contribType],
+      submitContrib: () => { if (!s.contribText.trim() && !s.icdQuery.trim()) return; this.setState(st => ({ contribs: [{ kind: st.contribType + (st.icdQuery ? ' · ' + st.icdQuery.toUpperCase() : ''), text: st.contribText || '—', status: 'Pending review', color: '#8A5A12' }, ...st.contribs], contribText: '', icdQuery: '' })); },
+      myContribs: s.contribs,
+      enforce2fa: s.enforce2fa, toggleEnforce: () => this.setState({ enforce2fa: !s.enforce2fa }),
+      userRows: s.users.map((u, i) => ({ name: u[0], email: u[1], dept: u[2], role: u[3], ini: u[0].replace('Dr. ', '').split(' ').map(x => x[0]).join(''), fa: u[4] === 'On' ? 'Enabled' : 'Setup pending', faColor: u[4] === 'On' ? '#1F5F55' : '#8A5A12', last: u[5],
+        onRole: e => this.setState(st => ({ users: st.users.map((x, j) => j === i ? [x[0], x[1], x[2], e.target.value, x[4], x[5]] : x) })) })),
+      tplTabs: this.seg(Object.keys(T), s.tplType, v => this.setState({ tplType: v }), true),
+      tplName: { Medical: 'CONSILIU MEDICAL v2', Executive: 'COMITET EXECUTIV v1', Administrative: 'ADMINISTRATIV v3' }[s.tplType],
+      tplRows: SECTIONS.map((x, i) => ({ name: x[0], hint: x[1], fg: tplArr[i] ? '#17201E' : '#8E9692', trackBg: tplArr[i] ? '#1F5F55' : '#C9C5BA', knob: tplArr[i] ? '19px' : '3px',
+        onToggle: () => this.setState(st => ({ tpl: { ...st.tpl, [st.tplType]: st.tpl[st.tplType].map((v, j) => j === i ? (v ? 0 : 1) : v) } })) })),
+      tplPreview: SECTIONS.filter((_, i) => tplArr[i]).map((x, i) => ({ label: (i + 1) + ' · ' + x[0].toUpperCase() })),
+      routes: [
+        { type: 'Medical', list: 'Consiliu medical', count: 9, emails: ['consiliu.medical@medpark.local','sef.sectie.*@medpark.local','+ attendees from diarization'], rule: 'Send after moderator approval · attach PDF + ICD-10 summary' },
+        { type: 'Executive', list: 'Comitet executiv', count: 7, emails: ['board@medpark.local','cfo@medpark.local','director.medical@medpark.local'], rule: 'Send after approval · confidential footer · no transcript attached' },
+        { type: 'Administrative', list: 'Administrație', count: 14, emails: ['admin.staff@medpark.local','hr@medpark.local','+ attendees'], rule: 'Auto-send 15 min after draft if no edits' }
+      ].map(r => ({ ...r, tagBg: T[r.type][0], tagFg: T[r.type][1] })),
+      meters: [{ label: 'GPU memory · RTX A4000 16 GB', value: '11.2 GB', pct: '70%' }, { label: 'System RAM · 32 GB', value: '18.4 GB', pct: '57%' }, { label: 'Queue', value: '1 job', pct: '20%' }, { label: 'Avg. 60 min → email', value: '11:40', pct: '78%' }],
+      services: [
+        { name: 'Whisper large-v3 (faster-whisper, int8)', detail: 'Language ID per segment · medical vocabulary prompt', addr: ':9000' },
+        { name: 'pyannote 3.1 diarization', detail: 'Speaker embeddings matched to directory', addr: ':9001' },
+        { name: 'Mistral 7B Instruct Q4_K_M · llama.cpp', detail: 'Summary, decisions, owners, deadlines, ICD-10', addr: ':8080' },
+        { name: 'n8n self-hosted', detail: 'Workflow mom-routing · 3 branches', addr: ':5678' },
+        { name: 'Mailpit (internal SMTP)', detail: 'Demo relay · production: Exchange on-prem', addr: ':1025' },
+        { name: 'Outbound firewall', detail: 'Egress denied for all pipeline hosts', addr: '0 calls' }
+      ],
+      audit: [
+        { t: '14:52', e: 'MoM 214 approved by E. Rusu · emailed to 9 recipients' },
+        { t: '14:31', e: 'N. Popescu submitted diagnosis N18.3 for MoM 214' },
+        { t: '10:21', e: 'N. Popescu signed in · 2FA TOTP' },
+        { t: '10:05', e: 'MoM 214 edited · v3' },
+        { t: '09:58', e: 'Job 318 started · Comitet executiv (72 min)' },
+        { t: '08:12', e: 'I. Bivol changed role: V. Ciobanu → Moderator' },
+        { t: '08:11', e: 'Failed 2FA attempt · igor.munteanu · workstation WS-B214' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

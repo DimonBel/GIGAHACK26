@@ -13,11 +13,13 @@ env/
 # --- Environment / secrets ---
 .env
 .env.*
+!.env.example
 
 # --- Whisper / VAD models (large, download separately — see README) ---
 models/
 
 # --- Audio / video inputs (large files, may contain patient data) ---
+/server/data/
 *.m4a
 *.mp3
 *.wav
@@ -30,7 +32,7 @@ models/
 # --- Transcription outputs ---
 *_transcript.txt
 *_dialog.txt
-/*.json
+/server/*.json
 *.srt
 *.vtt
 out/
@@ -46,7 +48,5 @@ out/
 *.swp
 
 # --- Benchmark outputs (contain transcripts); the scoring script stays in git ---
-/bench/*
-!/bench/eval_minutes.py
-!/bench/eval_speakers.py
-!/bench/eval_pipeline.py
+/server/bench/*
+!/server/bench/eval_*.py

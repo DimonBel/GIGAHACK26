@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#FAFAF8;color:#17201E;font-family:'Instrument Sans',system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+a{color:#1F5F55}a:hover{color:#17201E}
+input,select,textarea,button{font:inherit;color:inherit}
+textarea{resize:vertical}
+</style>
+</helmet>
+
+<sc-if value="{{ authOut }}" hint-placeholder-val="{{ true }}">
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 20px;gap:32px">
+  <div style="width:100%;max-width:1040px;display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:'Source Serif 4',serif;font-size:24px">Verbal</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763">MEDPARK · ON-PREMISE</span></div>
+    <div style="display:flex;gap:2px;background:#F2F1EC;padding:3px;border-radius:7px">
+      <sc-for list="{{ langs }}" as="l" hint-placeholder-count="3"><button onClick="{{ l.onClick }}" style="border:none;background:{{ l.bg }};color:{{ l.fg }};padding:4px 9px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">{{ l.label }}</button></sc-for>
+    </div>
+  </div>
+
+  <div style="width:100%;max-width:{{ authWidth }};margin-top:4vh;display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;gap:6px;justify-content:center">
+      <sc-for list="{{ authSteps }}" as="st" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:{{ st.fg }}"><span style="width:20px;height:20px;border-radius:50%;background:{{ st.bg }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px">{{ st.n }}</span>{{ st.label }}<span style="width:24px;height:1px;background:#E7E5DF;margin:0 4px"></span></div></sc-for>
+    </div>
+
+    <sc-if value="{{ stepSignin }}" hint-placeholder-val="{{ true }}">
+      <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:32px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:24px;font-weight:600">{{ t.signIn }}</div><div style="color:#5E6763">Hospital directory account (on-prem Active Directory).</div></div>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Email
+          <input value="{{ email }}" onChange="{{ onEmail }}" style="padding:11px 12px;border:1px solid #D9D6CD;border-radius:8px;font-size:14px;font-weight:400;color:#17201E"></input></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Password
+          <input type="password" defaultValue="password123" style="padding:11px 12px;border:1px solid #D9D6CD;border-radius:8px;font-size:14px;font-weight:400"></input></label>
+        <sc-if value="{{ emailUnknown }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:#A23B2A">Account not found in directory.</div></sc-if>
+        <button onClick="{{ doSignin }}" style="padding:12px;border:none;border-radius:8px;background:#1F5F55;color:#fff;font-weight:600;cursor:pointer">{{ t.continue }}</button>
+        <div style="display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid #F0EEE8">
+          <div style="font-size:12px;color:#5E6763">Demo accounts</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <sc-for list="{{ demoAccounts }}" as="d" hint-placeholder-count="4"><button onClick="{{ d.onClick }}" style="border:1px solid {{ d.border }};background:{{ d.bg }};padding:6px 10px;border-radius:999px;font-size:12px;cursor:pointer;display:flex;gap:6px"><b style="font-weight:600">{{ d.name }}</b><span style="color:#5E6763">{{ d.cabs }}</span></button></sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ stepTwoFa }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:32px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:24px;font-weight:600">{{ t.twoFa }}</div><div style="color:#5E6763;line-height:1.5">Enter the 6-digit code from your authenticator app for <b style="color:#17201E">{{ email }}</b>.</div></div>
+        <input value="{{ code }}" onChange="{{ onCode }}" placeholder="••••••" autoFocus style="padding:14px;border:1px solid #D9D6CD;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:28px;letter-spacing:.55em;text-align:center"></input>
+        <label style="display:flex;gap:8px;align-items:center;color:#5E6763;font-size:13px"><input type="checkbox" defaultChecked style="accent-color:#1F5F55"></input>Trust this workstation for 12 hours</label>
+        <button onClick="{{ doVerify }}" style="padding:12px;border:none;border-radius:8px;background:{{ verifyBg }};color:#fff;font-weight:600;cursor:pointer">{{ t.verify }}</button>
+        <div style="display:flex;justify-content:space-between;font-size:13px"><button onClick="{{ toSignin }}" style="background:none;border:none;color:#5E6763;cursor:pointer;padding:0">← Back</button><button onClick="{{ fillBackup }}" style="background:none;border:none;color:#1F5F55;cursor:pointer;padding:0;font-weight:500">Use a backup code</button></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ stepSetup }}" hint-placeholder-val="{{ false }}">
+      <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:32px;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:24px;font-weight:600">Set up two-factor authentication</div><div style="color:#5E6763;line-height:1.5">Required by hospital policy. Scan the code with an authenticator app, then enter the 6-digit code it shows.</div></div>
+        <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+          <div style="width:132px;height:132px;border:1px solid #D9D6CD;border-radius:10px;display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,#F2F1EC 0 6px,#fff 6px 12px);font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763">QR code</div>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0"><div style="font-size:12px;color:#5E6763">Or enter this key manually</div><div style="font-family:'JetBrains Mono',monospace;font-size:14px;background:#F2F1EC;padding:8px 10px;border-radius:6px">JBSW Y3DP EHPK 3PXP</div></div>
+        </div>
+        <input value="{{ code }}" onChange="{{ onCode }}" placeholder="••••••" style="padding:14px;border:1px solid #D9D6CD;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:28px;letter-spacing:.55em;text-align:center"></input>
+        <button onClick="{{ doVerify }}" style="padding:12px;border:none;border-radius:8px;background:{{ verifyBg }};color:#fff;font-weight:600;cursor:pointer">Activate 2FA</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ stepPick }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:6px;text-align:center"><div style="font-size:24px;font-weight:600">{{ t.chooseCabinet }}</div><div style="color:#5E6763">Signed in as {{ me.name }}. You can switch later from the header.</div></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+          <sc-for list="{{ cabinetCards }}" as="c" hint-placeholder-count="3">
+            <button onClick="{{ c.onClick }}" style="text-align:left;border:1px solid #E7E5DF;background:{{ c.bg }};border-radius:14px;padding:22px;cursor:{{ c.cursor }};display:flex;flex-direction:column;gap:10px;opacity:{{ c.op }}">
+              <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:18px;font-weight:600">{{ c.name }}</span><span style="font-size:12px;font-weight:600;color:{{ c.stateFg }}">{{ c.state }}</span></div>
+              <span style="color:#5E6763;line-height:1.5;font-size:13px">{{ c.desc }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+  <div style="margin-top:auto;display:flex;gap:8px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763"><span style="width:7px;height:7px;border-radius:50%;background:#1F8F6F"></span>Internal network only · no external calls</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ authIn }}" hint-placeholder-val="{{ false }}">
+<div style="min-height:100vh;display:flex;flex-direction:column">
+  <header style="background:#fff;border-bottom:1px solid #E7E5DF;position:sticky;top:0;z-index:10">
+    <div style="max-width:1200px;margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:18px;height:60px">
+      <span style="font-family:'Source Serif 4',serif;font-size:22px">Verbal</span>
+      <div style="position:relative">
+        <button onClick="{{ toggleCabMenu }}" style="display:flex;gap:8px;align-items:center;border:1px solid #E7E5DF;background:#FAFAF8;padding:6px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px"><span style="width:8px;height:8px;border-radius:50%;background:{{ cabColor }}"></span>{{ cabName }}<span style="color:#5E6763">▾</span></button>
+        <sc-if value="{{ cabMenuOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:42px;left:0;width:260px;background:#fff;border:1px solid #E7E5DF;border-radius:10px;box-shadow:0 12px 32px rgba(23,32,30,.1);padding:6px;display:flex;flex-direction:column">
+            <sc-for list="{{ cabMenu }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.onClick }}" style="text-align:left;border:none;background:{{ c.bg }};padding:10px;border-radius:7px;cursor:{{ c.cursor }};display:flex;justify-content:space-between;opacity:{{ c.op }}"><span style="font-weight:600">{{ c.name }}</span><span style="font-size:12px;color:#5E6763">{{ c.state }}</span></button></sc-for>
+          </div>
+        </sc-if>
+      </div>
+      <nav style="display:flex;gap:4px;height:100%;overflow-x:auto">
+        <sc-for list="{{ tabs }}" as="n" hint-placeholder-count="3"><button onClick="{{ n.onClick }}" style="border:none;background:none;border-bottom:2px solid {{ n.line }};color:{{ n.fg }};padding:0 12px;cursor:pointer;font-weight:500;white-space:nowrap">{{ n.label }}</button></sc-for>
+      </nav>
+      <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+        <span style="display:flex;gap:6px;align-items:center;font-size:12px;font-weight:600;color:#1F5F55"><span style="width:7px;height:7px;border-radius:50%;background:#1F8F6F"></span>Offline</span>
+        <div style="display:flex;gap:2px;background:#F2F1EC;padding:3px;border-radius:7px">
+          <sc-for list="{{ langs }}" as="l" hint-placeholder-count="3"><button onClick="{{ l.onClick }}" style="border:none;background:{{ l.bg }};color:{{ l.fg }};padding:4px 8px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer">{{ l.label }}</button></sc-for>
+        </div>
+        <div style="position:relative">
+          <button onClick="{{ toggleUserMenu }}" style="width:34px;height:34px;border-radius:50%;border:none;background:#E3EEEA;color:#1F5F55;font-weight:700;font-size:12px;cursor:pointer">{{ me.ini }}</button>
+          <sc-if value="{{ userMenuOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:44px;right:0;width:240px;background:#fff;border:1px solid #E7E5DF;border-radius:10px;box-shadow:0 12px 32px rgba(23,32,30,.1);padding:6px;display:flex;flex-direction:column">
+              <div style="padding:10px;display:flex;flex-direction:column;gap:2px;border-bottom:1px solid #F0EEE8;margin-bottom:4px"><b>{{ me.name }}</b><span style="font-size:12px;color:#5E6763">{{ email }}</span></div>
+              <button onClick="{{ goAccount }}" style="text-align:left;border:none;background:none;padding:9px 10px;border-radius:7px;cursor:pointer">{{ t.account }}</button>
+              <button onClick="{{ goPick }}" style="text-align:left;border:none;background:none;padding:9px 10px;border-radius:7px;cursor:pointer">{{ t.chooseCabinet }}</button>
+              <button onClick="{{ signOut }}" style="text-align:left;border:none;background:none;padding:9px 10px;border-radius:7px;cursor:pointer;color:#A23B2A">{{ t.signOut }}</button>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div style="width:100%;max-width:1200px;margin:0 auto;padding:28px 28px 64px;display:flex;flex-direction:column;gap:22px">
+
+<!-- ===== MEETING LIST (moderator + participant) ===== -->
+<sc-if value="{{ showList }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <sc-for list="{{ typeFilters }}" as="f" hint-placeholder-count="4"><button onClick="{{ f.onClick }}" style="border:1px solid #E7E5DF;background:{{ f.bg }};color:{{ f.fg }};padding:7px 12px;border-radius:999px;font-size:13px;cursor:pointer">{{ f.label }}</button></sc-for>
+    </div>
+    <sc-if value="{{ isMod }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goNew }}" style="border:none;background:#1F5F55;color:#fff;padding:10px 16px;border-radius:8px;font-weight:600;cursor:pointer">+ {{ t.new }}</button></sc-if>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <sc-for list="{{ meetingsShown }}" as="m" hint-placeholder-count="5">
+      <button onClick="{{ m.onOpen }}" style="text-align:left;background:#fff;border:1px solid #E7E5DF;border-radius:12px;padding:16px 18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;cursor:pointer">
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="padding:2px 8px;border-radius:999px;background:{{ m.tagBg }};color:{{ m.tagFg }};font-size:12px;font-weight:600">{{ m.type }}</span><span style="font-weight:600;font-size:15px">{{ m.title }}</span></div>
+          <div style="font-size:13px;color:#5E6763">{{ m.date }} · {{ m.len }} · {{ m.topics }} topics · {{ m.langs }}</div>
+        </div>
+        <span style="font-size:13px;font-weight:600;color:{{ m.stColor }};white-space:nowrap">{{ m.status }}</span>
+      </button>
+    </sc-for>
+  </div>
+</sc-if>
+
+<!-- ===== NEW MEETING ===== -->
+<sc-if value="{{ is.new }}" hint-placeholder-val="{{ false }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px;align-items:start">
+    <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:18px">
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+        <button onClick="{{ startPipe }}" style="border:1.5px dashed #C9C5BA;background:#FAFAF8;border-radius:12px;padding:26px 12px;cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:center"><b>Upload audio</b><span style="font-size:12px;color:#5E6763">.wav .mp3 .m4a</span></button>
+        <button onClick="{{ toggleRec }}" style="border:1px solid #E7E5DF;background:{{ recBg }};border-radius:12px;padding:26px 12px;cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:center"><b style="color:#A23B2A">● {{ recLabel }}</b><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ recTime }}</span></button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:12px;font-weight:600;color:#5E6763">Meeting type</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ newTypes }}" as="nt" hint-placeholder-count="3"><button onClick="{{ nt.onClick }}" style="border:1.5px solid {{ nt.border }};background:{{ nt.bg }};color:{{ nt.fg }};padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer">{{ nt.label }}</button></sc-for></div>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Title
+        <input defaultValue="Consiliu medical — Cardiologie" style="padding:10px 12px;border:1px solid #D9D6CD;border-radius:8px;font-size:14px;font-weight:400;color:#17201E"></input></label>
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Agenda topics (optional, one per line)
+        <textarea rows="3" defaultValue="Caz clinic NSTEMI&#10;Protocol protecție renală&#10;Grafic ture ATI" style="padding:10px 12px;border:1px solid #D9D6CD;border-radius:8px;font-size:14px;font-weight:400;color:#17201E;line-height:1.5"></textarea>
+        <span style="font-weight:400">Leave empty and topics are detected from the transcript.</span></label>
+      <button onClick="{{ startPipe }}" style="border:none;background:#1F5F55;color:#fff;padding:12px;border-radius:8px;font-weight:600;cursor:pointer">Process meeting</button>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;justify-content:space-between;padding-bottom:10px"><b style="font-size:15px">Processing</b><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ pipeEta }}</span></div>
+      <sc-for list="{{ pipeline }}" as="p" hint-placeholder-count="5">
+        <div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #F0EEE8">
+          <span style="width:20px;height:20px;border-radius:50%;background:{{ p.dotBg }};color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ p.mark }}</span>
+          <span style="flex:1;color:{{ p.fg }};font-weight:500">{{ p.name }}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ p.time }}</span>
+        </div>
+      </sc-for>
+      <sc-if value="{{ pipeDone }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goEditor }}" style="margin-top:12px;border:none;background:#17201E;color:#fff;padding:11px;border-radius:8px;font-weight:600;cursor:pointer">Review minutes →</button></sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ===== MINUTES BY TOPIC (moderator edit / participant read) ===== -->
+<sc-if value="{{ showMom }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:#5E6763"><span style="padding:2px 8px;border-radius:999px;background:#E3EEEA;color:#1F5F55;font-weight:600">Medical</span>Proces-verbal nr. 214 · 24.09.2026 · 58 min</div>
+      <div style="font-family:'Source Serif 4',serif;font-size:28px;line-height:1.2">Consiliu medical — Cardiologie</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="font-size:13px;color:{{ momStatusFg }};font-weight:600">{{ momStatus }}</span>
+      <sc-if value="{{ isMod }}" hint-placeholder-val="{{ true }}"><button onClick="{{ send }}" style="border:none;background:{{ sendBg }};color:#fff;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600">{{ sendLabel }}</button></sc-if>
+      <sc-if value="{{ isPart }}" hint-placeholder-val="{{ false }}"><button style="border:1px solid #D9D6CD;background:#fff;padding:9px 14px;border-radius:8px;cursor:pointer">Download PDF</button></sc-if>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+    <aside style="flex:1 1 240px;max-width:300px;min-width:0;display:flex;flex-direction:column;gap:14px;position:sticky;top:84px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#5E6763;padding:0 10px 4px">TOPICS</div>
+        <sc-for list="{{ topicNav }}" as="n" hint-placeholder-count="3">
+          <button onClick="{{ n.onClick }}" style="text-align:left;border:1px solid {{ n.border }};background:{{ n.bg }};padding:10px 12px;border-radius:9px;cursor:pointer;display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:start">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763;padding-top:1px">{{ n.num }}</span>
+            <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="font-weight:600;line-height:1.3">{{ n.title }}</span><span style="font-size:12px;color:{{ n.tagFg }}">{{ n.tag }}</span></span>
+            <span style="font-size:11px;font-weight:700;color:#8A5A12;background:{{ n.sugBg }};border-radius:999px;padding:1px 7px">{{ n.sug }}</span>
+          </button>
+        </sc-for>
+        <sc-if value="{{ isMod }}" hint-placeholder-val="{{ true }}"><button onClick="{{ addTopic }}" style="text-align:left;border:1px dashed #C9C5BA;background:none;padding:9px 12px;border-radius:9px;cursor:pointer;color:#5E6763">+ Add topic</button></sc-if>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#5E6763;padding:0 10px 4px">GENERAL</div>
+        <sc-for list="{{ generalNav }}" as="n" hint-placeholder-count="2"><button onClick="{{ n.onClick }}" style="text-align:left;border:1px solid {{ n.border }};background:{{ n.bg }};padding:10px 12px;border-radius:9px;cursor:pointer;font-weight:600">{{ n.label }}</button></sc-for>
+      </div>
+    </aside>
+
+    <section style="flex:1 1 560px;min-width:0;background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:clamp(20px,3vw,36px);display:flex;flex-direction:column;gap:28px">
+
+      <sc-if value="{{ selTopic }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:240px">
+            <div style="display:flex;gap:10px;align-items:center;font-size:12px;color:#5E6763"><span>Topic {{ cur.num }} of {{ topicCount }}</span><span style="font-family:'JetBrains Mono',monospace">{{ cur.time }}</span><span style="padding:2px 8px;border-radius:999px;background:{{ cur.tagBg }};color:{{ cur.tagFg }};font-weight:600">{{ cur.tag }}</span></div>
+            <sc-if value="{{ viewMode }}" hint-placeholder-val="{{ true }}"><div style="font-family:'Source Serif 4',serif;font-size:26px;line-height:1.2">{{ cur.title }}</div></sc-if>
+            <sc-if value="{{ editMode }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input value="{{ cur.title }}" onChange="{{ cur.onTitle }}" placeholder="Topic title" style="flex:1;min-width:220px;font-family:'Source Serif 4',serif;font-size:22px;padding:8px 10px;border:1px solid #D9D6CD;border-radius:8px"></input>
+                <select value="{{ cur.tag }}" onChange="{{ cur.onTag }}" style="padding:8px 10px;border:1px solid #D9D6CD;border-radius:8px;background:#fff"><option value="Medical">Medical</option><option value="Executive">Executive</option><option value="Administrative">Administrative</option></select>
+              </div>
+            </sc-if>
+          </div>
+          <sc-if value="{{ isMod }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:8px">
+              <sc-if value="{{ editMode }}" hint-placeholder-val="{{ false }}"><button onClick="{{ deleteTopic }}" style="border:1px solid #E7E5DF;background:#fff;color:#A23B2A;padding:8px 12px;border-radius:8px;cursor:pointer">Delete topic</button></sc-if>
+              <button onClick="{{ toggleEdit }}" style="border:1px solid {{ editBtnBorder }};background:{{ editBtnBg }};color:{{ editBtnFg }};padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600">{{ editBtnLabel }}</button>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ modHasSugs }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ cur.sugs }}" as="g" hint-placeholder-count="1">
+              <div style="border:1px solid #E3C88F;background:#FFFBF3;border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+                <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:12px;font-weight:600;color:#8A5A12">Suggestion · {{ g.kind }} · from {{ g.from }}</span><span>{{ g.text }}</span></div>
+                <div style="display:flex;gap:6px"><button onClick="{{ g.onDecline }}" style="border:1px solid #D9D6CD;background:#fff;padding:6px 10px;border-radius:7px;cursor:pointer">Decline</button><button onClick="{{ g.onAccept }}" style="border:none;background:#8A5A12;color:#fff;padding:6px 10px;border-radius:7px;cursor:pointer;font-weight:600">Add</button></div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#1F5F55">SUMMARY</div>
+          <sc-if value="{{ viewMode }}" hint-placeholder-val="{{ true }}"><div style="font-family:'Source Serif 4',serif;font-size:16px;line-height:1.65;text-wrap:pretty">{{ cur.summary }}</div></sc-if>
+          <sc-if value="{{ editMode }}" hint-placeholder-val="{{ false }}"><textarea rows="4" value="{{ cur.summary }}" onChange="{{ cur.onSummary }}" style="border:1px solid #D9D6CD;border-radius:8px;padding:10px 12px;font-family:'Source Serif 4',serif;font-size:15px;line-height:1.6"></textarea></sc-if>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#1F5F55">POINTS OF VIEW</div>
+          <sc-if value="{{ viewMode }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ cur.views }}" as="v" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:2px 16px;padding:10px 0;border-bottom:1px solid #F0EEE8"><b style="font-weight:600">{{ v.name }}</b><span style="font-family:'Source Serif 4',serif;font-size:15.5px;line-height:1.55;grid-column:span 3">{{ v.text }}</span></div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ editMode }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ cur.views }}" as="v" hint-placeholder-count="3">
+              <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+                <select value="{{ v.name }}" onChange="{{ v.onName }}" style="flex:0 1 190px;padding:8px;border:1px solid #D9D6CD;border-radius:8px;background:#fff"><sc-for list="{{ people }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+                <textarea rows="2" value="{{ v.text }}" onChange="{{ v.onText }}" style="flex:1 1 280px;border:1px solid #D9D6CD;border-radius:8px;padding:8px 10px;font-family:'Source Serif 4',serif;font-size:15px;line-height:1.5"></textarea>
+                <button onClick="{{ v.onRemove }}" style="border:none;background:none;color:#8E9692;cursor:pointer;font-size:18px;padding:6px">×</button>
+              </div>
+            </sc-for>
+            <button onClick="{{ cur.addView }}" style="align-self:flex-start;border:1px dashed #C9C5BA;background:none;padding:6px 12px;border-radius:7px;cursor:pointer;color:#5E6763;font-size:13px">+ Add point of view</button>
+          </sc-if>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#1F5F55">DECISIONS &amp; TASKS</div>
+          <sc-if value="{{ viewMode }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ cur.actions }}" as="a" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;padding:10px 0;border-bottom:1px solid #F0EEE8;align-items:baseline">
+                <span style="font-weight:500">{{ a.text }}</span><span style="font-size:13px;font-weight:600;color:{{ a.dueColor }};white-space:nowrap">{{ a.dueLabel }}</span>
+                <span style="font-size:13px;color:#5E6763">{{ a.owner }}</span>
+              </div>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ editMode }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ cur.actions }}" as="a" hint-placeholder-count="3">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <input value="{{ a.text }}" onChange="{{ a.onText }}" placeholder="Decision or task" style="flex:1 1 260px;padding:8px 10px;border:1px solid #D9D6CD;border-radius:8px"></input>
+                <select value="{{ a.owner }}" onChange="{{ a.onOwner }}" style="flex:0 1 190px;padding:8px;border:1px solid #D9D6CD;border-radius:8px;background:#fff"><sc-for list="{{ people }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+                <input type="date" value="{{ a.due }}" onChange="{{ a.onDue }}" style="flex:0 1 150px;padding:7px 8px;border:1px solid #D9D6CD;border-radius:8px"></input>
+                <button onClick="{{ a.onRemove }}" style="border:none;background:none;color:#8E9692;cursor:pointer;font-size:18px;padding:4px">×</button>
+              </div>
+            </sc-for>
+            <button onClick="{{ cur.addAction }}" style="align-self:flex-start;border:1px dashed #C9C5BA;background:none;padding:6px 12px;border-radius:7px;cursor:pointer;color:#5E6763;font-size:13px">+ Add task</button>
+          </sc-if>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#1F5F55">NEEDS ATTENTION</div>
+          <sc-if value="{{ viewMode }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ cur.attention }}" as="x" hint-placeholder-count="1"><div style="padding:10px 12px;background:#F8ECE8;border-radius:8px;color:#6E2519;font-family:'Source Serif 4',serif;font-size:15px">{{ x.text }}</div></sc-for>
+            <sc-if value="{{ cur.noAttention }}" hint-placeholder-val="{{ false }}"><div style="color:#8E9692;font-size:13px">Nothing flagged.</div></sc-if>
+          </sc-if>
+          <sc-if value="{{ editMode }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ cur.attention }}" as="x" hint-placeholder-count="1"><div style="display:flex;gap:8px"><input value="{{ x.text }}" onChange="{{ x.onText }}" style="flex:1;padding:8px 10px;border:1px solid #D9D6CD;border-radius:8px"></input><button onClick="{{ x.onRemove }}" style="border:none;background:none;color:#8E9692;cursor:pointer;font-size:18px">×</button></div></sc-for>
+            <button onClick="{{ cur.addAttention }}" style="align-self:flex-start;border:1px dashed #C9C5BA;background:none;padding:6px 12px;border-radius:7px;cursor:pointer;color:#5E6763;font-size:13px">+ Add attention point</button>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ cur.isMedical }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#1F5F55">DIAGNOSIS · PROCEDURES · DRG</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <sc-for list="{{ cur.codes }}" as="c" hint-placeholder-count="3"><span style="display:flex;gap:8px;align-items:center;border:1px solid #E7E5DF;border-radius:8px;padding:6px 10px"><span style="font-size:11px;color:#5E6763">{{ c.sys }}</span><b style="font-family:'JetBrains Mono',monospace;font-weight:500;color:{{ c.fg }}">{{ c.code }}</b><span style="font-size:13px">{{ c.label }}</span><sc-if value="{{ editMode }}"><button onClick="{{ c.onRemove }}" style="border:none;background:none;color:#8E9692;cursor:pointer;padding:0">×</button></sc-if></span></sc-for>
+              <sc-if value="{{ cur.noCodes }}" hint-placeholder-val="{{ false }}"><span style="color:#8E9692;font-size:13px">No codes yet.</span></sc-if>
+            </div>
+            <sc-if value="{{ editMode }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:4px;border:1px solid #D9D6CD;border-radius:10px;padding:8px">
+                <input value="{{ icdQ }}" onChange="{{ onIcdQ }}" placeholder="Search ICD-10 / ACHI code or term (RO · RU · EN)" style="border:none;outline:none;padding:6px 4px"></input>
+                <sc-for list="{{ icdResults }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.onAdd }}" style="text-align:left;border:none;background:none;padding:7px 4px;border-top:1px solid #F0EEE8;cursor:pointer;display:grid;grid-template-columns:78px minmax(0,1fr) auto;gap:10px"><b style="font-family:'JetBrains Mono',monospace;font-weight:500;color:#1F5F55">{{ r.code }}</b><span>{{ r.label }}</span><span style="font-size:12px;color:#5E6763">{{ r.sys }}</span></button></sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ cur.hasDrg }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:10px;align-items:baseline;padding:10px 12px;background:#F2F1EC;border-radius:8px;flex-wrap:wrap"><span style="font-size:12px;color:#5E6763">DRG</span><b style="font-family:'JetBrains Mono',monospace;font-weight:500">{{ cur.drg }}</b><span style="font-size:13px">{{ cur.drgLabel }}</span></div></sc-if>
+          </div>
+        </sc-if>
+
+        <div style="border-top:1px solid #F0EEE8;padding-top:14px;display:flex;flex-direction:column;gap:10px">
+          <button onClick="{{ toggleTx }}" style="align-self:flex-start;border:none;background:none;padding:0;cursor:pointer;color:#1F5F55;font-weight:600;font-size:13px">{{ txLabel }}</button>
+          <sc-if value="{{ showTx }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ cur.tx }}" as="s" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;font-size:13.5px;line-height:1.55;padding:6px 0">
+                <div style="display:flex;flex-direction:column;gap:2px"><b>{{ s.who }}</b><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5E6763">{{ s.ts }} · {{ s.langs }}</span></div>
+                <div>{{ s.text }}</div>
+              </div>
+            </sc-for>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ isPart }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#FAFAF8;border:1px solid #E7E5DF;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:2px"><b>Suggest an addition to this topic</b><span style="font-size:13px;color:#5E6763">The moderator approves it before it appears in the minutes.</span></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ sugKinds }}" as="k" hint-placeholder-count="4"><button onClick="{{ k.onClick }}" style="border:1px solid {{ k.border }};background:{{ k.bg }};color:{{ k.fg }};padding:6px 11px;border-radius:999px;font-size:13px;cursor:pointer">{{ k.label }}</button></sc-for></div>
+            <textarea rows="3" value="{{ sugText }}" onChange="{{ onSugText }}" placeholder="{{ sugPlaceholder }}" style="border:1px solid #D9D6CD;border-radius:8px;padding:10px 12px;line-height:1.5;background:#fff"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13px;color:#5E6763">{{ mySugNote }}</span><button onClick="{{ submitSug }}" style="border:none;background:#1F5F55;color:#fff;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600">Send to moderator</button></div>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ selParticipants }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Source Serif 4',serif;font-size:26px">Participants</div>
+        <div style="display:flex;flex-direction:column">
+          <sc-for list="{{ attendees }}" as="p" hint-placeholder-count="7">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #F0EEE8">
+              <div style="display:flex;flex-direction:column;gap:2px"><b style="font-weight:600">{{ p.name }}</b><span style="font-size:13px;color:#5E6763">{{ p.dept }} · {{ p.role }}</span></div>
+              <button onClick="{{ p.onToggle }}" style="border:1px solid #E7E5DF;background:{{ p.bg }};color:{{ p.fg }};padding:5px 12px;border-radius:999px;font-size:12px;font-weight:600;cursor:{{ p.cursor }}">{{ p.state }}</button>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ selNext }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Source Serif 4',serif;font-size:26px">Next meeting</div>
+        <sc-if value="{{ isMod }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+            <input type="date" value="{{ next.date }}" onChange="{{ next.onDate }}" style="padding:9px;border:1px solid #D9D6CD;border-radius:8px"></input>
+            <input type="time" value="{{ next.time }}" onChange="{{ next.onTime }}" style="padding:9px;border:1px solid #D9D6CD;border-radius:8px"></input>
+            <input value="{{ next.place }}" onChange="{{ next.onPlace }}" style="padding:9px 12px;border:1px solid #D9D6CD;border-radius:8px"></input>
+          </div>
+          <textarea rows="3" value="{{ next.agenda }}" onChange="{{ next.onAgenda }}" style="border:1px solid #D9D6CD;border-radius:8px;padding:10px 12px;font-family:'Source Serif 4',serif;font-size:15px;line-height:1.6"></textarea>
+        </sc-if>
+        <sc-if value="{{ isPart }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:6px"><b style="font-size:16px">{{ next.dateLabel }}, {{ next.time }} · {{ next.place }}</b><div style="font-family:'Source Serif 4',serif;font-size:16px;line-height:1.6">{{ next.agenda }}</div></div>
+        </sc-if>
+      </sc-if>
+    </section>
+  </div>
+</sc-if>
+
+<!-- ===== PARTICIPANT TASKS ===== -->
+<sc-if value="{{ is.tasks }}" hint-placeholder-val="{{ false }}">
+  <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;overflow:hidden;max-width:860px">
+    <sc-for list="{{ myTasks }}" as="a" hint-placeholder-count="3">
+      <label style="display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:14px;padding:16px 20px;border-bottom:1px solid #F0EEE8;align-items:center;cursor:pointer">
+        <input type="checkbox" checked="{{ a.done }}" onChange="{{ a.onToggle }}" style="width:18px;height:18px;accent-color:#1F5F55"></input>
+        <span style="display:flex;flex-direction:column;gap:3px"><span style="font-weight:500;text-decoration:{{ a.deco }};color:{{ a.fg }}">{{ a.text }}</span><span style="font-size:12px;color:#5E6763">{{ a.from }}</span></span>
+        <span style="font-size:13px;font-weight:600;color:{{ a.dueColor }}">{{ a.dueLabel }}</span>
+      </label>
+    </sc-for>
+  </div>
+</sc-if>
+
+<!-- ===== ADMIN · USERS ===== -->
+<sc-if value="{{ is.users }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+    <input placeholder="Search people" style="padding:9px 12px;border:1px solid #D9D6CD;border-radius:8px;background:#fff;width:280px;max-width:100%"></input>
+    <button style="border:none;background:#1F5F55;color:#fff;padding:10px 16px;border-radius:8px;font-weight:600;cursor:pointer">+ Add from directory</button>
+  </div>
+  <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;overflow:hidden">
+    <sc-for list="{{ userRows }}" as="u" hint-placeholder-count="7">
+      <div style="display:flex;gap:14px;padding:14px 18px;border-bottom:1px solid #F0EEE8;align-items:center;flex-wrap:wrap">
+        <div style="flex:1 1 240px;display:flex;flex-direction:column;gap:2px;min-width:0"><b style="font-weight:600">{{ u.name }}</b><span style="font-size:12px;color:#5E6763">{{ u.email }} · {{ u.dept }}</span></div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <sc-for list="{{ u.roles }}" as="r"><button onClick="{{ r.onClick }}" style="border:1px solid {{ r.border }};background:{{ r.bg }};color:{{ r.fg }};padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer">{{ r.label }}</button></sc-for>
+        </div>
+        <span style="flex:0 0 110px;font-size:12px;font-weight:600;color:{{ u.faColor }}">{{ u.fa }}</span>
+        <button onClick="{{ u.onReset }}" style="border:1px solid #E7E5DF;background:#fff;padding:6px 10px;border-radius:7px;font-size:12px;cursor:pointer">Reset 2FA</button>
+      </div>
+    </sc-for>
+  </div>
+  <div style="font-size:12px;color:#5E6763">Click a role chip to grant or remove access to that cabinet.</div>
+</sc-if>
+
+<!-- ===== ADMIN · PERMISSIONS ===== -->
+<sc-if value="{{ is.roles }}" hint-placeholder-val="{{ false }}">
+  <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;overflow:auto">
+    <div style="display:grid;grid-template-columns:minmax(220px,1fr) repeat(3,110px);min-width:560px">
+      <div style="padding:14px 18px;font-size:12px;font-weight:600;color:#5E6763;border-bottom:1px solid #E7E5DF">Permission</div>
+      <div style="padding:14px 0;font-size:12px;font-weight:600;color:#5E6763;border-bottom:1px solid #E7E5DF;text-align:center">Admin</div>
+      <div style="padding:14px 0;font-size:12px;font-weight:600;color:#5E6763;border-bottom:1px solid #E7E5DF;text-align:center">Moderator</div>
+      <div style="padding:14px 0;font-size:12px;font-weight:600;color:#5E6763;border-bottom:1px solid #E7E5DF;text-align:center">Participant</div>
+      <sc-for list="{{ permRows }}" as="p" hint-placeholder-count="8">
+        <div style="padding:12px 18px;border-bottom:1px solid #F0EEE8">{{ p.label }}</div>
+        <sc-for list="{{ p.cells }}" as="c"><div style="border-bottom:1px solid #F0EEE8;display:flex;justify-content:center;align-items:center"><input type="checkbox" checked="{{ c.on }}" onChange="{{ c.onToggle }}" style="width:17px;height:17px;accent-color:#1F5F55"></input></div></sc-for>
+      </sc-for>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ===== ADMIN · SECURITY ===== -->
+<sc-if value="{{ is.security }}" hint-placeholder-val="{{ false }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start">
+    <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:18px">
+      <b style="font-size:15px">Two-factor authentication</b>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:12px;font-weight:600;color:#5E6763">Required for</span>
+        <div style="display:flex;gap:2px;background:#F2F1EC;padding:3px;border-radius:8px;flex-wrap:wrap"><sc-for list="{{ policyOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="flex:1;border:none;background:{{ o.bg }};color:{{ o.fg }};padding:7px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">{{ o.label }}</button></sc-for></div>
+      </div>
+      <div style="display:flex;flex-direction:column"><span style="font-size:12px;font-weight:600;color:#5E6763;padding-bottom:4px">Allowed methods</span>
+        <sc-for list="{{ methodRows }}" as="m" hint-placeholder-count="3">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0EEE8"><span style="display:flex;flex-direction:column;gap:1px"><span style="font-weight:500">{{ m.label }}</span><span style="font-size:12px;color:#5E6763">{{ m.hint }}</span></span>
+            <button onClick="{{ m.onToggle }}" style="width:38px;height:22px;border-radius:11px;border:none;background:{{ m.track }};position:relative;cursor:pointer;padding:0;flex-shrink:0"><span style="position:absolute;top:3px;left:{{ m.knob }};width:16px;height:16px;border-radius:50%;background:#fff"></span></button></div>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Session timeout<select style="padding:8px;border:1px solid #D9D6CD;border-radius:8px;background:#fff;font-weight:400;color:#17201E"><option>30 minutes</option><option>1 hour</option><option>4 hours</option></select></label>
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#5E6763">Lock after<select style="padding:8px;border:1px solid #D9D6CD;border-radius:8px;background:#fff;font-weight:400;color:#17201E"><option>5 failed attempts</option><option>3 failed attempts</option></select></label>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:6px">
+      <b style="font-size:15px;padding-bottom:8px">Security events</b>
+      <sc-for list="{{ audit }}" as="a" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;padding:8px 0;border-bottom:1px solid #F0EEE8;font-size:13px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ a.t }}</span><span style="color:{{ a.fg }}">{{ a.e }}</span></div></sc-for>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ===== ADMIN · TEMPLATES ===== -->
+<sc-if value="{{ is.templates }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ tplTabs }}" as="f" hint-placeholder-count="3"><button onClick="{{ f.onClick }}" style="border:1px solid #E7E5DF;background:{{ f.bg }};color:{{ f.fg }};padding:7px 14px;border-radius:999px;font-size:13px;cursor:pointer">{{ f.label }}</button></sc-for></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start">
+    <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:22px;display:flex;flex-direction:column">
+      <b style="font-size:15px">Blocks inside every topic</b>
+      <span style="font-size:13px;color:#5E6763;padding:4px 0 8px">The local LLM fills these for each detected topic.</span>
+      <sc-for list="{{ tplRows }}" as="s" hint-placeholder-count="6">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #F0EEE8"><span style="font-weight:500;color:{{ s.fg }}">{{ s.name }}</span>
+          <button onClick="{{ s.onToggle }}" style="width:38px;height:22px;border-radius:11px;border:none;background:{{ s.track }};position:relative;cursor:pointer;padding:0"><span style="position:absolute;top:3px;left:{{ s.knob }};width:16px;height:16px;border-radius:50%;background:#fff"></span></button></div>
+      </sc-for>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:12px">
+      <b style="font-size:15px">Preview</b>
+      <div style="display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #F0EEE8;border-radius:10px">
+        <div style="font-family:'Source Serif 4',serif;font-size:18px">Topic 1 · …</div>
+        <sc-for list="{{ tplPreview }}" as="p" hint-placeholder-count="5"><div style="display:flex;flex-direction:column;gap:5px"><span style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#1F5F55">{{ p }}</span><span style="height:7px;background:#F2F1EC;border-radius:4px;width:85%"></span></div></sc-for>
+      </div>
+      <span style="font-size:12px;color:#5E6763">General sections: Participants, Next meeting.</span>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ===== ADMIN · ROUTING ===== -->
+<sc-if value="{{ is.routing }}" hint-placeholder-val="{{ false }}">
+  <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;overflow:hidden">
+    <sc-for list="{{ routes }}" as="r" hint-placeholder-count="3">
+      <div style="display:flex;gap:16px;padding:18px;border-bottom:1px solid #F0EEE8;align-items:center;flex-wrap:wrap">
+        <span style="padding:3px 10px;border-radius:999px;background:{{ r.tagBg }};color:{{ r.tagFg }};font-size:12px;font-weight:600;flex:0 0 auto">{{ r.type }}</span>
+        <div style="flex:1 1 260px;display:flex;flex-direction:column;gap:3px;min-width:0"><b style="font-weight:600">{{ r.list }} · {{ r.count }} recipients</b><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#5E6763">{{ r.emails }}</span></div>
+        <span style="flex:0 1 260px;font-size:13px;color:#5E6763">{{ r.rule }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;font-size:13px;color:#5E6763;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;color:#17201E">smtp://mail.medpark.local:1025</span>· n8n workflow mom-routing · external SMTP blocked</div>
+</sc-if>
+
+<!-- ===== ACCOUNT ===== -->
+<sc-if value="{{ is.account }}" hint-placeholder-val="{{ false }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;max-width:960px">
+    <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:14px">
+      <b style="font-size:15px">Profile</b>
+      <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;font-size:13px"><span style="color:#5E6763">Name</span><span>{{ me.name }}</span><span style="color:#5E6763">Email</span><span>{{ email }}</span><span style="color:#5E6763">Department</span><span>{{ me.dept }}</span><span style="color:#5E6763">Cabinets</span><span>{{ me.cabList }}</span></div>
+    </div>
+    <div style="background:#fff;border:1px solid #E7E5DF;border-radius:14px;padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:15px">Two-factor authentication</b><span style="font-size:12px;font-weight:600;color:#1F5F55">Enabled</span></div>
+      <div style="font-size:13px;color:#5E6763">Authenticator app · added 12.03.2026</div>
+      <button onClick="{{ toggleBackup }}" style="align-self:flex-start;border:1px solid #D9D6CD;background:#fff;padding:8px 12px;border-radius:8px;cursor:pointer">{{ backupLabel }}</button>
+      <sc-if value="{{ showBackup }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;font-family:'JetBrains Mono',monospace;font-size:13px;background:#F2F1EC;padding:12px;border-radius:8px"><span>4821-9930</span><span>7712-0458</span><span>3306-8124</span><span>9051-6677</span><span>1289-4410</span><span>6634-2071</span></div>
+      </sc-if>
+      <div style="display:flex;flex-direction:column;padding-top:6px"><span style="font-size:12px;font-weight:600;color:#5E6763;padding-bottom:4px">Active sessions</span>
+        <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="2"><div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #F0EEE8;font-size:13px"><span>{{ s.label }}</span><button onClick="{{ s.onRevoke }}" style="border:none;background:none;color:{{ s.fg }};cursor:pointer;font-size:12px;font-weight:600">{{ s.action }}</button></div></sc-for>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+  </div>
+</div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    step: 'signin', email: 'elena.rusu@medpark.md', code: '', emailUnknown: false,
+    cabinet: 'moderator', screen: 'editor', lang: 'en', menu: null,
+    sel: 0, editing: false, showTx: false, icdQ: '', filter: 'All', newType: 'Medical', stage: -1, rec: false, recSec: 0,
+    sugKind: 'Point of view', sugText: '', mySugs: 0, sent: false, tasksDone: [false, true, false],
+    absent: [], backup: false, policy: 'all', methods: [1, 1, 0], tplType: 'Medical',
+    tpl: { Medical: [1,1,1,1,1,0], Executive: [1,1,1,1,0,1], Administrative: [1,0,1,1,0,0] },
+    revoked: [],
+    next: { date: '2026-10-02', time: '14:00', place: 'Sala de consilii, bloc B', agenda: 'Evaluare post-PCI: ecocardiografie de control, funcție renală, toleranța la DAPT. Aprobarea protocolului de protecție renală.' },
+    perms: [[1,0,0],[1,1,0],[1,1,0],[1,1,0],[1,1,1],[1,1,1],[1,1,0],[1,0,0],[1,0,0]],
+    users: [
+      ['Ion Bivol','ion.bivol@medpark.md','IT & Securitate',['admin','moderator'],'on'],
+      ['Dr. Elena Rusu','elena.rusu@medpark.md','Cardiologie',['moderator','participant'],'on'],
+      ['Victor Ciobanu','victor.ciobanu@medpark.md','Direcția medicală',['moderator'],'on'],
+      ['Dr. Andrei Cebotari','andrei.cebotari@medpark.md','Chirurgie CV',['participant'],'on'],
+      ['Dr. Natalia Popescu','natalia.popescu@medpark.md','ATI',['participant'],'on'],
+      ['Dr. Igor Munteanu','igor.munteanu@medpark.md','Imagistică',['participant'],'setup'],
+      ['Olga Sîrbu','olga.sirbu@medpark.md','Farmacie clinică',['participant'],'on']
+    ],
+    topics: [
+      { title: 'Caz clinic: pacient M., 64 ani, NSTEMI', tag: 'Medical', time: '00:01–00:24',
+        summary: 'Pacient internat cu NSTEMI confirmat, troponină în creștere. Coronarografia arată stenoză de 80% pe LAD. Consiliul a decis PCI cu stent, cu protecție renală și dublă antiagregare.',
+        views: [{ name: 'Dr. Andrei Cebotari', text: 'PCI fără amânare; leziunea LAD este semnificativă hemodinamic.' }, { name: 'Dr. Natalia Popescu', text: 'Fără contraindicații anestezice; ClCr 48 ml/min, necesară hidratare.' }, { name: 'Dr. Igor Munteanu', text: 'FEVS 45%, hipokinezie anterioară; control ecografic post-PCI.' }],
+        actions: [{ text: 'Efectuare PCI cu stent farmacologic pe LAD', owner: 'Dr. Andrei Cebotari', due: '2026-09-28' }, { text: 'Încărcare raport ecocardiografic în SIA', owner: 'Dr. Igor Munteanu', due: '2026-09-25' }, { text: 'Verificare interacțiuni DAPT (aspirină + ticagrelor)', owner: 'Olga Sîrbu', due: '2026-09-26' }],
+        attention: ['Confirmați alergia la iod înainte de procedură.'],
+        codes: [['ICD-10','I21.4','Acute subendocardial MI (NSTEMI)'], ['ICD-10','I25.1','Atherosclerotic heart disease'], ['ACHI','38218-00','Coronary angiography'], ['ACHI','38306-00','Percutaneous insertion of coronary stent']],
+        drg: 'F10A', drgLabel: 'Interventional coronary procedures with AMI, major complexity',
+        sugs: [{ from: 'Dr. Natalia Popescu', kind: 'Diagnosis', text: 'N18.3 — Chronic kidney disease, stage 3', code: ['ICD-10','N18.3','Chronic kidney disease, stage 3'] }],
+        tx: [['E. Rusu','00:02:14','RO·EN','Deci, pacientul de 64 de ani, NSTEMI confirmat, troponina a crescut, și avem follow-up după angiografie.'], ['A. Cebotari','00:03:05','RO·RU','Coronarografia arată stenoză 80% pe LAD, честно говоря, я бы не откладывал, recomand PCI cu stent.'], ['N. Popescu','00:04:41','RU·RO','По анестезии рисков нет, dar clearance-ul la creatinină e 48, trebuie hidratare.'], ['I. Munteanu','00:06:20','RO·EN',"Ecocardiografia: FEVS 45%, hipokinezie anterioară. I'll upload the report by Friday."]] },
+      { title: 'Protocol de protecție renală la contrast', tag: 'Medical', time: '00:24–00:41',
+        summary: 'Se propune un protocol unic pentru pacienții cu ClCr sub 60 ml/min: hidratare IV 12 h pre- și post-procedură și limitarea volumului de contrast.',
+        views: [{ name: 'Dr. Natalia Popescu', text: 'Protocolul trebuie să fie obligatoriu în ATI și cardiologie intervențională.' }, { name: 'Olga Sîrbu', text: 'Sistăm AINS și metformin cu 48 h înainte de procedură.' }],
+        actions: [{ text: 'Redactare protocol, versiunea 1', owner: 'Dr. Natalia Popescu', due: '2026-10-01' }, { text: 'Listă de medicamente de sistat peri-procedural', owner: 'Olga Sîrbu', due: '2026-09-30' }],
+        attention: ['Necesită aprobarea Direcției medicale înainte de implementare.'],
+        codes: [['ICD-10','N14.1','Nephropathy induced by other drugs']], drg: '', drgLabel: '', sugs: [],
+        tx: [['N. Popescu','00:25:10','RO','Propun un protocol unic pentru toți pacienții cu clearance sub 60.'], ['O. Sîrbu','00:27:48','RO·RU','Metforminul îl oprim, и НПВС тоже, cu 48 de ore înainte.']] },
+      { title: 'Grafic ture ATI, octombrie', tag: 'Administrative', time: '00:41–00:58',
+        summary: 'Deficit de două asistente pe tura de noapte în săptămânile 2–3. Se redistribuie personal din blocul operator, cu ore suplimentare aprobate.',
+        views: [{ name: 'Maria Lungu', text: 'Redistribuirea este posibilă doar cu acordul șefului de bloc operator.' }, { name: 'Victor Ciobanu', text: 'Aprob ore suplimentare pentru două săptămâni.' }],
+        actions: [{ text: 'Grafic final ture ATI, octombrie', owner: 'Maria Lungu', due: '2026-09-29' }],
+        attention: [], codes: [], drg: '', drgLabel: '', sugs: [],
+        tx: [['M. Lungu','00:42:03','RO·EN','Avem gap pe night shift în săptămânile doi și trei.'], ['V. Ciobanu','00:47:30','RO','Aprob orele suplimentare, două săptămâni.']] }
+    ]
+  };
+
+  I18N = {
+    en: { admin:'Admin', moderator:'Moderator', participant:'Participant', meetings:'Meetings', new:'New meeting', editor:'Minutes', moms:'My minutes', read:'Minutes', tasks:'My tasks', users:'Users', roles:'Permissions', security:'Security', templates:'Templates', routing:'Routing', account:'Account & security', signIn:'Sign in', continue:'Continue', twoFa:'Two-factor verification', verify:'Verify', signOut:'Sign out', chooseCabinet:'Choose a cabinet' },
+    ro: { admin:'Administrator', moderator:'Moderator', participant:'Participant', meetings:'Ședințe', new:'Ședință nouă', editor:'Proces-verbal', moms:'Procesele mele', read:'Proces-verbal', tasks:'Sarcinile mele', users:'Utilizatori', roles:'Permisiuni', security:'Securitate', templates:'Șabloane', routing:'Rutare', account:'Cont și securitate', signIn:'Autentificare', continue:'Continuă', twoFa:'Verificare în doi pași', verify:'Verifică', signOut:'Ieșire', chooseCabinet:'Alegeți cabinetul' },
+    ru: { admin:'Администратор', moderator:'Модератор', participant:'Участник', meetings:'Совещания', new:'Новое совещание', editor:'Протокол', moms:'Мои протоколы', read:'Протокол', tasks:'Мои задачи', users:'Пользователи', roles:'Права', security:'Безопасность', templates:'Шаблоны', routing:'Маршрутизация', account:'Аккаунт и безопасность', signIn:'Вход', continue:'Продолжить', twoFa:'Двухфакторная проверка', verify:'Подтвердить', signOut:'Выйти', chooseCabinet:'Выберите кабинет' }
+  };
+  TABS = { admin: ['users','roles','security','templates','routing'], moderator: ['meetings','new','editor'], participant: ['moms','read','tasks'] };
+  HOME = { admin: 'users', moderator: 'editor', participant: 'read' };
+  CAB_COLOR = { admin: '#17201E', moderator: '#1F5F55', participant: '#8A5A12' };
+  CAB_DESC = { admin: 'Users, cabinet access, permissions, 2FA policy, templates and email routing.', moderator: 'Record or upload meetings, edit minutes topic by topic, approve and send.', participant: 'Read minutes, track your tasks, suggest additions to a topic.' };
+  TYPES = { Medical: ['#E3EEEA','#1F5F55'], Executive: ['#E6E9F5','#3B4A8C'], Administrative: ['#F5ECDC','#8A5A12'] };
+  PEOPLE = [['Dr. Elena Rusu','Cardiologie','Moderator'],['Dr. Andrei Cebotari','Chirurgie CV','Participant'],['Dr. Natalia Popescu','ATI','Participant'],['Dr. Igor Munteanu','Imagistică','Participant'],['Victor Ciobanu','Direcția medicală','Participant'],['Olga Sîrbu','Farmacie clinică','Participant'],['Maria Lungu','Asistentă șefă','Participant']];
+  CATALOG = [['ICD-10','I21.4','Acute subendocardial MI (NSTEMI)','infarct miocardic инфаркт'],['ICD-10','I25.1','Atherosclerotic heart disease','cardiopatie ateroscleroza'],['ICD-10','N18.3','Chronic kidney disease, stage 3','boala cronica rinichi почечная'],['ICD-10','N14.1','Nephropathy induced by other drugs','nefropatie contrast'],['ICD-10','I10','Essential hypertension','hipertensiune гипертензия'],['ICD-10','E11.9','Type 2 diabetes mellitus','diabet диабет'],['ICD-10','I48.9','Atrial fibrillation, unspecified','fibrilatie фибрилляция'],['ACHI','38218-00','Coronary angiography','coronarografie коронарография'],['ACHI','38306-00','Percutaneous insertion of coronary stent','stent PCI'],['ACHI','55113-00','Ultrasound of heart (echocardiography)','ecocardiografie эхо']];
+  PIPE = [['Upload to internal storage','0:04'],['Transcription · Whisper, RO/RU/EN','6:10'],['Speaker labels · pyannote','1:35'],['Topics & minutes · local LLM','3:20'],['Routing · n8n','0:02']];
+
+  get acct() {
+    const A = { 'elena.rusu@medpark.md': ['Dr. Elena Rusu','ER','Cardiologie',['moderator','participant']], 'ion.bivol@medpark.md': ['Ion Bivol','IB','IT & Securitate',['admin','moderator']], 'natalia.popescu@medpark.md': ['Dr. Natalia Popescu','NP','ATI',['participant']], 'igor.munteanu@medpark.md': ['Dr. Igor Munteanu','IM','Imagistică',['participant'],true] };
+    return A[this.state.email.trim().toLowerCase()];
+  }
+  seg(opts, cur, fn) { return opts.map(o => { const [v, l] = Array.isArray(o) ? o : [o, o]; const on = v === cur; return { label: l, bg: on ? '#fff' : 'transparent', fg: on ? '#17201E' : '#5E6763', onClick: () => fn(v) }; }); }
+  pill(opts, cur, fn) { return opts.map(o => { const on = o === cur; return { label: o, bg: on ? '#17201E' : '#fff', fg: on ? '#fff' : '#3E4744', onClick: () => fn(o) }; }); }
+  fmt(d) { if (!d) return '—'; const [y, m, dd] = d.split('-'); return dd + '.' + m + '.' + y; }
+  dueColor(d) { return d < '2026-09-26' ? '#A23B2A' : d === '2026-09-26' ? '#8A5A12' : '#3E4744'; }
+  enter(cab) { this.setState({ step: 'in', cabinet: cab, screen: this.HOME[cab], menu: null, editing: false }); }
+  updTopic(fn) { this.setState(s => ({ topics: s.topics.map((t, i) => i === s.sel ? fn(t) : t) })); }
+  updItem(key, j, patch) { this.updTopic(t => ({ ...t, [key]: t[key].map((x, k) => k === j ? (typeof x === 'string' ? patch : { ...x, ...patch }) : x) })); }
+  delItem(key, j) { this.updTopic(t => ({ ...t, [key]: t[key].filter((_, k) => k !== j) })); }
+  startPipe = () => { clearInterval(this.pt); this.setState({ stage: 0 }); this.pt = setInterval(() => this.setState(s => { if (s.stage >= 5) { clearInterval(this.pt); return null; } return { stage: s.stage + 1 }; }), 900); };
+  toggleRec = () => { if (this.state.rec) { clearInterval(this.rt); this.setState({ rec: false }); this.startPipe(); return; } this.setState({ rec: true, recSec: 0 }); this.rt = setInterval(() => this.setState(s => ({ recSec: s.recSec + 1 })), 1000); };
+  componentWillUnmount() { clearInterval(this.pt); clearInterval(this.rt); }
+
+  renderVals() {
+    const s = this.state, t = this.I18N[s.lang], T = this.TYPES, acct = this.acct || ['—','—','—',[]];
+    const cabs = acct[3];
+    const is = {}; ['meetings','new','editor','moms','read','tasks','users','roles','security','templates','routing','account'].forEach(k => is[k] = s.screen === k);
+    const isMod = s.cabinet === 'moderator', isPart = s.cabinet === 'participant';
+    const cabItem = c => { const has = cabs.includes(c); return { name: t[c], desc: this.CAB_DESC[c], state: has ? (c === s.cabinet && s.step === 'in' ? 'Current' : 'Open →') : 'No access', stateFg: has ? '#1F5F55' : '#8E9692', op: has ? 1 : 0.55, cursor: has ? 'pointer' : 'not-allowed', bg: has ? '#fff' : '#FAFAF8', onClick: () => has && this.enter(c) }; };
+
+    const meetings = [
+      ['Consiliu medical — Cardiologie','Medical','24.09.2026','58 min',3,'Awaiting approval','#8A5A12','RO · RU · EN'],
+      ['Comitet executiv — buget T4','Executive','26.09.2026','72 min',4,'Transcribing 42%','#3B4A8C','RO · EN'],
+      ['Ședință administrativă — ture ATI','Administrative','25.09.2026','31 min',2,'Sent','#1F5F55','RO · RU'],
+      ['Consiliu medical — Oncologie','Medical','23.09.2026','65 min',5,'Sent','#1F5F55','RO · EN'],
+      ['Comitet executiv — acreditare JCI','Executive','22.09.2026','45 min',3,'Sent','#1F5F55','RO · RU · EN']
+    ].map(m => ({ title: m[0], type: m[1], tagBg: T[m[1]][0], tagFg: T[m[1]][1], date: m[2], len: m[3], topics: m[4], status: m[5], stColor: m[6], langs: m[7], onOpen: () => this.setState({ screen: isMod ? 'editor' : 'read', sel: 0 }) }));
+
+    const selIsTopic = typeof s.sel === 'number' && s.topics[s.sel];
+    const tp = selIsTopic ? s.topics[s.sel] : null;
+    const editMode = isMod && s.editing && !!tp;
+    let cur = {};
+    if (tp) {
+      cur = {
+        num: s.sel + 1, title: tp.title, tag: tp.tag, tagBg: T[tp.tag][0], tagFg: T[tp.tag][1], time: tp.time, summary: tp.summary,
+        onTitle: e => this.updTopic(x => ({ ...x, title: e.target.value })), onTag: e => this.updTopic(x => ({ ...x, tag: e.target.value })), onSummary: e => this.updTopic(x => ({ ...x, summary: e.target.value })),
+        views: tp.views.map((v, j) => ({ ...v, onName: e => this.updItem('views', j, { name: e.target.value }), onText: e => this.updItem('views', j, { text: e.target.value }), onRemove: () => this.delItem('views', j) })),
+        addView: () => this.updTopic(x => ({ ...x, views: [...x.views, { name: 'Dr. Elena Rusu', text: '' }] })),
+        actions: tp.actions.map((a, j) => ({ ...a, dueLabel: this.fmt(a.due), dueColor: this.dueColor(a.due), onText: e => this.updItem('actions', j, { text: e.target.value }), onOwner: e => this.updItem('actions', j, { owner: e.target.value }), onDue: e => this.updItem('actions', j, { due: e.target.value }), onRemove: () => this.delItem('actions', j) })),
+        addAction: () => this.updTopic(x => ({ ...x, actions: [...x.actions, { text: '', owner: 'Dr. Elena Rusu', due: '2026-10-02' }] })),
+        attention: tp.attention.map((a, j) => ({ text: a, onText: e => this.updItem('attention', j, e.target.value), onRemove: () => this.delItem('attention', j) })),
+        noAttention: tp.attention.length === 0, addAttention: () => this.updTopic(x => ({ ...x, attention: [...x.attention, ''] })),
+        isMedical: tp.tag === 'Medical', codes: tp.codes.map((c, j) => ({ sys: c[0], code: c[1], label: c[2], fg: c[0] === 'ACHI' ? '#3B4A8C' : '#1F5F55', onRemove: () => this.delItem('codes', j) })), noCodes: tp.codes.length === 0,
+        hasDrg: !!tp.drg, drg: tp.drg, drgLabel: tp.drgLabel,
+        sugs: tp.sugs.map((g, j) => ({ ...g, onDecline: () => this.delItem('sugs', j), onAccept: () => this.updTopic(x => {
+          const n = { ...x, sugs: x.sugs.filter((_, k) => k !== j) };
+          if (g.code) n.codes = [...x.codes, g.code]; else if (g.kind === 'Point of view') n.views = [...x.views, { name: g.from, text: g.text }]; else if (g.kind === 'Attention point') n.attention = [...x.attention, g.text]; else n.actions = [...x.actions, { text: g.text, owner: g.from, due: '2026-10-02' }];
+          return n; }) })),
+        tx: tp.tx.map(r => ({ who: r[0], ts: r[1], langs: r[2], text: r[3] }))
+      };
+    }
+    const q = s.icdQ.trim().toLowerCase(), have = new Set(tp ? tp.codes.map(c => c[1]) : []);
+    const icdResults = q ? this.CATALOG.filter(c => !have.has(c[1]) && c.join(' ').toLowerCase().includes(q)).slice(0, 5).map(c => ({ sys: c[0], code: c[1], label: c[2], onAdd: () => { this.updTopic(x => ({ ...x, codes: [...x.codes, [c[0], c[1], c[2]]] })); this.setState({ icdQ: '' }); } })) : [];
+
+    const navBtn = (on) => ({ bg: on ? '#fff' : 'transparent', border: on ? '#E7E5DF' : 'transparent' });
+    const topicNav = s.topics.map((x, i) => ({ num: String(i + 1).padStart(2, '0'), title: x.title || 'Untitled topic', tag: x.tag, tagFg: T[x.tag][1], sug: isMod && x.sugs.length ? String(x.sugs.length) : '', sugBg: isMod && x.sugs.length ? '#F5ECDC' : 'transparent', ...navBtn(s.sel === i), onClick: () => this.setState({ sel: i, editing: false, showTx: false }) }));
+    const generalNav = [['participants','Participants'],['next','Next meeting']].map(([k, l]) => ({ label: l, ...navBtn(s.sel === k), onClick: () => this.setState({ sel: k, editing: false }) }));
+
+    const stage = s.stage;
+    const pipeline = this.PIPE.map((p, i) => { const done = stage > i; return { name: p[0], time: done ? p[1] : stage === i ? '…' : '', mark: done ? '✓' : String(i + 1), dotBg: done ? '#1F5F55' : stage === i ? '#8A5A12' : '#C9C5BA', fg: stage >= i ? '#17201E' : '#8E9692' }; });
+
+    const sugKinds = ['Point of view','Task','Attention point','Diagnosis'];
+    const BLOCKS = ['Summary','Points of view','Decisions & tasks','Needs attention','Diagnosis · procedures · DRG','Budget impact'];
+    const tplArr = s.tpl[s.tplType];
+    const PERMS = ['Manage users & cabinet access','Upload or record meetings','Edit minutes by topic','Approve & send minutes','Read minutes','Suggest additions','View transcripts','Configure templates & routing','View security log'];
+
+    return {
+      t, is, isMod, isPart, email: s.email,
+      me: { name: acct[0], ini: acct[1], dept: acct[2], cabList: cabs.map(c => t[c]).join(', ') },
+      langs: this.seg([['en','EN'],['ro','RO'],['ru','RU']], s.lang, v => this.setState({ lang: v })),
+      authOut: s.step !== 'in', authIn: s.step === 'in',
+      stepSignin: s.step === 'signin', stepTwoFa: s.step === '2fa', stepSetup: s.step === 'setup', stepPick: s.step === 'pick',
+      authWidth: s.step === 'pick' ? '860px' : '420px',
+      authSteps: [['Account','signin'],['2FA','2fa'],['Cabinet','pick']].map(([l, k], i) => { const order = { signin: 0, '2fa': 1, setup: 1, pick: 2 }[s.step]; return { n: order > i ? '✓' : String(i + 1), label: l, bg: order >= i ? '#1F5F55' : '#C9C5BA', fg: order >= i ? '#17201E' : '#8E9692' }; }),
+      onEmail: e => this.setState({ email: e.target.value, emailUnknown: false }), emailUnknown: s.emailUnknown,
+      demoAccounts: [['elena.rusu@medpark.md','Elena Rusu','Moderator + Participant'],['ion.bivol@medpark.md','Ion Bivol','Admin + Moderator'],['natalia.popescu@medpark.md','Natalia Popescu','Participant'],['igor.munteanu@medpark.md','Igor Munteanu','2FA not set up']].map(d => ({ name: d[1], cabs: d[2], bg: s.email === d[0] ? '#E3EEEA' : '#fff', border: s.email === d[0] ? '#1F5F55' : '#E7E5DF', onClick: () => this.setState({ email: d[0], emailUnknown: false }) })),
+      doSignin: () => { const a = this.acct; if (!a) return this.setState({ emailUnknown: true }); this.setState({ step: a[4] ? 'setup' : '2fa', code: '' }); },
+      code: s.code, onCode: e => this.setState({ code: e.target.value.replace(/\D/g, '').slice(0, 8) }), verifyBg: s.code.length >= 6 ? '#1F5F55' : '#8E9692',
+      fillBackup: () => this.setState({ code: '48219930' }), toSignin: () => this.setState({ step: 'signin' }),
+      doVerify: () => { if (s.code.length < 6) return; if (cabs.length === 1) this.enter(cabs[0]); else this.setState({ step: 'pick' }); },
+      cabinetCards: ['admin','moderator','participant'].map(cabItem),
+      cabName: t[s.cabinet], cabColor: this.CAB_COLOR[s.cabinet], cabMenuOpen: s.menu === 'cab', userMenuOpen: s.menu === 'user',
+      toggleCabMenu: () => this.setState({ menu: s.menu === 'cab' ? null : 'cab' }), toggleUserMenu: () => this.setState({ menu: s.menu === 'user' ? null : 'user' }),
+      cabMenu: ['admin','moderator','participant'].map(c => ({ ...cabItem(c), bg: c === s.cabinet ? '#F2F1EC' : '#fff' })),
+      tabs: this.TABS[s.cabinet].map(k => ({ label: t[k], fg: s.screen === k ? '#17201E' : '#5E6763', line: s.screen === k ? '#1F5F55' : 'transparent', onClick: () => this.setState({ screen: k, menu: null }) })),
+      goAccount: () => this.setState({ screen: 'account', menu: null }), goPick: () => this.setState({ step: 'pick', menu: null }), signOut: () => this.setState({ step: 'signin', menu: null, code: '' }),
+      showList: is.meetings || is.moms, typeFilters: this.pill(['All','Medical','Executive','Administrative'], s.filter, v => this.setState({ filter: v })),
+      meetingsShown: meetings.filter(m => (s.filter === 'All' || m.type === s.filter) && (isMod || m.status !== 'Transcribing 42%')),
+      goNew: () => this.setState({ screen: 'new' }), goEditor: () => this.setState({ screen: 'editor', sel: 0 }),
+      newTypes: Object.keys(T).map(k => ({ label: k, bg: s.newType === k ? T[k][0] : '#fff', fg: T[k][1], border: s.newType === k ? T[k][1] : '#E7E5DF', onClick: () => this.setState({ newType: k }) })),
+      startPipe: this.startPipe, toggleRec: this.toggleRec, recLabel: s.rec ? 'Stop' : 'Record', recBg: s.rec ? '#F8ECE8' : '#fff',
+      recTime: String(Math.floor(s.recSec / 60)).padStart(2, '0') + ':' + String(s.recSec % 60).padStart(2, '0'),
+      pipeline, pipeDone: stage >= 5, pipeEta: stage < 0 ? '≈ 11 min per hour of audio' : stage >= 5 ? 'done · 11:11' : 'running',
+      showMom: is.editor || is.read, momStatus: s.sent ? 'Sent to 9 recipients' : isMod ? 'Draft · auto-saved' : 'Approved 24.09', momStatusFg: s.sent || isPart ? '#1F5F55' : '#8A5A12',
+      sendBg: s.sent ? '#8E9692' : '#1F5F55', sendLabel: s.sent ? 'Sent ✓' : 'Approve & send', send: () => this.setState({ sent: true, editing: false }),
+      topicNav, generalNav, topicCount: s.topics.length,
+      addTopic: () => this.setState(st => ({ topics: [...st.topics, { title: '', tag: 'Medical', time: '—', summary: '', views: [], actions: [], attention: [], codes: [], drg: '', drgLabel: '', sugs: [], tx: [] }], sel: st.topics.length, editing: true })),
+      deleteTopic: () => this.setState(st => ({ topics: st.topics.filter((_, i) => i !== st.sel), sel: 0, editing: false })),
+      selTopic: !!tp, selParticipants: s.sel === 'participants', selNext: s.sel === 'next',
+      cur, editMode, viewMode: !editMode, modHasSugs: isMod && tp && tp.sugs.length > 0,
+      toggleEdit: () => this.setState({ editing: !s.editing, icdQ: '' }), editBtnLabel: s.editing ? 'Done' : 'Edit topic',
+      editBtnBg: s.editing ? '#1F5F55' : '#fff', editBtnFg: s.editing ? '#fff' : '#17201E', editBtnBorder: s.editing ? '#1F5F55' : '#D9D6CD',
+      people: this.PEOPLE.map(p => p[0]), icdQ: s.icdQ, onIcdQ: e => this.setState({ icdQ: e.target.value }), icdResults,
+      showTx: s.showTx, toggleTx: () => this.setState({ showTx: !s.showTx }), txLabel: (s.showTx ? 'Hide' : 'Show') + ' transcript for this topic' + (tp ? ' (' + tp.tx.length + ')' : ''),
+      sugKinds: sugKinds.map(k => ({ label: k, bg: s.sugKind === k ? '#E3EEEA' : '#fff', fg: s.sugKind === k ? '#1F5F55' : '#3E4744', border: s.sugKind === k ? '#1F5F55' : '#D9D6CD', onClick: () => this.setState({ sugKind: k }) })),
+      sugText: s.sugText, onSugText: e => this.setState({ sugText: e.target.value }),
+      sugPlaceholder: s.sugKind === 'Diagnosis' ? 'ICD-10 code and term, e.g. N18.3 Chronic kidney disease' : 'Write your addition…',
+      mySugNote: s.mySugs ? s.mySugs + ' suggestion(s) sent · waiting for moderator' : 'You are signed in as ' + acct[0],
+      submitSug: () => { if (!s.sugText.trim() || !tp) return; const m = s.sugText.match(/^([A-Z]\d{2}(\.\d)?)\s*(.*)$/i); const g = { from: acct[0], kind: s.sugKind, text: s.sugText.trim() };
+        if (s.sugKind === 'Diagnosis' && m) g.code = ['ICD-10', m[1].toUpperCase(), m[3] || '']; this.updTopic(x => ({ ...x, sugs: [...x.sugs, g] })); this.setState({ sugText: '', mySugs: s.mySugs + 1 }); },
+      attendees: this.PEOPLE.map((p, i) => { const away = s.absent.includes(i); return { name: p[0], dept: p[1], role: p[2], state: away ? 'Absent' : 'Present', bg: away ? '#F2F1EC' : '#E3EEEA', fg: away ? '#5E6763' : '#1F5F55', cursor: isMod ? 'pointer' : 'default', onToggle: () => isMod && this.setState(st => ({ absent: away ? st.absent.filter(x => x !== i) : [...st.absent, i] })) }; }),
+      next: { ...s.next, dateLabel: this.fmt(s.next.date), onDate: e => this.setState({ next: { ...s.next, date: e.target.value } }), onTime: e => this.setState({ next: { ...s.next, time: e.target.value } }), onPlace: e => this.setState({ next: { ...s.next, place: e.target.value } }), onAgenda: e => this.setState({ next: { ...s.next, agenda: e.target.value } }) },
+      myTasks: [['Redactare protocol de protecție renală, v1','Consiliu medical — Cardiologie · Topic 2','2026-10-01'],['Actualizare protocol sedare RMN pediatric','Consiliu medical — Oncologie · Topic 3','2026-09-22'],['Propunere grafic ture ATI','Ședință administrativă · Topic 1','2026-09-30']].map((a, i) => { const d = s.tasksDone[i]; return { text: a[0], from: a[1], done: d, deco: d ? 'line-through' : 'none', fg: d ? '#8E9692' : '#17201E', dueLabel: d ? 'Done' : 'Due ' + this.fmt(a[2]), dueColor: d ? '#8E9692' : this.dueColor(a[2]), onToggle: () => this.setState(st => ({ tasksDone: st.tasksDone.map((x, j) => j === i ? !x : x) })) }; }),
+      userRows: s.users.map((u, i) => ({ name: u[0], email: u[1], dept: u[2], fa: u[4] === 'on' ? '2FA enabled' : 'Setup pending', faColor: u[4] === 'on' ? '#1F5F55' : '#8A5A12',
+        onReset: () => this.setState(st => ({ users: st.users.map((x, j) => j === i ? [x[0], x[1], x[2], x[3], 'setup'] : x) })),
+        roles: ['admin','moderator','participant'].map(r => { const on = u[3].includes(r); return { label: t[r], bg: on ? '#E3EEEA' : '#fff', fg: on ? '#1F5F55' : '#8E9692', border: on ? '#1F5F55' : '#E7E5DF', onClick: () => this.setState(st => ({ users: st.users.map((x, j) => j === i ? [x[0], x[1], x[2], on ? x[3].filter(y => y !== r) : [...x[3], r], x[4]] : x) })) }; }) })),
+      permRows: PERMS.map((p, i) => ({ label: p, cells: [0, 1, 2].map(c => ({ on: !!s.perms[i][c], onToggle: () => this.setState(st => ({ perms: st.perms.map((row, j) => j === i ? row.map((v, k) => k === c ? (v ? 0 : 1) : v) : row) })) })) })),
+      policyOpts: this.seg([['all','All users'],['staff','Admins & moderators'],['optional','Optional']], s.policy, v => this.setState({ policy: v })),
+      methodRows: [['Authenticator app (TOTP)','Works offline'],['Backup codes','8 single-use codes per user'],['Hardware key (FIDO2)','USB keys issued by IT']].map((m, i) => ({ label: m[0], hint: m[1], track: s.methods[i] ? '#1F5F55' : '#C9C5BA', knob: s.methods[i] ? '19px' : '3px', onToggle: () => this.setState(st => ({ methods: st.methods.map((v, j) => j === i ? (v ? 0 : 1) : v) })) })),
+      audit: [['10:21','N. Popescu signed in · TOTP','#17201E'],['09:40','E. Rusu signed in · TOTP','#17201E'],['08:12','I. Bivol granted Moderator to V. Ciobanu','#17201E'],['08:11','Failed 2FA · igor.munteanu · WS-B214','#A23B2A'],['08:10','Failed 2FA · igor.munteanu · WS-B214','#A23B2A'],['07:55','A. Cebotari signed in · backup code','#8A5A12']].map(a => ({ t: a[0], e: a[1], fg: a[2] })),
+      tplTabs: this.pill(Object.keys(T), s.tplType, v => this.setState({ tplType: v })),
+      tplRows: BLOCKS.map((b, i) => ({ name: b, fg: tplArr[i] ? '#17201E' : '#8E9692', track: tplArr[i] ? '#1F5F55' : '#C9C5BA', knob: tplArr[i] ? '19px' : '3px', onToggle: () => this.setState(st => ({ tpl: { ...st.tpl, [st.tplType]: st.tpl[st.tplType].map((v, j) => j === i ? (v ? 0 : 1) : v) } })) })),
+      tplPreview: BLOCKS.filter((_, i) => tplArr[i]).map(b => b.toUpperCase()),
+      routes: [['Medical','Consiliu medical',9,'consiliu.medical@ · sef.sectie.*@ · attendees','Send after moderator approval'],['Executive','Comitet executiv',7,'board@ · cfo@ · director.medical@','Send after approval · no transcript attached'],['Administrative','Administrație',14,'admin.staff@ · hr@ · attendees','Auto-send 15 min after draft']].map(r => ({ type: r[0], tagBg: T[r[0]][0], tagFg: T[r[0]][1], list: r[1], count: r[2], emails: r[3], rule: r[4] })),
+      showBackup: s.backup, toggleBackup: () => this.setState({ backup: !s.backup }), backupLabel: s.backup ? 'Hide backup codes' : 'Show backup codes',
+      sessions: ['This workstation · WS-C102 · now','Tablet · Sala de consilii · 2 h ago'].map((l, i) => { const r = s.revoked.includes(i); return { label: l, action: i === 0 ? 'Current' : r ? 'Revoked' : 'Revoke', fg: i === 0 || r ? '#8E9692' : '#A23B2A', onRevoke: () => i && this.setState(st => ({ revoked: [...st.revoked, i] })) }; })
+    };
+  }
+}
+</script>
+</body>
+</html>
