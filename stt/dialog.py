@@ -1,6 +1,9 @@
-"""Combine whisper words with speaker turns into a dialog: who said what, and when."""
+"""Combine whisper words with speaker turns into a dialog: who said what, when, and in which language."""
 import json
-from dataclasses import asdict, dataclass
+from collections import Counter
+from dataclasses import dataclass, field
+
+from .transcriber import language_tag, timestamp, word_languages
 
 PAUSE_SPLIT = 2.0  # seconds of silence that start a new line even for the same speaker
 CHUNK_PAUSE = 0.5  # a pause this long also ends a sentence chunk
@@ -13,20 +16,21 @@ class Utterance:
     end: float
     speaker: str
     text: str
+    words: list = field(default_factory=list)
+    accent: str = ""  # English accent label, see accent.label_speakers
 
+    @property
+    def langs(self) -> list:
+        return word_languages(self.words)
 
-def segment_words(start: float, end: float, text: str) -> list:
-    """Approximate word times for a live segment by spreading its duration by word length."""
-    from .transcriber import Word
+    @property
+    def lang(self) -> str:
+        """The utterance's main language ("" if its words aren't tagged)."""
+        return (self.langs or [""])[0]
 
-    tokens = text.split()
-    total = sum(len(t) for t in tokens) or 1
-    words, t = [], start
-    for tok in tokens:
-        dur = (end - start) * len(tok) / total
-        words.append(Word(t, t + dur, tok))
-        t += dur
-    return words
+    @property
+    def tag(self) -> str:
+        return language_tag(self.words, self.accent)
 
 
 def _sentence_chunks(words: list) -> list:
@@ -61,22 +65,34 @@ def _speaker_for(chunk: list, turns: list) -> str:
 
 
 def build_dialog(words: list, turns: list) -> list:
-    """Assign each sentence to a speaker and merge consecutive words of the same speaker into utterances."""
+    """Assign each sentence to a speaker and merge consecutive sentences of the same speaker into utterances.
+
+    A sentence transcribed in another language than the utterance so far starts a new line, so every line
+    has one main language. A Russian word inside Romanian speech stays on its "ro+ru" line, even when
+    pauses around it make it a chunk of its own."""
     dialog = []
     for chunk in _sentence_chunks(words):
         speaker = _speaker_for(chunk, turns) if turns else "SPEAKER 1"
-        for w in chunk:
-            _append(dialog, w, speaker)
+        new_line = bool(dialog) and _spoken_in(dialog[-1].words) != _spoken_in(chunk)
+        for i, w in enumerate(chunk):
+            _append(dialog, w, speaker, new_line=new_line and i == 0)
     return dialog
 
 
-def _append(dialog: list, w, speaker: str):
+def _spoken_in(words: list) -> str:
+    """The language most of these words were transcribed in ("" if unknown)."""
+    counts = Counter(w.segment_lang for w in words if w.segment_lang)
+    return counts.most_common(1)[0][0] if counts else ""
+
+
+def _append(dialog: list, w, speaker: str, new_line: bool = False):
     last = dialog[-1] if dialog else None
-    if last and last.speaker == speaker and w.start - last.end <= PAUSE_SPLIT:
+    if last and not new_line and last.speaker == speaker and w.start - last.end <= PAUSE_SPLIT:
         last.text += _join(w.text)
         last.end = max(last.end, w.end)
+        last.words.append(w)
     else:
-        dialog.append(Utterance(w.start, w.end, speaker, w.text))
+        dialog.append(Utterance(w.start, w.end, speaker, w.text, [w]))
 
 
 def _join(word: str) -> str:
@@ -84,24 +100,22 @@ def _join(word: str) -> str:
     return word if word[:1] in ",.!?;:%)" else " " + word
 
 
-def _ts(seconds: float, sep: str = ".") -> str:
-    ms = int(round(seconds * 1000))
-    h, ms = divmod(ms, 3_600_000)
-    m, ms = divmod(ms, 60_000)
-    s, ms = divmod(ms, 1000)
-    return f"{h:02d}:{m:02d}:{s:02d}{sep}{ms:03d}"
+def _who(u: Utterance) -> str:
+    return f"{u.speaker} [{u.tag}]" if u.tag else u.speaker
 
 
 def to_text(dialog: list) -> str:
-    return "\n".join(f"[{_ts(u.start)[:8]} - {_ts(u.end)[:8]}] {u.speaker}: {u.text}" for u in dialog)
+    return "\n".join(f"[{timestamp(u.start)[:8]} - {timestamp(u.end)[:8]}] {_who(u)}: {u.text}" for u in dialog)
 
 
 def to_srt(dialog: list) -> str:
     return "\n".join(
-        f"{i}\n{_ts(u.start, ',')} --> {_ts(u.end, ',')}\n{u.speaker}: {u.text}\n"
+        f"{i}\n{timestamp(u.start, ',')} --> {timestamp(u.end, ',')}\n{_who(u)}: {u.text}\n"
         for i, u in enumerate(dialog, 1)
     )
 
 
 def to_json(dialog: list) -> str:
-    return json.dumps([asdict(u) for u in dialog], ensure_ascii=False, indent=2)
+    return json.dumps([{"start": round(u.start, 2), "end": round(u.end, 2), "speaker": u.speaker, "text": u.text,
+                        "languages": u.langs, "accent": u.accent, "words": [w.to_dict() for w in u.words]}
+                       for u in dialog], ensure_ascii=False, indent=2)

@@ -1,6 +1,8 @@
-from stt.dialog import build_dialog, to_srt, to_text
+import json
+
+from stt.dialog import build_dialog, to_json, to_srt, to_text
 from stt.diarizer import Turn
-from stt.transcriber import Word, _tokens_to_words
+from stt.transcriber import Word
 
 
 def words(*items):
@@ -44,18 +46,40 @@ def test_formatters():
     assert "00:01:01,500 --> 00:01:02,000\nSPEAKER 1: Salut" in to_srt(d)
 
 
-def test_tokens_to_words_merges_subwords_and_skips_special():
-    tok = lambda t, a, b: {"text": t, "offsets": {"from": a, "to": b}}
-    ws = _tokens_to_words([tok("[_BEG_]", 0, 0), tok(" mio", 100, 200), tok("card", 200, 300),
-                           tok(",", 300, 310), tok(" da", 400, 500), tok("[_TT_25]", 500, 500)], 0.1, 0.5)
-    assert [(w.text, round(w.start, 3), round(w.end, 3)) for w in ws] == [("miocard,", 0.1, 0.31), ("da", 0.4, 0.5)]
+def test_language_tags_in_text_srt_and_json():
+    ws = [Word(0.1, 0.5, "Pacientul,", "ro"), Word(0.6, 0.9, "короче,", "ru"), Word(1.0, 1.4, "are", "ro"),
+          Word(4.0, 4.5, "Deadline", "en"), Word(4.6, 5.0, "Friday.", "en")]
+    d = build_dialog(ws, [Turn(0, 2, "SPEAKER 1"), Turn(3.5, 5.5, "SPEAKER 2")])
+    d[1].accent = "australia"
+    assert to_text(d).splitlines() == [
+        "[00:00:00 - 00:00:01] SPEAKER 1 [ro+ru]: Pacientul, короче, are",
+        "[00:00:04 - 00:00:05] SPEAKER 2 [en, Australian]: Deadline Friday."]
+    assert "SPEAKER 1 [ro+ru]: Pacientul, короче, are" in to_srt(d)
+    first = json.loads(to_json(d))[0]
+    assert first["languages"] == ["ro", "ru"]
+    assert first["words"][1] == {"text": "короче,", "start": 0.6, "end": 0.9, "lang": "ru"}
 
 
-def test_tokens_remapped_into_segment_range():
-    # VAD case: tokens on a compressed timeline (1.0-2.0s) but the segment really is at 5.0-7.0s.
-    tok = lambda t, a, b: {"text": t, "offsets": {"from": a, "to": b}}
-    ws = _tokens_to_words([tok(" a", 1000, 1500), tok(" b", 1500, 2000)], 5.0, 7.0)
-    assert [(w.start, w.end) for w in ws] == [(5.0, 6.0), (6.0, 7.0)]
+def spoken(lang, *items):
+    """Words transcribed in one language: (start, end, text, word language)."""
+    return [Word(s, e, t, wl, segment_lang=lang) for s, e, t, wl in items]
+
+
+def test_same_speaker_switching_language_starts_a_new_line():
+    ws = (spoken("ro", (0.0, 0.4, "Bine,", "ro"), (0.5, 0.9, "короче,", "ru"), (1.0, 1.5, "facem.", "ro"))
+          + spoken("ru", (1.6, 2.0, "Хорошо,", "ru"), (2.1, 2.6, "давайте.", "ru"))
+          + spoken("en", (2.7, 3.2, "Deadline.", "en")))
+    d = build_dialog(ws, [Turn(0, 4, "SPEAKER 1")])
+    assert [(u.tag, u.text) for u in d] == [("ro+ru", "Bine, короче, facem."), ("ru", "Хорошо, давайте."),
+                                            ("en", "Deadline.")]
+
+
+def test_russian_word_between_pauses_stays_on_its_romanian_line():
+    # The pauses make "давай" a chunk of its own, but it was said inside Romanian speech.
+    ws = spoken("ro", (0.0, 1.0, "Analizele", "ro"), (1.1, 1.5, "sunt", "ro"), (1.6, 2.0, "gata,", "ro"),
+                (2.8, 3.1, "давай", "ru"), (3.9, 4.3, "le", "ro"), (4.4, 5.0, "discutăm.", "ro"))
+    d = build_dialog(ws, [Turn(0, 6, "SPEAKER 1")])
+    assert [(u.tag, u.text) for u in d] == [("ro+ru", "Analizele sunt gata, давай le discutăm.")]
 
 
 def test_speaker_change_snaps_to_sentence_boundary():
@@ -67,9 +91,3 @@ def test_speaker_change_snaps_to_sentence_boundary():
     # The sentence "We will do ECG." is not cut at the diarizer's late edge (8.0s, inside "We").
     assert d[-1].speaker == "SPEAKER 1" and d[-1].text == "We will do ECG."
     assert d[0].text.startswith("side.")
-
-
-def test_segment_words_spreads_time_by_length():
-    from stt.dialog import segment_words
-    ws = segment_words(10.0, 13.0, "ab abcd")
-    assert [(w.text, w.start, w.end) for w in ws] == [("ab", 10.0, 11.0), ("abcd", 11.0, 13.0)]

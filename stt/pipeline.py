@@ -1,33 +1,40 @@
-"""Full dialog pipeline: convert audio -> detect speakers (pyannote) -> transcribe live with speakers."""
+"""Full dialog pipeline: convert audio -> transcribe (Whisper) and detect speakers (pyannote) at the same time
+-> give every sentence to the speaker who talks most during it."""
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .audio import to_wav16k
-from .dialog import build_dialog, segment_words, to_text
+from .dialog import build_dialog
 from .diarizer import diarize
 from .transcriber import DEFAULT_MODEL, transcribe_wav
 
 
-def transcribe_dialog(audio: Path, model: Path = DEFAULT_MODEL, language: str = "auto",
-                      translate: bool = False, live: bool = True):
-    """Return (language, dialog utterances) for any audio/video file.
+def transcribe_dialog(audio: Path, model: Path = DEFAULT_MODEL, language: str = "auto", translate: bool = False,
+                      romanian_model: Path = None, engine: str = "whisper.cpp", fix_words: bool = True):
+    """Return (main language, dialog utterances) for any audio/video file.
 
-    Speakers are detected first, so with live=True every line is printed to stdout with its
-    speaker as soon as Whisper recognizes it.
+    pyannote runs in a background thread while whisper-server (its own process) transcribes, so the
+    speaker detection costs almost no extra time. The transcript is shown on stderr as it is made.
     """
+    import soundfile as sf
+
+    from .accent import label_speakers
+
     with tempfile.TemporaryDirectory() as tmp:
         print("[1/3] Converting audio...", file=sys.stderr)
         wav = to_wav16k(Path(audio), Path(tmp) / "input.wav")
-        print("[2/3] Detecting speakers with pyannote...", file=sys.stderr, flush=True)
-        turns = diarize(wav)
-        print(f"Found {len({t.speaker for t in turns})} speaker(s).", file=sys.stderr)
-        print("[3/3] Transcribing with Whisper Large V3...\n", file=sys.stderr, flush=True)
-
-        def show(start, end, text):
-            for u in build_dialog(segment_words(start, end, text), turns):
-                print(to_text([u]), flush=True)
-
-        transcript = transcribe_wav(wav, model, language, translate, on_segment=show if live else None)
-    # Final dialog uses Whisper's word timestamps (more precise than the live approximation).
-    return transcript.language, build_dialog(transcript.words, turns)
+        print("[2/3] Detecting speakers (pyannote) while transcribing (Whisper)...\n", file=sys.stderr, flush=True)
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            speakers = pool.submit(diarize, wav)
+            transcript = transcribe_wav(wav, model, language, translate, accents=False,
+                                       romanian_model=romanian_model, engine=engine, fix_words=fix_words)
+            turns = speakers.result()
+        print(f"[3/3] Found {len({t.speaker for t in turns})} speaker(s); matching sentences to speakers.",
+              file=sys.stderr, flush=True)
+        dialog = build_dialog(transcript.words, turns)
+        if not translate:
+            audio_data, sr = sf.read(str(wav), dtype="float32")
+            label_speakers(dialog, audio_data, sr)  # one English accent per speaker, from all their English
+    return transcript.language, dialog

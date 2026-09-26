@@ -7,5 +7,12 @@ torch>=2.2,<2.9
 torchaudio>=2.2,<2.9
 soundfile
 huggingface_hub<0.26  # pyannote 3.x still passes use_auth_token
+# English accent ID (local SpeechBrain model, see scripts/download_models.py)
+speechbrain>=1.0,<2
+# Faster Whisper on Apple Silicon (--engine mlx; models: scripts/download_models.py --mlx)
+mlx-whisper==0.4.3; sys_platform == "darwin" and platform_machine == "arm64"
+# Word-level language tags (offline word frequencies for ro/ru/en), misheard-word correction
+wordfreq
+rapidfuzz
 # Tests
 pytest
