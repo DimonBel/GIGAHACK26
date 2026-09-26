@@ -21,7 +21,7 @@ Models are not in git (`models/` is gitignored). Download them once:
 | `models/ggml-large-v3-q8_0.bin` (Large V3, 8-bit) | `dialog` default (`--engine whisper-file`), ~20% faster | 1.6 GB | recommended (made from the file above) |
 | `models/ggml-large-v3-turbo-q8_0.bin` (Large V3 Turbo, 8-bit) | `transcribe` default (`--engine whisper-turbo`) | 0.8 GB | for `transcribe` |
 | `models/ggml-silero-v5.1.2.bin` (Silero VAD) | skips silence, fewer hallucinated words | 0.9 MB | recommended (used automatically if present) |
-| pyannote 3.1 (Hugging Face) | who said what (`dialog`) | ~30 MB | for `dialog` — see [Speaker dialog](#speaker-dialog-who-said-what) |
+| pyannote community-1 (Hugging Face) | who said what (`dialog`) | ~30 MB | for `dialog` — see [Speaker dialog](#speaker-dialog-who-said-what) |
 | `gemma4:e4b` (Ollama) | Minutes of Meeting; also `--engine gemma` (speech-to-text) | 9.6 GB | for `--minutes` / `stt.minutes` |
 | `gemma4:e2b` (Ollama) | `--engine gemma-fast` (speech-to-text) | 7.2 GB | optional |
 | `llama3.1:8b` (Ollama) | short summary (`--summarize`) | 4.9 GB | optional |
@@ -86,7 +86,7 @@ language only when Whisper is ≥80% sure, and uncertain pieces are re-transcrib
 
 ## Speaker dialog (who said what)
 
-Detects the different speakers with **pyannote 3.1** (local, Apple GPU) and writes the
+Detects the different speakers with **pyannote community-1** (local, Apple GPU) and writes the
 transcript as a dialog:
 
 ```
@@ -97,8 +97,7 @@ transcript as a dialog:
 
 **One-time setup** (only to download the model; afterwards it works offline):
 1. Create a free token at https://huggingface.co/settings/tokens (type "Read").
-2. Accept the terms on https://huggingface.co/pyannote/speaker-diarization-3.1
-   and https://huggingface.co/pyannote/segmentation-3.0.
+2. Accept the terms on https://huggingface.co/pyannote/speaker-diarization-community-1.
 3. Create a `.env` file in the project folder containing `HF_TOKEN=hf_...`
 
 ```bash
@@ -125,8 +124,33 @@ remarks made while the other person talks ("Da.") get their own line - but Whisp
 turn (~170 times for 12 minutes instead of ~25), which takes much longer.
 Whisper artifacts (repetition loops, subtitle credits) are filtered out in both modes.
 
-The number of speakers is detected automatically. Limitations: when two people talk at the
-same time, words in the overlap may go to either speaker; labels (SPEAKER 1, 2...) are per file.
+### How many speakers, and who they are
+
+The number of speakers is detected automatically. pyannote 3.1 split long recordings into many short
+"speakers" (55 labels for a 60-min ICU round, 52 of them under 75 s); community-1 finds 8 there, at the same
+speed, with the same main voices. Labels with little talk time left over are merged into the voice they
+resemble most (pyannote's own voice embeddings; a short voice clearly unlike everyone else is kept as its own
+speaker), which gives 7. If you know the count, say so:
+
+```bash
+.venv/bin/python main.py dialog meeting.m4a --lang ro --speakers 4 --out meeting.txt        # exactly 4
+.venv/bin/python main.py dialog meeting.m4a --lang ro --min-speakers 3 --max-speakers 8 --out meeting.txt
+```
+
+`--roles` (always on with `--minutes`) asks the local LLM (gemma4:e4b) what each main speaker does in the
+meeting, from their longest lines — e.g. "leads the round", "presents patients" — and their name only when
+someone addresses them by it. Labels in the dialog stay `SPEAKER N`; the roles are a guess and are shown as one:
+a legend at the top of the `.txt`, `<name>.speakers.json`, and a Participants section in the minutes.
+
+Check speaker detection on your own recordings (no reference needed; `--samples` writes short clips of every
+speaker so you can hear whether two labels are the same person):
+
+```bash
+.venv/bin/python bench/eval_speakers.py meeting.m4a --samples out/speakers
+```
+
+Limitations: when two people talk at the same time, words in the overlap may go to either speaker; labels
+(SPEAKER 1, 2...) are per file.
 
 ## Optional: summarize with a local LLM (Ollama)
 
@@ -186,7 +210,8 @@ a follow-up question for missed facts (+3 facts, +25 s); 600-word chunks (faster
 main.py              CLI entry point
 stt/audio.py         ffmpeg → 16 kHz mono WAV
 stt/transcriber.py   runs whisper-cli (Large V3) on a whole file
-stt/diarizer.py      pyannote 3.1 speaker detection
+stt/diarizer.py      pyannote community-1 speaker detection, merges fragment speakers
+stt/speakers.py      speaker roles guessed by the local LLM
 stt/dialog.py        speaker turns -> blocks, text cleanup, dialog txt/srt/json output
 stt/pipeline.py      convert -> diarize -> transcribe (whole file, or each turn), feeds the live minutes
 stt/engines.py       speech-to-text engines: whisper, whisper-turbo, gemma, gemma-fast

@@ -14,6 +14,8 @@ import io
 import queue
 import sys
 import tempfile
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from pathlib import Path
@@ -30,48 +32,82 @@ WORKERS = 2  # parallel whisper-server processes (each holds a copy of the model
 
 
 def transcribe_dialog_file(audio: Path, model: Path = DEFAULT_MODEL, language: str = "auto",
-                           translate: bool = False, beam_size: int = 1, live: bool = True, on_utterance=None):
+                           translate: bool = False, beam_size: int = 1, live: bool = True, on_utterance=None,
+                           speakers: dict = None, audio_filters: str = "", parallel: bool = True,
+                           timings: dict = None):
     """Return the dialog (list of Utterance) for any audio/video file, using one Whisper run over the file.
 
-    Speakers are detected first, so with live=True every line is printed to stdout with its speaker as
-    soon as Whisper recognizes it. on_utterance(utterance) is also called live for every recognized line
-    (e.g. to build the minutes while transcription is still running).
+    Speaker detection (pyannote) and Whisper run at the same time (parallel=True): Whisper's segments are
+    held back until the speaker turns exist, then printed / passed to on_utterance(utterance) live with their
+    speaker (e.g. to build the minutes while transcription is still running). speakers: optional hints for
+    diarize() (num_speakers / min_speakers / max_speakers). audio_filters: ffmpeg filter chain for the
+    conversion (see audio.CLEAN_FILTERS). timings: filled with the seconds of each stage.
     """
+    timings = timings if timings is not None else {}
     with tempfile.TemporaryDirectory() as tmp:
         print("[1/3] Converting audio...", file=sys.stderr)
-        wav = to_wav16k(Path(audio), Path(tmp) / "input.wav")
+        t = time.perf_counter()
+        wav = to_wav16k(Path(audio), Path(tmp) / "input.wav", audio_filters)
+        timings["convert"] = round(time.perf_counter() - t, 1)
+        turns, ready = [], threading.Event()
+
+        def detect():
+            t = time.perf_counter()
+            try:
+                turns.extend(diarize(wav, **(speakers or {})))
+                print(f"Found {len({t.speaker for t in turns})} speaker(s).", file=sys.stderr, flush=True)
+            except RuntimeError as e:  # model not downloaded yet: still produce a transcript
+                print(f"Warning: speaker detection unavailable, continuing without speakers.\n  {e}".split("\n")[0],
+                      file=sys.stderr)
+            finally:
+                timings["speakers"] = round(time.perf_counter() - t, 1)
+                ready.set()
+
         print("[2/3] Detecting speakers...", file=sys.stderr, flush=True)
-        try:
-            turns = diarize(wav)
-            print(f"Found {len({t.speaker for t in turns})} speaker(s).", file=sys.stderr)
-        except RuntimeError as e:  # model not downloaded yet: still produce a transcript
-            print(f"Warning: speaker detection unavailable, continuing without speakers.\n  {e}".split("\n")[0],
-                  file=sys.stderr)
-            turns = []
-        print(f"[3/3] Transcribing the whole file with {Path(model).name}...\n", file=sys.stderr, flush=True)
+        detector = threading.Thread(target=detect, daemon=True)
+        detector.start()
+        if not parallel:
+            detector.join()
+        print(f"[3/3] Transcribing the whole file with {Path(model).name}"
+              f"{' (speakers are detected meanwhile)' if parallel else ''}...\n", file=sys.stderr, flush=True)
+        pending = []  # Whisper segments that arrived before the speaker turns
+
+        def emit(start, end, text):
+            for u in build_dialog(segment_words(start, end, text), turns):
+                if live:
+                    print(to_text([u]), flush=True)
+                if on_utterance:
+                    on_utterance(u)
 
         def show(start, end, text):
             text = clean_text(text)
             if text:
-                for u in build_dialog(segment_words(start, end, text), turns):
-                    if live:
-                        print(to_text([u]), flush=True)
-                    if on_utterance:
-                        on_utterance(u)
+                pending.append((start, end, text))
+            if ready.is_set():
+                while pending:
+                    emit(*pending.pop(0))
 
+        t = time.perf_counter()
         transcript = transcribe_wav(wav, Path(model), language, translate, beam_size=beam_size,
                                     on_segment=show if live or on_utterance else None)
+        timings["transcribe"] = round(time.perf_counter() - t, 1)
+        detector.join()
+        while pending:
+            emit(*pending.pop(0))
     # Final dialog uses Whisper's word timestamps (more precise than the live approximation);
     # segments that are only a Whisper artifact (subtitle credits, [BLANK_AUDIO]) are left out.
     words = [w for s in transcript.segments if clean_text(s.text) for w in s.words]
     dialog = build_dialog(words, turns)
     for u in dialog:
         u.text = collapse_repeats(u.text)
+    print("[timing] " + " | ".join(f"{k} {v:.0f}s" for k, v in timings.items())
+          + (" (speakers and transcription in parallel)" if parallel else ""), file=sys.stderr, flush=True)
     return dialog
 
 
 def transcribe_dialog(audio: Path, engine: str = "whisper", language: str = "auto",
-                      translate: bool = False, live: bool = True, workers: int = WORKERS, on_utterance=None):
+                      translate: bool = False, live: bool = True, workers: int = WORKERS, on_utterance=None,
+                      speakers: dict = None):
     """Return the dialog (list of Utterance) for any audio/video file.
 
     With live=True every line is printed to stdout, with its speaker, as soon as it's transcribed;
@@ -84,7 +120,7 @@ def transcribe_dialog(audio: Path, engine: str = "whisper", language: str = "aut
         wav = to_wav16k(Path(audio), Path(tmp) / "input.wav")
         audio_data, sr = sf.read(str(wav), dtype="int16")
         print("[2/3] Detecting speakers...", file=sys.stderr, flush=True)
-        turns = diarize(wav)
+        turns = diarize(wav, **(speakers or {}))
     blocks = speaker_blocks(turns)
     print(f"Found {len({t.speaker for t in turns})} speaker(s), {len(blocks)} turns.", file=sys.stderr)
     print(f"[3/3] Transcribing each turn with {engine}...\n", file=sys.stderr, flush=True)

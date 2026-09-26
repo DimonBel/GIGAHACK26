@@ -75,3 +75,39 @@ def test_new_whisper_segment_starts_a_new_chunk_without_punctuation():
           Word(3.6, 4.6, "patru", first=True), Word(4.6, 6, "cinci"), Word(6, 7.5, "sase")]
     assert [(u.speaker, u.text) for u in build_dialog(ws, turns)] == [
         ("SPEAKER 1", "unu doi trei"), ("SPEAKER 2", "patru cinci sase")]
+
+
+def test_parallel_mode_holds_segments_until_speakers_are_known(monkeypatch, tmp_path):
+    """Whisper finishes segments before pyannote has the turns: they are passed on later, in order, with speakers."""
+    import threading
+
+    from stt import pipeline
+    from stt.transcriber import Segment, Transcript
+
+    diarize_may_finish, seen = threading.Event(), []
+
+    def slow_diarize(wav, **hints):
+        diarize_may_finish.wait(5)
+        return TURNS
+
+    def fake_transcribe(wav, model, language, translate, beam_size=1, on_segment=None):
+        on_segment(0.1, 1.0, "Buna ziua.")   # before the turns exist
+        on_segment(3.2, 3.6, "Da.")
+        assert seen == []                    # held back, nothing emitted without speakers
+        diarize_may_finish.set()
+        pipeline.time.sleep(0.2)             # let the detector thread store the turns
+        on_segment(6.6, 7.0, "Bine.")
+        segs = [Segment("", "", "Buna ziua.", words((0.1, 1.0, "Buna"))), Segment("", "", "Da.", words((3.2, 3.6, "Da."))),
+                Segment("", "", "Bine.", words((6.6, 7.0, "Bine.")))]
+        return Transcript("ro", segs)
+
+    monkeypatch.setattr(pipeline, "to_wav16k", lambda src, dst, filters="": dst)
+    monkeypatch.setattr(pipeline, "diarize", slow_diarize)
+    monkeypatch.setattr(pipeline, "transcribe_wav", fake_transcribe)
+    timings = {}
+    dialog = pipeline.transcribe_dialog_file(tmp_path / "a.wav", live=False, on_utterance=seen.append,
+                                             timings=timings)
+    assert [(u.speaker, u.text) for u in seen] == [("SPEAKER 1", "Buna ziua."), ("SPEAKER 2", "Da."),
+                                                   ("SPEAKER 1", "Bine.")]
+    assert [u.speaker for u in dialog] == ["SPEAKER 1", "SPEAKER 2", "SPEAKER 1"]
+    assert set(timings) == {"convert", "speakers", "transcribe"}

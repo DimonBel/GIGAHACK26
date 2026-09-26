@@ -295,7 +295,7 @@ def parse_dialog(path: Path) -> list:
 
 
 def _chat(model, system, user, schema, num_ctx=4096, num_thread=10, num_predict=1000, retry=True,
-          temperature=0.1):
+          temperature=0.1, timeout=3600):
     body = {
         "model": model,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
@@ -311,7 +311,7 @@ def _chat(model, system, user, schema, num_ctx=4096, num_thread=10, num_predict=
                                  headers={"Content-Type": "application/json"})
     t = time.perf_counter()
     try:
-        with urllib.request.urlopen(req, timeout=3600) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         if e.code == 404:
@@ -328,7 +328,8 @@ def _chat(model, system, user, schema, num_ctx=4096, num_thread=10, num_predict=
         if retry:
             print(f"  invalid JSON from {model} ({data.get('done_reason')}), retrying: "
                   f"{data['message']['content'][:200]!r}", file=sys.stderr)
-            result, again = _chat(model, system, user, schema, num_ctx, num_thread, num_predict, retry=False)
+            result, again = _chat(model, system, user, schema, num_ctx, num_thread, num_predict, retry=False,
+                                  timeout=timeout)
             again["wall"] += stats["wall"]
             return result, again
         raise
@@ -705,6 +706,11 @@ def _clock(seconds: float) -> str:
 
 def to_markdown(m: dict, meeting_type: str) -> str:
     out = [f"# {m['title']}", f"*Meeting type: {meeting_type.capitalize()}*", "", "## Summary", m["summary"], ""]
+    if m.get("participants"):
+        out += ["## Participants (roles guessed by the local LLM from what each voice says)"]
+        out += [f"- **{s}** — {r['role']}" + (f" ({r['name']})" if r.get("name") else "")
+                + (f" · {r['seconds'] // 60} min {r['seconds'] % 60:02d} s" if r.get("seconds") else "")
+                for s, r in m["participants"].items()] + [""]
     out += ["## Key moments"] + [f"- `{k['time']}` {k['moment']}" for k in m["key_moments"]] + [""]
     out.append("## Patients" if meeting_type == "medical" else "## Agenda items")
     for t in m["topics"]:
@@ -751,6 +757,8 @@ def main():
     for line in parse_dialog(args.dialog):
         builder.add_line(line)
     minutes = builder.finalize()
+    from .speakers import read_legend  # a dialog .txt written with --roles / --minutes starts with a legend
+    minutes["participants"] = read_legend(args.dialog.read_text(encoding="utf-8"))
     total = time.perf_counter() - t0
     # With live transcription, everything except the last chunk and finalize runs during the meeting.
     maps = [c for c in builder.calls if c["step"] == "map"]

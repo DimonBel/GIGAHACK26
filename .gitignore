@@ -48,3 +48,5 @@ out/
 # --- Benchmark outputs (contain transcripts); the scoring script stays in git ---
 /bench/*
 !/bench/eval_minutes.py
+!/bench/eval_speakers.py
+!/bench/eval_pipeline.py
