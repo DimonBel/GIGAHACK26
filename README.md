@@ -66,6 +66,30 @@ ollama pull llama3.1:8b
 .venv/bin/python main.py transcribe audio.mp3 --summarize
 ```
 
+## Minutes of Meeting (local LLM, CPU-only)
+
+Structured minutes (patients / agenda items, decisions, action items with owner and deadline, key moments,
+open issues, AI suggestions) in English, generated locally with **gemma3:4b** via Ollama.
+
+```bash
+ollama pull gemma3:4b
+OLLAMA_NUM_PARALLEL=3 ollama serve &     # parallel slots: 2 samples per chunk + the final summary
+# from audio: minutes are extracted chunk by chunk while Whisper is still transcribing
+.venv/bin/python main.py dialog meeting.m4a --lang ro --minutes medical --out meeting.txt
+# from an existing dialog transcript
+.venv/bin/python -m stt.minutes meeting_dialog.txt --type medical --out out/meeting
+```
+
+How it works (`stt/minutes.py`): the transcript is normalized with a medical lexicon (ASR errors such as
+"nor" -> noradrenaline), cut into ~300-word chunks at patient boundaries, each chunk is extracted twice
+(different temperatures, decoded in parallel) and the results are merged in code: code decides which patient
+an item belongs to, checks that doses / lab values occur in the transcript (else "⚠ unverified") and finds each
+item's timestamp. One short final call writes title, summary and suggestions.
+
+Measured on a 15 W laptop CPU (Core Ultra 7 155U) for an 11.7-min ICU handover: ~19-21 of 25 reference facts,
+minutes ready ~45-90 s after the transcript. Qwen3-8B on the whole transcript scored 10/25 in 42 min; 1-2B models
+were not usable.
+
 ## Project layout
 
 ```
@@ -78,5 +102,6 @@ stt/pipeline.py      convert -> transcribe -> diarize -> align
 tests/               unit tests (.venv/bin/python -m pytest tests)
 stt/recorder.py      microphone recording (sounddevice)
 stt/llm.py           optional Ollama summarization
+stt/minutes.py       Minutes of Meeting (chunked extraction with gemma3:4b)
 models/              ggml model files (gitignored)
 ```

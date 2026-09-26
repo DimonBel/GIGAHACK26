@@ -38,8 +38,14 @@ def run_dialog(audio: Path, args):
 
     t0 = time.time()
     live = args.format in ("txt", "timestamps")  # txt is shown live; srt/json are printed at the end
+    minutes = None
+    if args.minutes:
+        # Minutes are extracted chunk by chunk while Whisper is still transcribing.
+        from stt.minutes import LiveMinutes, MinutesBuilder
+        minutes = LiveMinutes(MinutesBuilder(args.minutes, args.minutes_model))
     language, utterances = transcribe_dialog(audio, model=Path(args.model), language=args.lang,
-                                             translate=args.translate, live=live)
+                                             translate=args.translate, live=live,
+                                             on_utterance=minutes.feed if minutes else None)
     print(f"\n[language: {language} | {time.time() - t0:.1f}s]", file=sys.stderr)
     formatter = {"srt": fmt.to_srt, "json": fmt.to_json}.get(args.format, fmt.to_text)
     result = formatter(utterances)
@@ -52,6 +58,28 @@ def run_dialog(audio: Path, args):
         from stt.llm import summarize
         print("\n--- Summary (local LLM) ---")
         print(summarize(fmt.to_text(utterances), model=args.llm_model))
+    if minutes:
+        write_minutes(minutes, args, t0)
+
+
+def write_minutes(minutes, args, t0: float):
+    import json
+
+    from stt.minutes import to_markdown
+
+    t_end = time.time()
+    print("\nFinishing the minutes...", file=sys.stderr, flush=True)
+    result = minutes.finish()
+    md = to_markdown(result, args.minutes)
+    print(f"[minutes ready {time.time() - t_end:.1f}s after transcription | total {time.time() - t0:.1f}s]",
+          file=sys.stderr)
+    if not args.out:
+        print("\n" + md)
+        return
+    base = str(Path(args.out).with_suffix(""))
+    Path(base + ".minutes.md").write_text(md, encoding="utf-8")
+    Path(base + ".minutes.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Saved minutes to {base}.minutes.md / .json", file=sys.stderr)
 
 
 def main():
@@ -67,6 +95,9 @@ def main():
     common.add_argument("--out", help="save result to this file")
     common.add_argument("--summarize", action="store_true", help="summarize with a local LLM (Ollama)")
     common.add_argument("--llm-model", default="llama3.1:8b", help="Ollama model name")
+    common.add_argument("--minutes", choices=["medical", "executive", "administrative"],
+                        help="dialog only: also write Minutes of Meeting for this meeting type (Ollama)")
+    common.add_argument("--minutes-model", default="gemma3:4b", help="Ollama model for the minutes")
 
     t = sub.add_parser("transcribe", parents=[common], help="transcribe an audio/video file")
     t.add_argument("file")

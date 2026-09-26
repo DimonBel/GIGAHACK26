@@ -1,6 +1,8 @@
 # Microphone recording
 sounddevice
 numpy
+# Audio decoding fallback when the ffmpeg binary is unavailable
+av
 # Speaker diarization (pyannote 3.1, runs locally on Apple GPU / CPU)
 pyannote.audio>=3.3,<4
 torch>=2.2,<2.9
