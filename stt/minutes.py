@@ -3,12 +3,13 @@
 Input: dialog text as written by `main.py dialog` ("[00:00:00 - 00:00:29] SPEAKER 2: ...").
 Output: JSON (for automation / email routing) and Markdown (for people), always in English.
 
-Small models on CPU cannot digest a whole multi-patient meeting in one call (they merge patients and
+Small local models cannot digest a whole multi-patient meeting in one call (they merge patients and
 invent), and big models are too slow. So the transcript is processed in three steps:
 
-  1. map      - the transcript is cut at patient/topic boundaries into ~300-word chunks and a small model
-                extracts facts from each chunk. MinutesBuilder.add_line() can be fed while Whisper is still
-                transcribing, so most of this work is done before the meeting audio is fully processed.
+  1. map      - code cuts the transcript where the speakers move to another bed / patient ("patul 9", "boxa")
+                and names that patient; a small model extracts the facts of each chunk, filed per patient.
+                MinutesBuilder.add_line() can be fed while Whisper is still transcribing, so most of this
+                work is done before the meeting audio is fully processed.
   2. merge    - plain code joins the chunk results (same patient -> one entry, duplicates dropped).
   3. finalize - key moments are picked in code; one short LLM call writes title, summary and suggestions.
 
@@ -16,25 +17,61 @@ invent), and big models are too slow. So the transcript is processed in three st
 """
 import argparse
 import json
+import os
 import queue
 import re
 import sys
 import threading
 import time
 import unicodedata
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
-DEFAULT_MODEL = "gemma3:4b"
+def _ollama_url() -> str:
+    """Chat endpoint of the Ollama server named by OLLAMA_HOST (as the ollama CLI reads it), else localhost."""
+    host = os.environ.get("OLLAMA_HOST", "").strip() or "127.0.0.1:11434"
+    host = host if "://" in host else "http://" + host
+    if not re.search(r":\d+$", host.rstrip("/")):
+        host = host.rstrip("/") + ":11434"
+    return host.rstrip("/") + "/api/chat"
+
+
+OLLAMA_URL = _ollama_url()
+DEFAULT_MODEL = "gemma4:e4b"
 MEETING_TYPES = ("medical", "executive", "administrative")
 LINE = re.compile(r"\[(?P<start>[\d:]+) - (?P<end>[\d:]+)\] (?P<speaker>[^:]+): (?P<text>.*)")
-# A new patient / agenda item usually starts with one of these words.
-TOPIC_CUE = re.compile(r"\b(pacient\w*|patul|patului|salonul|punctul|următor\w*|пациент\w*|больн\w*|"
-                       r"следующ\w*|next patient|agenda item)\b", re.IGNORECASE)
-CHUNK_MIN_WORDS = 220  # cut at the next topic cue once a chunk has this many words
+
+# Spoken numbers (Romanian, Russian), used to read and to verify bed numbers.
+NUMBER_WORDS = {
+    "1": "unu|unul|una|один", "2": "doi|două|doua|два", "3": "trei|три", "4": "patru|четыре",
+    "5": "cinci|пять", "6": "șase|sase|шесть", "7": "șapte|sapte|семь", "8": "opt|восемь",
+    "9": "nouă|noua|девять", "10": "zece|десять", "11": "unsprezece", "12": "doisprezece",
+    "13": "treisprezece", "14": "paisprezece", "15": "cincisprezece", "16": "șaisprezece",
+    "17": "șaptesprezece", "18": "optsprezece", "19": "nouăsprezece", "20": "douăzeci",
+}
+WORD_TO_NUMBER = {w: n for n, words in NUMBER_WORDS.items() for w in words.split("|")}
+_NUM = r"\d{1,2}|" + "|".join(sorted(WORD_TO_NUMBER, key=len, reverse=True))
+
+# A sentence that names another bed / room starts a new patient. Code, not the model, owns patient identity:
+# the chunk is cut there and the patient is named from the cue. ASR mangles "patul 9" into "pipatu nouă",
+# "apatul, nouă" or "patru opt", hence the loose prefix and suffix.
+NAME_CUES = [
+    (re.compile(rf"\b\w{{0,2}}pat(?:ul|u|ului|ru)?\b[\s,.]+(?:de\s+|nr\.?\s*)?(?P<n>{_NUM})\b", re.I), "Bed {n}"),
+    (re.compile(rf"\b(?:койк\w*|палат\w*)\s+(?:№\s*)?(?P<n>{_NUM})\b", re.I), "Bed {n}"),
+    (re.compile(r"\bbox\w*", re.I), "Box"),
+    (re.compile(r"\b(?:primir\w*|internăr\w*|admissions?)\b", re.I), "Expected admissions"),
+    (re.compile(rf"\b(?:punctul|item)\s+(?P<n>{_NUM})\b", re.I), "Item {n}"),
+]
+# Weaker hints of a new topic: only used to prefer a cut there once a chunk is long; the chunk still continues
+# the current patient ("pacientul" is also said mid-discussion).
+TOPIC_CUE = re.compile(r"\b(pacient\w*|salonul|următor\w*|пациент\w*|больн\w*|следующ\w*|next patient|"
+                       r"agenda item)\b", re.IGNORECASE)
+CHUNK_MIN_WORDS = 220  # cut at the next weak cue once a chunk has this many words
 CHUNK_MAX_WORDS = 420  # hard cut
+TOPIC_MIN_WORDS = 25   # below this, a named cue renames the chunk instead of cutting (e.g. "Așa." + "patul 8")
+SENTENCE = re.compile(r"(?<=[.?!…])\s+")
 
 _STR = {"type": "string"}
 
@@ -57,36 +94,18 @@ def _bounded(schema, max_items, min_items):
     return schema
 
 
-# No "time" fields: code finds each item's transcript line (_locate), and every generated token costs ~0.15 s.
-_ACTIONS = _objs(max_items=5, task=_STR, owner=_STR, deadline=_STR,
-                 priority={"type": "string", "enum": ["high", "medium", "low"]})
-
+# Every fact is filed under its patient / agenda item, so nothing is written twice (the old schema had a plan
+# per topic plus global decision / action lists that repeated it) and code knows whose each item is.
+# No "time" fields: code finds each item's transcript line (_locate), and every generated token costs time.
 CHUNK_SCHEMA = {
     "type": "object",
     "properties": {
-        "topics": _objs(max_items=4, name=_STR, status=_STR, plan=_strs(6)),
-        "decisions": _strs(6),
-        "action_items": _ACTIONS,
-        "open_issues": _strs(3),
+        "topics": _objs(max_items=3, min_items=1, name=_STR, status=_STR, findings=_strs(7), decisions=_strs(6),
+                        tasks=_objs(max_items=4, task=_STR, owner=_STR, deadline=_STR,
+                                    priority={"type": "string", "enum": ["high", "medium", "low"]}),
+                        open=_strs(2)),
     },
-    "required": ["topics", "decisions", "action_items", "open_issues"],
-}
-
-# Experimental (--slots): explicit per-patient slots instead of a generic "plan", with decisions / action items
-# derived in code. With gemma3:4b it catches stopped drugs and named consultants but drops other facts, so it
-# scores below the generic schema (15-17 vs 19-21 on the reference checklist).
-_MEDS = _objs(max_items=6, drug=_STR, dose=_STR,
-              action={"type": "string", "enum": ["start", "stop", "increase", "decrease", "change", "continue"]})
-
-MEDICAL_CHUNK_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "patients": _objs(max_items=4, name=_STR, status=_STR, results=_strs(6), medications=_MEDS,
-                          procedures=_strs(4), consults=_objs(max_items=3, specialist=_STR, name=_STR),
-                          watch=_objs(max_items=3, what=_STR, until=_STR)),
-        "open_issues": _strs(3),
-    },
-    "required": ["patients", "open_issues"],
+    "required": ["topics"],
 }
 
 FINAL_SCHEMA = {
@@ -102,88 +121,136 @@ FINAL_SCHEMA = {
 # Known ASR errors and ICU slang, fixed in the transcript before any LLM call: small models copy misspelled
 # drug names instead of correcting them, and confuse abbreviations ("nor" 0.22 vs "DOB" 4) with each other.
 MEDICAL_LEXICON = [
-    (r"\b(di)?nor(ul|ului|u)?\b", "noradrenalină"),
+    (r"\bnorodrenal\w*", "noradrenalină"),
+    (r"\b(di)?nor(ul|ului|u|i)?\b", "noradrenalină"),
     (r"\bdob(-ul|ul|u)?\b", "dobutamină"),
     (r"\bm[ie]rop[ie]n[ae]m\w*", "meropenem"),
     (r"\bamica?cin\w*", "amikacină"),
+    (r"\b[bf]uconazol\w*", "fluconazol"),
     (r"\bclepsiell\w*|\bklepsiel\w*", "Klebsiella"),
-    (r"\bne(p|f)r[ao]st[oa]m\w*", "nefrostomă"),
+    (r"\bne(p|f)r[ao]st[oa](m|r)\w*", "nefrostomă"),
     (r"\bhidronifer\w*|\bhidronefr\w*", "hidronefroză"),
-    (r"\btrombopro(f|fl)\w*", "tromboprofilaxie"),
-    (r"\bdiacarp\w*", "Diacarb (acetazolamidă)"),
-    (r"\btrans ?f[aă]g[ei]an\w*|\btrans ?duracec\w*", "ecografie transesofagiană (ETE)"),
+    (r"\btrombopro(f|fl)\w*", "tromboprofilaxie (thromboprophylaxis)"),
+    (r"\bantiagreg\w*", "antiagregante (antiplatelets)"),
+    (r"\btrombe?aspira\w*", "tromboaspirație"),
+    (r"\btrivascular\w*", "trivascular (boală coronariană trivasculară)"),
+    (r"\bmitrala (trei|3)\b", "insuficiență mitrală gradul 3"),
+    (r"\bdiacar[bp]\w*", "Diacarb (acetazolamidă)"),
+    (r"\bforxiga\b", "Forxiga (dapagliflozin)"),
+    (r"\btr[aâ]ns ?(s?u|e?s?o)?f[aă]g[ei]an\w*|\btrans ?duracec\w*", "ecografie transesofagiană (ETE)"),
+    (r"\btr[aâ]ns ?t[uo]racic\w*", "ecografie transtoracică (ETT)"),
+    (r"\bi?endocardi\w*\s+te\s+ie?rnu\s+ved\w*", "endocardită nu se vede (no endocarditis)"),
+    (r"\bi?endocardi(?!t[ăa] nu se vede|tis\b)\w*", "endocardită"),
     (r"\b(pune\w*) (o )?arti?er[aăe]\w*", r"\1 linie arterială"),
     (r"\beco\b", "ecocardiografie"),
     (r"\bEKS\b", "EKS (pacemaker)"),
+    (r"\bpea?cemaker\w*", "pacemaker"),
+    (r"\bcre?t[ie]nin\w*", "creatinină"),
+    (r"\buria\b", "uree"),
+    (r"\bde oameni\b", "µmol/l"),  # "200 de micromoli" heard as "200 de oameni"
+    (r"\bclerus\w*", "clearance"),
+    (r"\blictizi\w*", "atelectazie"),
+    (r"\b(en)?cefalopat\w*", "encefalopatie"),
+    (r"\bechilibr\w*", "gazometrie"),
+    (r"\bvolemnic\b", "volemic"),
+    (r"\bg[aâ]nd de s[aâ]nge\b", "concentrat eritrocitar (transfuzie)"),
+    (r"\bdremul\b", "drenul"),
+    (r"\bm[âa]șc[ăa]\b", "mască"),
+    (r"\bne ?invaziv\w*", "ventilație neinvazivă"),
+    (r"\btensiun\w*", "tensiunea arterială"),
+    (r"\b(\d{2,3}) pe (\d{2,3})\b", r"\1/\2"),  # "80 pe 40" -> "80/40"
+    (r"\balcalotic\w*", "alcaloză metabolică"),
 ]
 
 GLOSSARY = """The transcript is noisy speech recognition of Romanian (with Russian and Latin medical terms); \
 speaker labels may be wrong. "gol" means the ventricles are empty (hypovolemia), not low ejection fraction. \
 "secundare" nodules means metastases. "scan" means CT scan. "stent"/"stentare" with "hidronefroză" means a \
-ureteral stent. "ruptura de cordaj" = chordae tendineae rupture."""
+ureteral stent. "ruptura de cordaj" = chordae tendineae rupture. "reanimare" = ICU. "boxa" = isolation room. \
+"suport presor" = vasopressors. "descărcat volemic" = fluid removed with diuretics. "am scos" = stopped, \
+"am introdus" = started."""
 
 CHUNK_SYSTEM = """You extract facts for the Minutes of a {meeting_type} meeting at Medpark hospital (Moldova) \
 from one part of the transcript. Translate everything into {language}; write short phrases.
 
 """ + GLOSSARY + """
 
-Rules:
-- Use only what is said in this part. Never invent values, names, owners or deadlines. Keep doses and lab \
-values exact.
-- topics: {topics_hint} {continuation}
-  name: the bed number or name exactly as said (e.g. "Bed 9"), or "" if not said. At most 6 plan items \
-per topic.
-- decisions: every management decision in this part, one short phrase each: drugs started, stopped or \
-changed (with dose), transfusions, procedures and scans ordered, consults requested.
-- action_items: concrete tasks, including what must be watched and until when. owner = the person's name \
-or role only if said in this part (e.g. "the cardiologist"), else "ICU team". deadline only if said (e.g. \
-"this evening", "tomorrow"), else "Not specified". priority: high = patient safety / urgent, medium = today, \
-low = other.
-- At most 5 action_items per part.
-- open_issues: unresolved questions or things being waited for.
-- Empty lists are fine if this part has nothing of that kind."""
+topics: {topics_hint} For each:
+- name: the bed / room exactly as said (e.g. "Bed 9"), or "" if not said.
+- status: {status_hint}
+- findings: {findings_hint}
+- decisions: what was decided or done in this meeting: {decisions_hint}
+- tasks: what must still be done, asked, awaited or watched, saying exactly what (e.g. "Watch for delirium", \
+"Ask Matei about the BiPAP mask"). owner = the named person or specialist who must act, only if said in \
+this part (e.g. "urologist Butnari"), else "". deadline only if said (e.g. "this evening"), else "". \
+priority: high = patient safety / urgent, medium = today, low = other.
+- open: unresolved questions.
+Use only what is said in this part. Never invent values, names, owners or deadlines. Keep doses and lab \
+values exact. Empty lists are fine."""
 
-TOPICS_HINT = {
-    "medical": "one entry per patient discussed in this part, in order (status = clinical state with key "
-               "values; plan = treatment steps). A new patient starts when the speakers move to another bed / "
-               "patient ('pacientul', 'patul').",
-    "executive": "one entry per agenda item (status = where it stands with key figures; plan = next steps).",
-    "administrative": "one entry per agenda item (status = where it stands; plan = next steps).",
+HINTS = {
+    "medical": dict(
+        topics_hint="one entry per patient discussed in this part, in order. Start a new entry only when the "
+                    "speakers clearly move to another bed / patient.",
+        status_hint="diagnosis, history and current state (therapy running with doses, consciousness), at "
+                    "most 30 words; lab / imaging values go in findings, not here. For a topic that is not a "
+                    "patient (e.g. expected admissions): what was said.",
+        findings_hint="every vital sign (blood pressure, SpO2, heart rate), lab value, blood gas, imaging, "
+                      "echocardiography or culture result mentioned, with exact values and trend (e.g. "
+                      "\"creatinine 240 µmol/l, was 90\").",
+        decisions_hint="the treatment plan: drugs started, stopped, changed (with the dose) or continued, "
+                       "procedures, lines, scans, transfusions, consults ordered."),
+    "executive": dict(
+        topics_hint="one entry per agenda item, in order.",
+        status_hint="where it stands, with key figures, at most 35 words.",
+        findings_hint="every figure, result or fact reported.",
+        decisions_hint="what was approved, rejected or changed."),
+    "administrative": dict(
+        topics_hint="one entry per agenda item, in order.",
+        status_hint="where it stands, at most 35 words.",
+        findings_hint="every figure, result or fact reported.",
+        decisions_hint="what was approved, rejected or changed."),
 }
-
-MEDICAL_CHUNK_SYSTEM = """You extract facts for the Minutes of a medical meeting (ICU handover) at Medpark hospital \
-(Moldova) from one part of the transcript. Translate everything into {language}; write short phrases.
-
-""" + GLOSSARY + """
-
-List each patient discussed in this part, in order. A new patient starts when the speakers move to another bed \
-or patient ('pacientul', 'patul'). {continuation}
-- name: the bed number exactly as said (e.g. "Bed 9"), or "" if not said.
-- status: diagnosis and current clinical state, at most 25 words.
-- results: every lab value and every imaging (CT, echocardiography) or microbiology finding mentioned, with \
-values (e.g. "creatinine 240, was 90", "CT: pleural fluid right 600 ml").
-- medications: every drug mentioned, with what was decided (start, stop, increase, decrease, change or \
-continue) and the current (latest) dose exactly as said, or "".
-- procedures: interventions done or ordered (lines, scans, echocardiography, transfusion, ventilation, \
-drains, stents).
-- consults: specialists called or to be called; name only if said, else "".
-- watch: what must be monitored or awaited; until = the time limit if said (e.g. "this evening"), else "".
-- open_issues: unresolved questions in this part.
-Use only what is said. Never invent values or names. Empty lists are fine."""
 
 FINAL_SYSTEM = """You write the header of the Minutes of a {meeting_type} meeting at Medpark hospital, in \
 {language}, from the facts already extracted below. Use only these facts.
 - title: short, specific.
-- summary: 2-3 sentences for a reader who missed the meeting.
-- suggestions: at most 3 follow-ups the team may have overlooked, based only on these facts, at most \
+- summary: 2-3 sentences for a reader who missed the meeting: who was discussed and the main decisions.
+- suggestions: at most 3 follow-ups the team may have overlooked (not already an open issue), based only \
+on these facts, at most \
 15 words each.
 Never add details that are not in the facts (no age, sex, diagnoses or numbers of your own)."""
+
+# Small models translate the same drug differently from chunk to chunk; one name per drug lets duplicates merge.
+CANONICAL = [
+    (r"\bnorepinephrine\b", "noradrenaline"),
+    (r"\bnoradrenalin(?!e)\b", "noradrenaline"),
+]
+EMPTY = re.compile(r"^(none|n/?a|nothing|not (specified|mentioned|said|stated)|unknown|-+)?\W*$", re.I)
+# Sentences a model writes instead of leaving a field empty ("Patient status not fully detailed.").
+FILLER = re.compile(r"[^.;]*\b(not (fully )?(detailed|specified|mentioned|discussed|said)|no (details|information)|unclear|"
+                    r"discussion (revolves|about|regarding))\b[^.;]*[.;]?\s*", re.I)
+# Plan items that change nothing: kept under the patient, but they are not key moments.
+UNCHANGED = re.compile(r"^(continu|maintain|keep|consider|plan)\w*\b", re.I)
+# Items that change the patient's care rank first among key moments.
+ACTION = re.compile(r"\b(start|stop|order|plac|insert|transfus|call|consult|increas|reduc|decreas|switch|chang|"
+                    r"set|adjust|introduc|discontinu|withdr)\w*", re.I)
+MAX_IN_FLIGHT = 2  # chunks sent to Ollama at once: 1.4x faster on an M4 with OLLAMA_NUM_PARALLEL=2, 4 is slower
 
 
 def normalize(text: str) -> str:
     for pattern, replacement in MEDICAL_LEXICON:
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
     return text
+
+
+def _clean(text: str) -> str:
+    """Model output with one name per drug, or "" for filler ("None", "N/A", "")."""
+    text = FILLER.sub("", text).strip()
+    if EMPTY.match(text):
+        return ""
+    for pattern, replacement in CANONICAL:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    return text[:1].upper() + text[1:]
 
 
 def _short_time(ts: str) -> str:
@@ -196,6 +263,13 @@ def format_line(start: str, speaker: str, text: str):
     words = text.split()
     if len(words) >= 4 and len(set(w.strip(",.").lower() for w in words)) / len(words) < 0.3:
         return None  # "Viniște, viniște, viniște, ..." style hallucination
+    seen, kept = set(), []
+    for sentence in SENTENCE.split(text):  # "Bine, când va faceți acest tratament." x5 style loop
+        key = re.sub(r"\W+", " ", sentence.lower()).strip()
+        if key not in seen or len(key) < 12:
+            kept.append(sentence)
+        seen.add(key)
+    text = " ".join(kept)
     speaker = re.sub(r"SPEAKER\s*", "S", speaker.strip())
     return f"[{_short_time(start)}] {speaker}: {normalize(text)}"
 
@@ -211,7 +285,7 @@ def parse_dialog(path: Path) -> list:
     return lines
 
 
-def _chat(model, system, user, schema, num_ctx=4096, num_thread=10, num_predict=900, retry=True,
+def _chat(model, system, user, schema, num_ctx=4096, num_thread=10, num_predict=1000, retry=True,
           temperature=0.1):
     body = {
         "model": model,
@@ -222,14 +296,18 @@ def _chat(model, system, user, schema, num_ctx=4096, num_thread=10, num_predict=
         "options": {"temperature": temperature if retry else 0.4, "num_ctx": num_ctx, "num_thread": num_thread,
                     "num_predict": num_predict},
     }
-    if model.startswith("qwen3"):
-        body["think"] = False
+    if model.startswith(("qwen3", "gemma4")):
+        body["think"] = False  # thinking models would spend the whole num_predict budget before the JSON
     req = urllib.request.Request(OLLAMA_URL, data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     t = time.perf_counter()
     try:
         with urllib.request.urlopen(req, timeout=3600) as resp:
             data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise RuntimeError(f"Ollama has no model {model!r}. Download it with: ollama pull {model}")
+        raise RuntimeError(f"Ollama error for {model}: {e}")
     except OSError as e:
         raise RuntimeError(f"Could not reach Ollama at {OLLAMA_URL}. Is it running? ({e})")
     stats = {"wall": round(time.perf_counter() - t, 1), "prompt_tokens": data.get("prompt_eval_count", 0),
@@ -247,20 +325,20 @@ def _chat(model, system, user, schema, num_ctx=4096, num_thread=10, num_predict=
         raise
 
 
+def _cue_name(sentence: str):
+    """Name of the bed / room / item a sentence moves to ("da pacientul de pipatu nouă" -> "Bed 9"), or None."""
+    for pattern, name in NAME_CUES:
+        m = pattern.search(sentence)
+        if m:
+            n = m.groupdict().get("n")
+            return name.format(n=WORD_TO_NUMBER.get(n.lower(), n) if n else "")
+    return None
+
+
 def _bed(name: str) -> str:
     """Bed number in a topic name ("Bed 9" -> "9"), or "" if there is none."""
     digits = re.findall(r"\d+", name)
     return digits[0] if digits else ""
-
-
-# Spoken numbers (Romanian, Russian) used to check a bed number the model claims was said.
-NUMBER_WORDS = {
-    "1": "unu|unul|una|один", "2": "doi|două|doua|два", "3": "trei|три", "4": "patru|четыре",
-    "5": "cinci|пять", "6": "șase|sase|шесть", "7": "șapte|sapte|семь", "8": "opt|восемь",
-    "9": "nouă|noua|девять", "10": "zece|десять", "11": "unsprezece", "12": "doisprezece",
-    "13": "treisprezece", "14": "paisprezece", "15": "cincisprezece", "16": "șaisprezece",
-    "17": "șaptesprezece", "18": "optsprezece", "19": "nouăsprezece", "20": "douăzeci",
-}
 
 
 def _number_said(number: str, text: str) -> bool:
@@ -311,18 +389,14 @@ def _union(a: dict, b: dict) -> dict:
     """Merge a second extraction of the same chunk into the first one.
 
     Topics are matched by position (both samples list the patients of the chunk in order); a topic that only
-    the second sample has is dropped, since its patient split cannot be trusted. Everything else is united
-    and near-duplicates are removed.
+    the second sample has is dropped, since its patient split cannot be trusted. List fields are united and
+    near-duplicates are removed.
     """
-    out = {k: list(v) for k, v in a.items()}
-    list_key = "topics" if "topics" in a else "patients"
-    for mine, theirs in zip(out[list_key], b[list_key]):
+    out = {"topics": [dict(t) for t in a["topics"]]}
+    for mine, theirs in zip(out["topics"], b["topics"]):
         for field, value in theirs.items():
             if isinstance(value, list):
                 mine[field] = mine[field] + [x for x in value if not any(_same(x, y) for y in mine[field])]
-    for key in out:
-        if key != list_key:
-            out[key] += [x for x in b[key] if not any(_same(x, y) for y in out[key])]
     return out
 
 
@@ -335,73 +409,106 @@ class MinutesBuilder:
     """Incremental minutes: feed transcript lines as they arrive, then finalize()."""
 
     def __init__(self, meeting_type="medical", model=DEFAULT_MODEL, language="English", num_thread=10,
-                 verbose=True, final_model=None, slots=False, samples=2):
+                 verbose=True, final_model=None, samples=1):
         self.meeting_type, self.model, self.language = meeting_type, model, language
         self.samples = max(1, min(samples, len(SAMPLE_TEMPERATURES) + 1))
         self.final_model = final_model or model
-        # Per-patient slots (medications / consults / watch). Experimental: with gemma3:4b it catches stopped
-        # drugs and named consultants but drops other facts, scoring below the generic schema overall.
-        self.slots = slots and meeting_type == "medical"
-        self.starts_new_topic = True  # the current buffer starts at a topic cue (or the meeting start)
+        self.default_owner = "ICU team" if meeting_type == "medical" else "Team"
         self.num_thread, self.verbose = num_thread, verbose
+        # The system prompt is identical for every chunk (the per-chunk note goes into the user message),
+        # so Ollama reuses its cached prompt instead of re-reading it on every call.
+        self.system = CHUNK_SYSTEM.format(meeting_type=meeting_type, language=language, **HINTS[meeting_type])
         self.buffer, self.buffer_words = [], 0
+        self.starts_new_topic, self.next_name = True, None  # what the current buffer starts with
+        self.current_name = None  # the bed / room the speakers are on, from the last name cue
+        self.label = None  # name of the topic the next continuation chunk continues
+        # Chunks are extracted in the background (up to MAX_IN_FLIGHT at once) and merged strictly in order.
+        self.pool, self.pending, self.submitted = ThreadPoolExecutor(MAX_IN_FLIGHT), [], 0
         self.topics, self.decisions, self.actions, self.issues = [], [], [], []
         self.warnings = []
         self.calls = []
 
     def add_line(self, line: str):
-        words = len(line.split())
-        text = line.split(":", 1)[-1]
-        cue = bool(TOPIC_CUE.search(text))
-        if self.buffer and (self.buffer_words + words > CHUNK_MAX_WORDS or
-                            (self.buffer_words >= CHUNK_MIN_WORDS and cue)):
+        prefix, text = line.split(": ", 1)
+        sentences = SENTENCE.split(text)
+        for i, sentence in enumerate(sentences):
+            name = _cue_name(sentence)
+            if name and name != self.current_name:
+                # Cut exactly at the sentence that moves on, even in the middle of a long utterance.
+                if i:
+                    self._append(f"{prefix}: {' '.join(sentences[:i])}")
+                self._start_topic(name)
+                self._append(f"{prefix}: {' '.join(sentences[i:])}")
+                return
+        if self.buffer_words >= CHUNK_MIN_WORDS and TOPIC_CUE.search(text):
             self._flush()
-            self.starts_new_topic = cue
+        self._append(line)
+
+    def _append(self, line: str):
+        words = len(line.split())
+        if self.buffer and self.buffer_words + words > CHUNK_MAX_WORDS:
+            self._flush()  # mid-discussion: the next chunk continues the current patient
         self.buffer.append(line)
         self.buffer_words += words
+
+    def _start_topic(self, name: str):
+        self.current_name = name
+        if self.buffer_words < TOPIC_MIN_WORDS and self.starts_new_topic and not self.next_name:
+            self.next_name = name  # only a preamble ("Așa.") so far: it belongs to this patient
+            return
+        self._flush()
+        self.starts_new_topic, self.next_name = True, name
 
     def _flush(self):
         if not self.buffer:
             return
-        self.continues = bool(self.topics) and not self.starts_new_topic
-        # Only the name: given the previous status, small models copy it into this chunk's output.
-        continuation = (f'This part starts in the middle of the discussion of "{self.topics[-1]["name"]}"; '
-                        f'the first topic is that one (report only what is new in this part).'
-                        if self.continues else "")
-        medical = self.slots
-        if medical:
-            system = MEDICAL_CHUNK_SYSTEM.format(language=self.language, continuation=continuation)
+        continues = self.submitted > 0 and not self.starts_new_topic
+        if continues:
+            note = (f'The first lines continue the discussion of {self.label or "the previous patient"}: make it '
+                    f'the first topic and report only what is new.\n\n')
+        elif self.next_name:
+            note = f"This part starts with {self.next_name}.\n\n"
         else:
-            system = CHUNK_SYSTEM.format(meeting_type=self.meeting_type, language=self.language,
-                                         topics_hint=TOPICS_HINT[self.meeting_type], continuation=continuation)
-        user = "Transcript part:\n\n" + "\n".join(self.buffer)
-        schema = MEDICAL_CHUNK_SCHEMA if medical else CHUNK_SCHEMA
-        # Self-consistency: a small model misses a different random subset of facts on every run, so extra
-        # samples at a higher temperature are merged in (union; duplicates are dropped by the merge step).
-        # The samples are sent concurrently: with OLLAMA_NUM_PARALLEL >= samples they are decoded as one batch,
-        # which on CPU costs little more than a single sample (decoding is memory-bandwidth bound).
+            note = ""
+        user = note + "Transcript part:\n\n" + "\n".join(self.buffer)
+        future = self.pool.submit(self._extract, user)
+        self.pending.append((future, self.buffer, self.buffer_words, continues, self.next_name))
+        self.submitted += 1
+        if not continues:
+            self.label = self.next_name
+        self.buffer, self.buffer_words = [], 0
+        self.starts_new_topic, self.next_name = False, None
+        self._merge_ready()
+
+    def _extract(self, user: str):
+        # Self-consistency (--samples 2+): a small model misses a different random subset of facts on every
+        # run, so extra samples at a higher temperature are merged in. Only worth it when Ollama decodes them
+        # as one batch (OLLAMA_NUM_PARALLEL >= samples); otherwise each sample adds the full time again.
         temperatures = (0.1,) + SAMPLE_TEMPERATURES[:self.samples - 1]
         t = time.perf_counter()
         with ThreadPoolExecutor(len(temperatures)) as pool:
-            results = list(pool.map(lambda temp: _chat(self.model, system, user, schema, num_thread=self.num_thread,
-                                                       temperature=temp), temperatures))
+            results = list(pool.map(lambda temp: _chat(self.model, self.system, user, CHUNK_SCHEMA,
+                                                       num_thread=self.num_thread, temperature=temp),
+                                    temperatures))
         part, stats = results[0]
         for extra, extra_stats in results[1:]:
             part = _union(part, extra)
             stats["output_tokens"] += extra_stats["output_tokens"]
-        stats.update(step="map", wall=round(time.perf_counter() - t, 1), lines=len(self.buffer),
-                     words=self.buffer_words, samples=self.samples)
-        self.calls.append(stats)
-        if self.verbose:
-            print(f"  map {self.buffer[0].split()[0]}..{self.buffer[-1].split()[0]} {self.buffer_words} words: "
-                  f"{stats['wall']}s ({stats['prompt_tokens']} in / {stats['output_tokens']} out)",
-                  file=sys.stderr, flush=True)
-        chunk_time = self.buffer[0][1:self.buffer[0].index("]")]
-        if medical:
-            self._merge_medical(part, chunk_time, self.buffer)
-        else:
-            self._merge(part, chunk_time, self.buffer)
-        self.buffer, self.buffer_words = [], 0
+        stats["wall"] = round(time.perf_counter() - t, 1)
+        return part, stats
+
+    def _merge_ready(self, wait=False):
+        """Merge finished chunks in transcript order (all of them when wait=True)."""
+        while self.pending and (wait or self.pending[0][0].done()):
+            future, lines, words, continues, cue_name = self.pending.pop(0)
+            part, stats = future.result()
+            stats.update(step="map", lines=len(lines), words=words, samples=self.samples)
+            self.calls.append(stats)
+            if self.verbose:
+                print(f"  map {lines[0].split()[0]}..{lines[-1].split()[0]} {words} words"
+                      f"{' (' + cue_name + ')' if cue_name else ''}: {stats['wall']}s "
+                      f"({stats['prompt_tokens']} in / {stats['output_tokens']} out)", file=sys.stderr, flush=True)
+            self._merge(part, lines, continues, cue_name)
 
     def _check(self, text: str, source_numbers: set, chunk_time: str) -> str:
         """Flag doses / lab values that do not occur in the transcript chunk they were extracted from."""
@@ -425,151 +532,120 @@ class MinutesBuilder:
             return "" if self.meeting_type == "medical" else name
         return name if _number_said(bed, chunk_text) else ""
 
-    def _merge(self, part, chunk_time, lines):
-        """Code decides patient identity: only a chunk cut in mid-discussion continues the previous entry.
+    def _topic_for(self, i, t, continues, cue_name, chunk_text, chunk_time) -> int:
+        """Index of the topic an extracted entry belongs to; creates it if it is new.
 
-        Topics are never merged by name: small models mislabel beds, and a wrong name is far less harmful
-        than two patients merged into one. Item times come from the transcript line the item matches best;
-        the model's own time (often missing or wrong) is only the fallback.
+        Code decides patient identity: a chunk cut in mid-discussion continues the previous entry, and a chunk
+        cut at a name cue starts that patient (or returns to it). Model names are only trusted for further
+        patients inside a chunk, and never used to merge: small models mislabel beds, and a wrong name is far
+        less harmful than two patients merged into one.
         """
-        chunk_text = "\n".join(lines)
-        src = _key_numbers(chunk_text)
-        for i, t in enumerate(part["topics"]):
-            status = self._check(t["status"], src, chunk_time)
-            plan = [self._check(x, src, chunk_time) for x in t["plan"]]
-            target = self.topics[-1] if i == 0 and self.continues else None
-            if target is None:
-                name = self._checked_name(t["name"], chunk_text) or f"Patient {len(self.topics) + 1}"
-                self.topics.append({"name": name, "status": status, "plan": plan, "time": chunk_time})
-                continue
+        if i == 0 and continues:
+            idx = len(self.topics) - 1
             name = self._checked_name(t["name"], chunk_text)
-            if name and target["name"].startswith("Patient "):
-                target["name"] = name
-            if status and not any(_similar(status, s) for s in target["status"].split("; ")):
-                target["status"] += "; " + status
-            target["plan"] += [x for x in plan if not any(_similar(x, y) for y in target["plan"])]
-        for d in part["decisions"]:
-            if not any(_similar(d, x["decision"]) for x in self.decisions):
-                self.decisions.append({"decision": self._check(d, src, chunk_time),
-                                       "time": _locate(d, lines, chunk_time)})
-        for a in part["action_items"]:
-            if not any(_similar(a["task"], x["task"]) for x in self.actions):
-                self.actions.append({**a, "task": self._check(a["task"], src, chunk_time),
-                                     "time": _locate(a["task"], lines, chunk_time)})
-        self.issues += [x for x in part["open_issues"] if not any(_similar(x, y) for y in self.issues)]
+            if name and self.topics[idx]["name"].startswith("Patient "):
+                self.topics[idx]["name"] = name
+            return idx
+        if i == 0 and cue_name:
+            for idx, topic in enumerate(self.topics):
+                if topic["name"] == cue_name:
+                    return idx
+        name = (cue_name if i == 0 else None) or self._checked_name(t["name"], chunk_text)
+        self.topics.append({"name": name or f"Patient {len(self.topics) + 1}", "time": chunk_time,
+                            "status": "", "findings": []})
+        return len(self.topics) - 1
 
-    def _merge_medical(self, part, chunk_time, lines):
-        """Turn the per-patient slots into topics, decisions and action items (linked to their patient)."""
-        text = "\n".join(lines)
-        src = _key_numbers(text)
+    def _merge(self, part, lines, continues, cue_name):
+        chunk_text = "\n".join(lines)
+        chunk_time = lines[0][1:lines[0].index("]")]
+        src = _key_numbers(chunk_text)
 
-        def item(s):  # number check + timestamp of the transcript line it comes from
-            s = self._check(s, src, chunk_time)
-            return s, _locate(s, lines, chunk_time)
+        def checked(text):
+            text = _clean(text)
+            return text and self._check(text, src, chunk_time)
 
-        for i, p in enumerate(part["patients"]):
-            if i == 0 and self.continues:
-                idx = len(self.topics) - 1
-                name = self._checked_name(p["name"], text)
-                if name and self.topics[idx]["name"].startswith("Patient "):
-                    self.topics[idx]["name"] = name
-            else:
-                name = self._checked_name(p["name"], text) or f"Patient {len(self.topics) + 1}"
-                self.topics.append({"name": name, "status": "", "plan": [], "time": chunk_time})
-                idx = len(self.topics) - 1
+        for i, t in enumerate(part["topics"]):
+            idx = self._topic_for(i, t, continues, cue_name, chunk_text, chunk_time)
             topic = self.topics[idx]
-            status = p["status"].strip().rstrip(".")
-            status += f". Results: {'; '.join(p['results'])}." if p["results"] else ("." if status else "")
-            status, _ = item(status)
+            status = checked(t["status"]).rstrip(".")
             if status and not any(_similar(status, s) for s in topic["status"].split("; ") if s):
                 topic["status"] = f"{topic['status']}; {status}" if topic["status"] else status
-
-            def add(task, decision=False, owner="ICU team", deadline="Not specified", priority="high",
-                    plan_only=False):
-                task, t = item(task)
-                if not any(_similar(task, x) for x in topic["plan"]):
-                    topic["plan"].append(task)
-                if plan_only:
-                    return
-                target = self.decisions if decision else self.actions
-                key = "decision" if decision else "task"
-                if any(_similar(task, x[key]) and x["_topic"] == idx for x in target):
-                    return
-                entry = {key: task, "time": t, "_topic": idx}
-                if not decision:
-                    entry.update(owner=owner, deadline=deadline, priority=priority)
-                target.append(entry)
-
-            for m in p["medications"]:
-                dose = m["dose"].strip()
-                dose = f" {dose}" if dose and dose not in m["drug"] else ""
-                unchanged = m["action"] == "continue"  # plan only: not a decision, not a new task
-                add(f"{m['action'].capitalize()} {m['drug'].strip()}{dose}", decision=True, plan_only=unchanged)
-            for proc in p["procedures"]:
-                add(proc[:1].upper() + proc[1:])
-            for c in p["consults"]:
-                who = f"{c['specialist'].strip()} {c['name'].strip()}".strip()
-                add(f"Consult {who}", owner=who, priority="medium")
-            for w in p["watch"]:
-                what, until = re.sub(r"^(monitor\w*\s*)+", "", w["what"].strip(), flags=re.I), w["until"].strip()
-                if len(re.findall(r"\w{3,}", what)) < 1:  # "Monitor monitor" style filler
-                    continue
-                add(f"Monitor {what}", deadline=until or "Not specified",
-                    priority="high" if until else "medium")
-        self.issues += [x for x in part["open_issues"] if not any(_similar(x, y) for y in self.issues)]
+            for f in map(checked, t["findings"]):
+                if f and not any(_similar(f, x) for x in topic["findings"]):
+                    topic["findings"].append(f)
+            for d in map(checked, t["decisions"]):
+                if d and not any(_similar(d, x["decision"]) for x in self.decisions if x["_topic"] == idx):
+                    self.decisions.append({"decision": d, "time": _locate(d, lines, chunk_time), "_topic": idx})
+            for a in t["tasks"]:
+                task = checked(a["task"])
+                if task and not any(_similar(task, x["task"]) for x in self.actions if x["_topic"] == idx):
+                    self.actions.append({"task": task, "owner": _clean(a["owner"]) or self.default_owner,
+                                         "deadline": _clean(a["deadline"]) or "Not specified",
+                                         "priority": a["priority"], "time": _locate(task, lines, chunk_time),
+                                         "_topic": idx})
+            for o in map(_clean, t["open"]):
+                if o and not any(_similar(o, x["issue"]) for x in self.issues):
+                    self.issues.append({"issue": o, "_topic": idx})
 
     def _facts_text(self) -> str:
-        """Merged facts as compact text for the finalize call (statuses, decisions, open issues only)."""
-        out = ["Topics:"] + [f"- {t['name']}: {t['status']}" for t in self.topics]
-        out += ["Decisions:"] + [f"- {d['decision']}" + (f" ({d['patient']})" if d.get("patient") else "")
-                                 for d in self.decisions]
-        out += ["Open issues:"] + [f"- {i}" for i in self.issues]
+        """Merged facts as compact text for the finalize call (statuses and decisions per patient)."""
+        out = []
+        for idx, t in enumerate(self.topics):
+            out.append(f"- {t['name']}: {t['status']}")
+            out += [f"  - decided: {d['decision']}" for d in self.decisions if d["_topic"] == idx]
+        out += ["Open issues:"] + [f"- {i['issue']}" for i in self.issues]
         return "\n".join(out)
 
-    def _key_moments(self, limit=5) -> list:
+    def _key_moments(self, limit=6) -> list:
         """Most important moments, chosen in code from what the chunk extraction already rated.
 
-        Selecting (instead of letting the LLM rewrite) keeps them traceable and saves ~25 s on CPU.
+        Selecting (instead of letting the LLM rewrite) keeps them traceable and saves an LLM call. One per
+        patient first, so a long discussion of one patient does not crowd out the others.
         """
-        rank = {"high": 0, "medium": 1, "low": 2}
-        items = sorted(self.actions, key=lambda a: rank.get(a["priority"], 3))
-        def who(x):
-            return f" — {x['patient']}" if x.get("patient") else ""
-
-        picked = [{"time": a["time"], "moment": a["task"] + who(a)} for a in items if a["priority"] == "high"]
-        picked += [{"time": d["time"], "moment": d["decision"] + who(d)} for d in self.decisions]
-        moments = []
-        for m in picked:
-            if not any(_similar(m["moment"], x["moment"]) for x in moments):
-                moments.append(m)
-        return sorted(moments[:limit], key=lambda m: m["time"])
+        candidates = [(d["time"], d["decision"], d["patient"]) for d in self.decisions
+                      if not UNCHANGED.match(d["decision"])]
+        candidates += [(a["time"], a["task"], a["patient"]) for a in self.actions if a["priority"] == "high"]
+        candidates.sort(key=lambda c: not ACTION.search(c[1]))  # care changes first (stable sort)
+        picked, seen = [], set()
+        for rnd in (0, 1, 2):
+            for time_, text, patient in candidates:
+                if len(picked) >= limit:
+                    break
+                if (rnd == 0 and patient in seen) or any(_similar(text, m["moment"]) for m in picked):
+                    continue
+                seen.add(patient)
+                picked.append({"time": time_, "moment": f"{text} — {patient}"})
+        return sorted(picked, key=lambda m: m["time"])
 
     def finalize(self) -> dict:
         system = FINAL_SYSTEM.format(meeting_type=self.meeting_type, language=self.language)
+        self._merge_ready(wait=True)
         if self.topics and self.buffer:
             # The header (title / summary / suggestions) is written from everything before the last chunk,
             # concurrently with extracting that last chunk (needs OLLAMA_NUM_PARALLEL >= samples + 1). The last
             # minutes are usually wrap-up, and key moments / tables below still include them.
-            facts = self._facts_text()
-            with ThreadPoolExecutor(1) as pool:
-                header = pool.submit(_chat, self.final_model, system, facts, FINAL_SCHEMA,
-                                     num_thread=self.num_thread, num_predict=400)
-                self._flush()
-                head, stats = header.result()
+            header = self.pool.submit(_chat, self.final_model, system, self._facts_text(), FINAL_SCHEMA,
+                                      num_thread=self.num_thread, num_predict=400)
+            self._flush()
+            self._merge_ready(wait=True)
+            head, stats = header.result()
         else:
             self._flush()
+            self._merge_ready(wait=True)
             head, stats = _chat(self.final_model, system, self._facts_text(), FINAL_SCHEMA,
                                 num_thread=self.num_thread, num_predict=400)
-        for entry in self.decisions + self.actions:  # patients can be renamed after an item was recorded
-            if "_topic" in entry:
-                entry["patient"] = self.topics[entry.pop("_topic")]["name"]
+        self.pool.shutdown()
+        for entry in self.decisions + self.actions + self.issues:  # patients can be renamed after recording
+            entry["patient"] = self.topics[entry.pop("_topic")]["name"]
         stats["step"] = "finalize"
         self.calls.append(stats)
         if self.verbose:
             print(f"  finalize: {stats['wall']}s ({stats['prompt_tokens']} in / {stats['output_tokens']} out)",
                   file=sys.stderr, flush=True)
-        return {**head, "key_moments": self._key_moments(), "topics": self.topics, "decisions": self.decisions,
-                "action_items": self.actions, "open_issues": self.issues, "warnings": self.warnings}
+        return {**head, "suggestions": [s for s in map(_clean, head["suggestions"]) if s],
+                "key_moments": self._key_moments(), "topics": self.topics, "decisions": self.decisions,
+                "action_items": self.actions,
+                "open_issues": [f"{i['patient']}: {i['issue']}" for i in self.issues], "warnings": self.warnings}
 
 
 class LiveMinutes:
@@ -608,19 +684,20 @@ def to_markdown(m: dict, meeting_type: str) -> str:
     out += ["## Key moments"] + [f"- `{k['time']}` {k['moment']}" for k in m["key_moments"]] + [""]
     out.append("## Patients" if meeting_type == "medical" else "## Agenda items")
     for t in m["topics"]:
-        out += [f"### {t['name']}  `{t['time']}`", f"**Status:** {t['status']}"]
-        if t["plan"]:
-            out += ["", "**Plan:**"] + [f"- {p}" for p in t["plan"]]
+        out += [f"### {t['name']}  `{t['time']}`", f"**Status:** {t['status'] or '—'}"]
+        if t["findings"]:
+            out += ["", "**Findings:**"] + [f"- {f}" for f in t["findings"]]
+        decisions = [d for d in m["decisions"] if d["patient"] == t["name"]]
+        if decisions:
+            out += ["", "**Decisions:**"] + [f"- `{d['time']}` {d['decision']}" for d in decisions]
         out.append("")
-    out += ["## Decisions"] + [f"- `{d['time']}` {d['decision']}" + (f" — {d['patient']}" if d.get("patient")
-                                                                       else "") for d in m["decisions"]]
-    by_patient = any(a.get("patient") for a in m["action_items"])
-    head = "| # | Task |" + (" Patient |" if by_patient else "") + " Owner | Deadline | Priority | Time |"
-    out += ["", "## Action items", head, "|---" * head.count(" |") + "|"]
+    head = "| # | Task | Patient | Owner | Deadline | Priority | Time |" if meeting_type == "medical" else \
+        "| # | Task | Item | Owner | Deadline | Priority | Time |"
+    out += ["## Action items", head, "|---" * head.count(" |") + "|"]
     order = {"high": 0, "medium": 1, "low": 2}
     for i, a in enumerate(sorted(m["action_items"], key=lambda a: order.get(a["priority"], 3)), 1):
-        patient = f" {a.get('patient', '')} |" if by_patient else ""
-        out.append(f"| {i} | {a['task']} |{patient} {a['owner']} | {a['deadline']} | {a['priority']} | {a['time']} |")
+        out.append(f"| {i} | {a['task']} | {a['patient']} | {a['owner']} | {a['deadline']} | {a['priority']} "
+                   f"| {a['time']} |")
     if m["open_issues"]:
         out += ["", "## Open issues"] + [f"- {o}" for o in m["open_issues"]]
     if m["suggestions"]:
@@ -636,9 +713,9 @@ def main():
     p.add_argument("--type", choices=MEETING_TYPES, default="medical")
     p.add_argument("--model", default=DEFAULT_MODEL, help="model for extracting facts from each chunk")
     p.add_argument("--final-model", help="model for title/summary/suggestions (default: --model)")
-    p.add_argument("--slots", action="store_true", help="medical: experimental per-patient slot extraction")
-    p.add_argument("--samples", type=int, default=2,
-                   help="extractions per chunk merged together (1-3); more = better recall, slower")
+    p.add_argument("--samples", type=int, default=1,
+                   help="extractions per chunk merged together (1-3); more = better recall, slower unless "
+                        "OLLAMA_NUM_PARALLEL >= samples")
     p.add_argument("--language", default="English")
     p.add_argument("--threads", type=int, default=10)
     p.add_argument("--out", type=str, help="output path prefix (writes .json, .md, .meta.json)")
@@ -646,17 +723,16 @@ def main():
 
     t0 = time.perf_counter()
     builder = MinutesBuilder(args.type, args.model, args.language, args.threads, final_model=args.final_model,
-                             slots=args.slots, samples=args.samples)
+                             samples=args.samples)
     for line in parse_dialog(args.dialog):
         builder.add_line(line)
-    t_before_last = time.perf_counter()
-    last_chunk_calls = len(builder.calls)
     minutes = builder.finalize()
     total = time.perf_counter() - t0
     # With live transcription, everything except the last chunk and finalize runs during the meeting.
-    after_end = time.perf_counter() - t_before_last
+    maps = [c for c in builder.calls if c["step"] == "map"]
+    after_end = (maps[-1]["wall"] if maps else 0) + builder.calls[-1]["wall"]
     stats = {"model": args.model, "final_model": builder.final_model, "total_seconds": round(total, 1),
-             "seconds_after_transcript_end": round(after_end, 1), "map_calls": last_chunk_calls + 1,
+             "seconds_after_transcript_end": round(after_end, 1), "map_calls": len(maps),
              "calls": builder.calls}
     md = to_markdown(minutes, args.type)
     print(md)

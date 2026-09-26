@@ -97,7 +97,7 @@ def main():
     common.add_argument("--llm-model", default="llama3.1:8b", help="Ollama model name")
     common.add_argument("--minutes", choices=["medical", "executive", "administrative"],
                         help="dialog only: also write Minutes of Meeting for this meeting type (Ollama)")
-    common.add_argument("--minutes-model", default="gemma3:4b", help="Ollama model for the minutes")
+    common.add_argument("--minutes-model", default="gemma4:e4b", help="Ollama model for the minutes")
 
     t = sub.add_parser("transcribe", parents=[common], help="transcribe an audio/video file")
     t.add_argument("file")

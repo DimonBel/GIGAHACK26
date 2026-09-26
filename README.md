@@ -6,13 +6,39 @@ Everything runs locally on your Mac (Metal GPU acceleration) — no cloud APIs.
 ## Setup
 
 ```bash
-brew install whisper-cpp ffmpeg
-mkdir -p models
-curl -L -o models/ggml-large-v3.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin
-brew install python@3.12
+brew install whisper-cpp ffmpeg ollama python@3.12
 python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
+
+## Models to install
+
+Models are not in git (`models/` is gitignored). Download them once:
+
+| Model | Used for | Size | Required? |
+|---|---|---|---|
+| `models/ggml-large-v3.bin` (Whisper Large V3) | speech-to-text | 3.1 GB | yes |
+| `models/ggml-silero-v5.1.2.bin` (Silero VAD) | skips silence, fewer hallucinated words | 0.9 MB | recommended (used automatically if present) |
+| pyannote 3.1 (Hugging Face) | who said what (`dialog`) | ~30 MB | for `dialog` — see [Speaker dialog](#speaker-dialog-who-said-what) |
+| `gemma4:e4b` (Ollama) | Minutes of Meeting | 9.6 GB | for `--minutes` / `stt.minutes` |
+| `llama3.1:8b` (Ollama) | short summary (`--summarize`) | 4.9 GB | optional |
+
+```bash
+mkdir -p models
+curl -L -o models/ggml-large-v3.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin
+curl -L -o models/ggml-silero-v5.1.2.bin \
+  https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin
+
+brew services start ollama        # or: ollama serve &
+ollama pull gemma4:e4b            # minutes
+ollama pull llama3.1:8b           # optional, only for --summarize
+ollama list                       # check what is installed
+```
+
+Other models work too: `--model PATH` for Whisper, `--minutes-model` / `--model` for the minutes (any Ollama
+model, e.g. `gemma3:4b`). If a download stops on a bad connection, run the same `ollama pull` again — it
+resumes.
 
 ## Usage
 
@@ -66,29 +92,38 @@ ollama pull llama3.1:8b
 .venv/bin/python main.py transcribe audio.mp3 --summarize
 ```
 
-## Minutes of Meeting (local LLM, CPU-only)
+## Minutes of Meeting (local LLM)
 
-Structured minutes (patients / agenda items, decisions, action items with owner and deadline, key moments,
-open issues, AI suggestions) in English, generated locally with **gemma3:4b** via Ollama.
+Structured minutes (per patient / agenda item: status, findings, decisions; action items with owner and
+deadline; key moments, open issues, AI suggestions) in English, generated locally with **gemma4:e4b** via Ollama.
 
 ```bash
-ollama pull gemma3:4b
-OLLAMA_NUM_PARALLEL=3 ollama serve &     # parallel slots: 2 samples per chunk + the final summary
+ollama pull gemma4:e4b
 # from audio: minutes are extracted chunk by chunk while Whisper is still transcribing
 .venv/bin/python main.py dialog meeting.m4a --lang ro --minutes medical --out meeting.txt
 # from an existing dialog transcript
 .venv/bin/python -m stt.minutes meeting_dialog.txt --type medical --out out/meeting
 ```
 
-How it works (`stt/minutes.py`): the transcript is normalized with a medical lexicon (ASR errors such as
-"nor" -> noradrenaline), cut into ~300-word chunks at patient boundaries, each chunk is extracted twice
-(different temperatures, decoded in parallel) and the results are merged in code: code decides which patient
-an item belongs to, checks that doses / lab values occur in the transcript (else "⚠ unverified") and finds each
-item's timestamp. One short final call writes title, summary and suggestions.
+Output: `out/meeting.md` (for people), `out/meeting.json` (for automation), `out/meeting.meta.json` (timings).
+Meeting types: `medical`, `executive`, `administrative`.
 
-Measured on a 15 W laptop CPU (Core Ultra 7 155U) for an 11.7-min ICU handover: ~19-21 of 25 reference facts,
-minutes ready ~45-90 s after the transcript. Qwen3-8B on the whole transcript scored 10/25 in 42 min; 1-2B models
-were not usable.
+Optional speed-up: let Ollama decode 2 chunks at once (about 1.4x faster on an M4 with 16 GB; 4 was slower):
+
+```bash
+OLLAMA_NUM_PARALLEL=2 ollama serve
+```
+
+How it works (`stt/minutes.py`): the transcript is normalized with a medical lexicon of ASR errors (e.g.
+"nor" -> noradrenaline, "80 pe 40" -> 80/40, "200 de oameni" -> 200 µmol/l). Code cuts it where the speakers
+move to another bed or room ("patul 9", "boxa") and names that patient, so the model never has to guess who is
+who. The model extracts each chunk's facts filed per patient; code merges them, checks that doses / lab values
+occur in the transcript (else "⚠ unverified") and finds each item's timestamp. One short final call writes
+title, summary and suggestions.
+
+Measured on an Apple M4 (16 GB) for the 11.7-min Medpark ICU handover: 34-37 of 44 reference facts under the
+right patient (before: 18 with 8 invented facts), ~80 s in total, ~20-25 s after the end of the transcript in
+live mode. Score an output with `python3 bench/eval_minutes.py out/meeting.md`.
 
 ## Project layout
 
@@ -102,6 +137,7 @@ stt/pipeline.py      convert -> transcribe -> diarize -> align
 tests/               unit tests (.venv/bin/python -m pytest tests)
 stt/recorder.py      microphone recording (sounddevice)
 stt/llm.py           optional Ollama summarization
-stt/minutes.py       Minutes of Meeting (chunked extraction with gemma3:4b)
-models/              ggml model files (gitignored)
+stt/minutes.py       Minutes of Meeting (chunked extraction with gemma4:e4b)
+models/              Whisper / VAD model files (gitignored, see Models to install)
+bench/eval_minutes.py scores minutes against the Medpark reference facts
 ```

@@ -15,9 +15,9 @@ env/
 .env.*
 
 # --- Whisper / VAD models (large, download separately — see README) ---
-models/*.bin
-models/*.gguf
+models/
 
+*.claude
 # --- Audio / video inputs (large files, may contain patient data) ---
 *.m4a
 *.mp3
@@ -34,6 +34,7 @@ models/*.gguf
 /*.json
 *.srt
 *.vtt
+out/
 
 # --- Tools ---
 .omc/
