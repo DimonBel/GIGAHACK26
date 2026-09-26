@@ -17,6 +17,7 @@ env/
 # --- Whisper / VAD models (large, download separately — see README) ---
 models/*.bin
 models/*.gguf
+models/whisperkit/
 
 # --- Audio / video inputs (large files, may contain patient data) ---
 *.m4a

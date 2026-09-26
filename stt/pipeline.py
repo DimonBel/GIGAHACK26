@@ -60,8 +60,8 @@ def transcribe_dialog(audio: Path, engine: str = "whisper", language: str = "aut
     return dialog
 
 
-def transcribe_clips(servers: list, clips: list, sr: int):
-    """Yield the text of each clip, in order, spreading the work over the given engines."""
+def transcribe_clips(servers: list, clips: list, sr: int, call=lambda server, wav: server.transcribe(wav)):
+    """Yield call(engine, clip WAV) for each clip, in order, spreading the work over the given engines."""
     free = queue.Queue()
     for s in servers:
         free.put(s)
@@ -69,12 +69,34 @@ def transcribe_clips(servers: list, clips: list, sr: int):
     def work(clip):
         server = free.get()  # whichever engine is idle
         try:
-            return server.transcribe(wav_bytes(clip, sr))
+            return call(server, wav_bytes(clip, sr))
         finally:
             free.put(server)
 
     with ThreadPoolExecutor(max_workers=len(servers)) as pool:
         yield from pool.map(work, clips)
+
+
+def transcribe_auto_language(servers: list, pieces: list, sr: int) -> list:
+    """Transcribe pieces of a recording whose language(s) aren't known: detect per piece, then redo the
+    pieces whose detection was too weak in the recording's main language (see engines.choose_language)."""
+    from .engines import choose_language, main_language
+
+    texts, probs = [], []
+    for n, (text, p) in enumerate(transcribe_clips(servers, pieces, sr, lambda s, w: s.transcribe_detect(w)), 1):
+        texts.append(text)
+        probs.append(p)
+        detected = max(p, key=p.get, default="?")
+        print(f"  [{n}/{len(pieces)}] ({detected} {p.get(detected, 0):.0%}) {clean_text(text)}", file=sys.stderr, flush=True)
+    main = main_language(probs)
+    redo = [i for i, p in enumerate(probs) if choose_language(p, main) != max(p, key=p.get, default=None)]
+    print(f"Main language: {main}. Re-transcribing {len(redo)} uncertain piece(s) in {main}...",
+          file=sys.stderr, flush=True)
+    redone = transcribe_clips(servers, [pieces[i] for i in redo], sr, lambda s, w: s.transcribe(w, main))
+    for i, text in zip(redo, redone):
+        texts[i] = text
+        print(f"  [{i + 1}/{len(pieces)}] ({main}) {clean_text(text)}", file=sys.stderr, flush=True)
+    return texts
 
 
 def wav_bytes(audio, sr: int) -> bytes:
@@ -85,19 +107,29 @@ def wav_bytes(audio, sr: int) -> bytes:
     return buf.getvalue()
 
 
-def transcribe_plain(audio: Path, engine: str = "gemma", language: str = "auto", translate: bool = False) -> str:
+def transcribe_plain(audio: Path, engine: str = "whisper-turbo", language: str = "auto",
+                     translate: bool = False, workers: int = WORKERS) -> str:
     """Plain text, no speaker detection: cut the audio into <=28 s pieces at quiet moments and
-    transcribe them one by one, printing each piece as soon as it's done."""
-    from .engines import GEMMA_MAX_SECONDS, split_wav
+    transcribe them on `workers` engines at once, printing each piece (in order) as soon as it's done.
+
+    With language="auto" (Whisper engines) the language is detected automatically: the recording's
+    main language from all pieces, and per piece where Whisper is confident (see transcribe_auto_language)."""
+    import soundfile as sf
+
+    from .engines import GEMMA_MAX_SECONDS, split_audio
 
     with tempfile.TemporaryDirectory() as tmp:
         wav = to_wav16k(Path(audio), Path(tmp) / "input.wav")
-        pieces = split_wav(wav.read_bytes(), GEMMA_MAX_SECONDS)
-    texts = []
-    with make_engine(engine, language, translate) as server:
-        for n, piece in enumerate(pieces, 1):
-            text = clean_text(server.transcribe(piece))
-            print(f"  [{n}/{len(pieces)}] {text}", file=sys.stderr, flush=True)
-            if text:
-                texts.append(text)
-    return "\n".join(texts)
+        audio_data, sr = sf.read(str(wav), dtype="int16")
+    pieces = split_audio(audio_data, sr, GEMMA_MAX_SECONDS)
+    engines = [make_engine(engine, language, translate) for _ in range(1 if engine.startswith("gemma") else workers)]
+    with ExitStack() as stack:
+        servers = [stack.enter_context(e) for e in engines]
+        if language == "auto" and not translate and hasattr(servers[0], "transcribe_detect"):
+            raws = transcribe_auto_language(servers, pieces, sr)
+        else:
+            raws = []
+            for n, raw in enumerate(transcribe_clips(servers, pieces, sr), 1):
+                raws.append(raw)
+                print(f"  [{n}/{len(pieces)}] {clean_text(raw)}", file=sys.stderr, flush=True)
+    return "\n".join(t for t in map(clean_text, raws) if t)

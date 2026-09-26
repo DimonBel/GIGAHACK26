@@ -20,7 +20,8 @@ Transcribe a file (mp3, m4a, wav, mp4, ogg, ...):
 
 ```bash
 .venv/bin/python main.py transcribe audio.mp3
-.venv/bin/python main.py transcribe audio.mp3 --lang ro --format srt --out audio.srt
+.venv/bin/python main.py transcribe audio.mp3 --lang ro --out audio.txt
+.venv/bin/python main.py transcribe audio.mp3 --engine whisper-file --format srt --out audio.srt
 .venv/bin/python main.py transcribe audio.mp3 --translate        # translate to English
 ```
 
@@ -30,7 +31,24 @@ Record from the microphone, then transcribe:
 .venv/bin/python main.py record --seconds 10
 ```
 
-Options: `--lang auto|en|ro|ru|...`, `--format txt|srt|timestamps`, `--out FILE`, `--model PATH`.
+Options: `--lang auto|en|ro|ru|...`, `--format txt|srt|timestamps`, `--out FILE`, `--model PATH`,
+`--engine whisper-turbo|whisper|gemma|gemma-fast|whisper-file`.
+
+`transcribe` uses **Whisper Large V3 Turbo** (8-bit, `models/ggml-large-v3-turbo-q8_0.bin`) by default. Create it once:
+
+```bash
+curl -L -o models/ggml-large-v3-turbo.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+whisper-quantize models/ggml-large-v3-turbo.bin models/ggml-large-v3-turbo-q8_0.bin q8_0
+```
+
+The audio is cut
+into ≤28 s pieces at quiet moments and 2 whisper-servers transcribe them in parallel.
+
+With `--lang auto` (default) the language is detected automatically — Romanian (incl. Moldovan), Russian
+or English. Whisper's per-piece guess is unreliable for Moldovan speech (Romanian often guessed as Russian at
+~50%), so the recording's main language is taken from all pieces together, a piece keeps a different
+language only when Whisper is ≥80% sure, and uncertain pieces are re-transcribed in the main language.
+`--format srt/timestamps` need `--engine whisper-file` (one whisper-cli run over the whole file).
 
 ## Speaker dialog (who said what)
 

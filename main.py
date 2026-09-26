@@ -8,7 +8,7 @@ from pathlib import Path
 from stt.engines import ENGINES
 from stt.transcriber import DEFAULT_MODEL, transcribe
 
-DEFAULT_ENGINE = "gemma"
+DEFAULT_ENGINE = "whisper-turbo"
 
 
 def output(transcript, fmt: str, out: Path = None):
@@ -40,7 +40,7 @@ def report_time(t0: float, audio: Path):
 
 def run(audio: Path, args):
     t0 = time.time()
-    if args.engine.startswith("gemma"):
+    if args.engine != "whisper-file":
         from stt.pipeline import transcribe_plain
 
         print(f"Transcribing with {args.engine} (no speaker detection)...", file=sys.stderr, flush=True)
@@ -49,15 +49,15 @@ def run(audio: Path, args):
         if args.out:
             Path(args.out).write_text(text + "\n", encoding="utf-8")
             print(f"\nSaved to {args.out}", file=sys.stderr)
-        report_time(t0, audio)
-        return
-    transcript = transcribe(audio, model=Path(args.model), language=args.lang, translate=args.translate)
-    print(f"[language: {transcript.language}]\n", file=sys.stderr)
-    output(transcript, args.format, Path(args.out) if args.out else None)
+    else:
+        transcript = transcribe(audio, model=Path(args.model), language=args.lang, translate=args.translate)
+        print(f"[language: {transcript.language}]\n", file=sys.stderr)
+        output(transcript, args.format, Path(args.out) if args.out else None)
+        text = transcript.text
     if args.summarize:
         from stt.llm import summarize
         print("\n--- Summary (local LLM) ---")
-        print(summarize(transcript.text, model=args.llm_model))
+        print(summarize(text, model=args.llm_model))
     report_time(t0, audio)
 
 
@@ -99,9 +99,10 @@ def main():
 
     t = sub.add_parser("transcribe", parents=[common], help="transcribe an audio/video file (no speakers)")
     t.add_argument("file")
-    t.add_argument("--engine", choices=["gemma", "gemma-fast", "whisper"], default=DEFAULT_ENGINE,
-                   help="gemma = Gemma 4 E4B, gemma-fast = Gemma 4 E2B (both via Ollama), "
-                        "whisper = whisper.cpp Large V3 (default: %(default)s)")
+    t.add_argument("--engine", choices=ENGINES + ("whisper-file",), default=DEFAULT_ENGINE,
+                   help="whisper-turbo = Whisper Large V3 Turbo (fast, default), whisper = Large V3, "
+                        "gemma / gemma-fast = Gemma 4 E4B / E2B via Ollama, whisper-file = whole file "
+                        "in one whisper-cli run (needed for --format srt/timestamps) (default: %(default)s)")
 
     r = sub.add_parser("record", parents=[common], help="record from the microphone, then transcribe")
     r.add_argument("--seconds", type=float, default=10)

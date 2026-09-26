@@ -57,17 +57,29 @@ class WhisperServer:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
 
-    def transcribe(self, wav_bytes: bytes) -> str:
-        """Transcribe one 16 kHz mono WAV clip and return its text."""
+    def transcribe(self, wav_bytes: bytes, language: str = None) -> str:
+        """Transcribe one 16 kHz mono WAV clip and return its text (language overrides the server's -l)."""
+        fields = {"response_format": "json"}
+        if language:
+            fields["language"] = language
+        return self._inference(wav_bytes, fields)["text"].strip()
+
+    def transcribe_detect(self, wav_bytes: bytes) -> tuple:
+        """Transcribe with automatic language detection; return (text, {language code: probability})."""
+        result = self._inference(wav_bytes, {"response_format": "verbose_json", "language": "auto"})
+        return result["text"].strip(), result.get("language_probabilities", {})
+
+    def _inference(self, wav_bytes: bytes, fields: dict) -> dict:
         boundary = uuid.uuid4().hex
         parts = [
             (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="clip.wav"\r\n'
              "Content-Type: audio/wav\r\n\r\n").encode() + wav_bytes + b"\r\n",
-            f'--{boundary}\r\nContent-Disposition: form-data; name="response_format"\r\n\r\njson\r\n'.encode(),
+            *(f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+              for k, v in fields.items()),
             f"--{boundary}--\r\n".encode(),
         ]
         req = urllib.request.Request(
             f"http://127.0.0.1:{self.port}/inference", data=b"".join(parts),
             headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
         with urllib.request.urlopen(req, timeout=600) as resp:
-            return json.loads(resp.read())["text"].strip()
+            return json.loads(resp.read())

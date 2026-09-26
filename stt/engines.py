@@ -2,7 +2,7 @@
 
 Every engine is a context manager with transcribe(wav_bytes) -> str:
   whisper        Whisper Large V3 (whisper.cpp server) - most accurate, slowest
-  whisper-turbo  Whisper Large V3 Turbo - same encoder, 4 instead of 32 decoder layers
+  whisper-turbo  Whisper Large V3 Turbo - same encoder, 4 instead of 32 decoder layers (default, fast)
   gemma          Gemma 4 E4B via local Ollama - audio-capable LLM
   gemma-fast     Gemma 4 E2B via local Ollama - smaller and faster, less accurate
 """
@@ -21,6 +21,24 @@ GEMMA_MAX_SECONDS = 28.0  # Gemma's audio encoder accepts at most 30 s per reque
 
 LANGUAGE_NAMES = {"ro": "Romanian", "ru": "Russian", "en": "English", "uk": "Ukrainian", "fr": "French",
                   "de": "German", "it": "Italian", "es": "Spanish"}
+
+# Automatic language choice for recordings that mix these languages (Moldovan speech is Romanian).
+LANGUAGES = ("ro", "ru", "en")
+SWITCH_CONFIDENCE = 0.8  # a piece may differ from the recording's main language only when this sure
+
+
+def main_language(probabilities: list) -> str:
+    """The recording's main language: the one of LANGUAGES with the highest total probability over all pieces."""
+    return max(LANGUAGES, key=lambda lang: sum(p.get(lang, 0.0) for p in probabilities))
+
+
+def choose_language(probs: dict, main: str) -> str:
+    """Language for one piece: its detected language if Whisper is confident, otherwise the main language.
+
+    Whisper's detection on a single piece is unreliable for Moldovan speech (Romanian pieces are often
+    guessed as Russian with ~50% probability), so weak guesses fall back to the recording's language."""
+    lang = max(LANGUAGES, key=lambda l: probs.get(l, 0.0))
+    return lang if probs.get(lang, 0.0) >= SWITCH_CONFIDENCE else main
 
 
 class GemmaEngine:
@@ -73,14 +91,25 @@ def gemma_prompt(language: str, translate: bool) -> str:
 
 
 def split_wav(wav_bytes: bytes, max_seconds: float) -> list:
-    """Split a WAV clip into parts of at most max_seconds, cutting at the quietest moment near each limit."""
-    import numpy as np
+    """Split a WAV clip into WAV parts of at most max_seconds, cut at quiet moments (see split_audio)."""
     import soundfile as sf
 
     audio, sr = sf.read(io.BytesIO(wav_bytes), dtype="int16")
-    limit = int(max_seconds * sr)
-    if len(audio) <= limit:
+    if len(audio) <= int(max_seconds * sr):
         return [wav_bytes]
+    out = []
+    for p in split_audio(audio, sr, max_seconds):
+        buf = io.BytesIO()
+        sf.write(buf, p, sr, format="WAV", subtype="PCM_16")
+        out.append(buf.getvalue())
+    return out
+
+
+def split_audio(audio, sr: int, max_seconds: float) -> list:
+    """Split int16 samples into parts of at most max_seconds, cutting at the quietest moment near each limit."""
+    import numpy as np
+
+    limit = int(max_seconds * sr)
     parts, start = [], 0
     win = int(0.1 * sr)
     while len(audio) - start > limit:
@@ -91,12 +120,7 @@ def split_wav(wav_bytes: bytes, max_seconds: float) -> list:
         parts.append(audio[start:cut])
         start = cut
     parts.append(audio[start:])
-    out = []
-    for p in parts:
-        buf = io.BytesIO()
-        sf.write(buf, p, sr, format="WAV", subtype="PCM_16")
-        out.append(buf.getvalue())
-    return out
+    return parts
 
 
 ENGINES = ("whisper", "whisper-turbo", "gemma", "gemma-fast")
@@ -106,11 +130,14 @@ def make_engine(name: str, language: str = "auto", translate: bool = False):
     if name == "whisper":
         return WhisperServer(MODELS_DIR / "ggml-large-v3.bin", language, translate)
     if name == "whisper-turbo":
-        path = MODELS_DIR / "ggml-large-v3-turbo.bin"
+        # 8-bit version: ~20% faster on Apple M4, same words as the f16 model on the Medpark recording.
+        path = MODELS_DIR / "ggml-large-v3-turbo-q8_0.bin"
         if not path.exists():
+            f16 = MODELS_DIR / "ggml-large-v3-turbo.bin"
             raise FileNotFoundError(
-                f"{path} not found. Download it with:\n  curl -L -o {path} "
-                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin")
+                f"{path} not found. Create it with:\n  curl -L -o {f16} "
+                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin\n"
+                f"  whisper-quantize {f16} {path} q8_0")
         return WhisperServer(path, language, translate)
     if name == "gemma":
         return GemmaEngine(language, translate)
