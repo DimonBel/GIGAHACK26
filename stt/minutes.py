@@ -76,8 +76,14 @@ SENTENCE = re.compile(r"(?<=[.?!…])\s+")
 _STR = {"type": "string"}
 
 
-def _strs(max_items=None, min_items=0):
-    return _bounded({"type": "array", "items": _STR}, max_items, min_items)
+def _text(max_len):
+    # Enforced by Ollama's grammar: stops a small model that loops inside one string ("status": "... ... ...")
+    # from burning the whole token budget and ending in invalid JSON. Generous, so normal answers are not cut.
+    return {"type": "string", "maxLength": max_len}
+
+
+def _strs(max_items=None, min_items=0, max_len=None):
+    return _bounded({"type": "array", "items": _text(max_len) if max_len else _STR}, max_items, min_items)
 
 
 def _objs(max_items=None, min_items=0, **props):
@@ -100,10 +106,11 @@ def _bounded(schema, max_items, min_items):
 CHUNK_SCHEMA = {
     "type": "object",
     "properties": {
-        "topics": _objs(max_items=3, min_items=1, name=_STR, status=_STR, findings=_strs(7), decisions=_strs(6),
-                        tasks=_objs(max_items=4, task=_STR, owner=_STR, deadline=_STR,
+        "topics": _objs(max_items=3, min_items=1, name=_text(40), status=_text(300),
+                        findings=_strs(7, max_len=160), decisions=_strs(6, max_len=160),
+                        tasks=_objs(max_items=4, task=_text(160), owner=_text(60), deadline=_text(40),
                                     priority={"type": "string", "enum": ["high", "medium", "low"]}),
-                        open=_strs(2)),
+                        open=_strs(2, max_len=160)),
     },
     "required": ["topics"],
 }
@@ -111,9 +118,9 @@ CHUNK_SCHEMA = {
 FINAL_SCHEMA = {
     "type": "object",
     "properties": {
-        "title": _STR,
-        "summary": _STR,
-        "suggestions": _strs(3),
+        "title": _text(80),
+        "summary": _text(600),
+        "suggestions": _strs(2, max_len=120),
     },
     "required": ["title", "summary", "suggestions"],
 }
@@ -158,8 +165,9 @@ MEDICAL_LEXICON = [
     (r"\bm[âa]șc[ăa]\b", "mască"),
     (r"\bne ?invaziv\w*", "ventilație neinvazivă"),
     (r"\btensiun\w*", "tensiunea arterială"),
-    (r"\b(\d{2,3}) pe (\d{2,3})\b", r"\1/\2"),  # "80 pe 40" -> "80/40"
+    (r"\b(\d{2,3})%? pe (\d{2,3})\b%?", r"\1/\2"),  # "80 pe 40", "80% pe 40%" -> "80/40"
     (r"\balcalotic\w*", "alcaloză metabolică"),
+    (r"\bcuiepidur\w*", "cu epidurală"),
 ]
 
 GLOSSARY = """The transcript is noisy speech recognition of Romanian (with Russian and Latin medical terms); \
@@ -185,7 +193,7 @@ this part (e.g. "urologist Butnari"), else "". deadline only if said (e.g. "this
 priority: high = patient safety / urgent, medium = today, low = other.
 - open: unresolved questions.
 Use only what is said in this part. Never invent values, names, owners or deadlines. Keep doses and lab \
-values exact. Empty lists are fine."""
+values exact. Leave out words you cannot understand instead of copying or guessing them. Empty lists are fine."""
 
 HINTS = {
     "medical": dict(
@@ -215,9 +223,8 @@ FINAL_SYSTEM = """You write the header of the Minutes of a {meeting_type} meetin
 {language}, from the facts already extracted below. Use only these facts.
 - title: short, specific.
 - summary: 2-3 sentences for a reader who missed the meeting: who was discussed and the main decisions.
-- suggestions: at most 3 follow-ups the team may have overlooked (not already an open issue), based only \
-on these facts, at most \
-15 words each.
+- suggestions: at most 2 follow-ups the team may have overlooked (not already an open issue), based only \
+on these facts, at most 12 words each.
 Never add details that are not in the facts (no age, sex, diagnoses or numbers of your own)."""
 
 # Small models translate the same drug differently from chunk to chunk; one name per drug lets duplicates merge.
@@ -250,6 +257,8 @@ def _clean(text: str) -> str:
         return ""
     for pattern, replacement in CANONICAL:
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    if len(text) >= 150 and not text.endswith((".", ")")):  # probably cut by maxLength: end at a whole word
+        text = text.rsplit(" ", 1)[0].rstrip(",;") + "…"
     return text[:1].upper() + text[1:]
 
 
@@ -359,6 +368,12 @@ def _similar(a: str, b: str) -> bool:
     """Near-duplicate phrases ("Call urologist Butnari" / "Call the urologist Butnari")."""
     wa, wb = set(re.findall(r"\w{3,}", a.lower())), set(re.findall(r"\w{3,}", b.lower()))
     return bool(wa and wb) and len(wa & wb) / min(len(wa), len(wb)) >= 0.75
+
+
+def _overlaps(a: str, b: str) -> bool:
+    """Looser than _similar, for an AI suggestion that restates an open issue in other words."""
+    wa, wb = _stems(a), _stems(b)
+    return bool(wa and wb) and len(wa & wb) / min(len(wa), len(wb)) >= 0.5
 
 
 def _stems(text: str) -> set:
@@ -486,10 +501,17 @@ class MinutesBuilder:
         # as one batch (OLLAMA_NUM_PARALLEL >= samples); otherwise each sample adds the full time again.
         temperatures = (0.1,) + SAMPLE_TEMPERATURES[:self.samples - 1]
         t = time.perf_counter()
+        def sample(temp):
+            try:
+                return _chat(self.model, self.system, user, CHUNK_SCHEMA, num_thread=self.num_thread,
+                             temperature=temp)
+            except json.JSONDecodeError:  # two broken answers: lose this chunk, not the whole minutes
+                print("  chunk skipped: no valid JSON after a retry", file=sys.stderr)
+                return {"topics": []}, {"wall": 0, "prompt_tokens": 0, "prompt_s": 0, "output_tokens": 0,
+                                        "output_s": 0}
+
         with ThreadPoolExecutor(len(temperatures)) as pool:
-            results = list(pool.map(lambda temp: _chat(self.model, self.system, user, CHUNK_SCHEMA,
-                                                       num_thread=self.num_thread, temperature=temp),
-                                    temperatures))
+            results = list(pool.map(sample, temperatures))
         part, stats = results[0]
         for extra, extra_stats in results[1:]:
             part = _union(part, extra)
@@ -584,7 +606,7 @@ class MinutesBuilder:
                                          "priority": a["priority"], "time": _locate(task, lines, chunk_time),
                                          "_topic": idx})
             for o in map(_clean, t["open"]):
-                if o and not any(_similar(o, x["issue"]) for x in self.issues):
+                if o and not UNCHANGED.match(o) and not any(_similar(o, x["issue"]) for x in self.issues):
                     self.issues.append({"issue": o, "_topic": idx})
 
     def _facts_text(self) -> str:
@@ -642,7 +664,9 @@ class MinutesBuilder:
         if self.verbose:
             print(f"  finalize: {stats['wall']}s ({stats['prompt_tokens']} in / {stats['output_tokens']} out)",
                   file=sys.stderr, flush=True)
-        return {**head, "suggestions": [s for s in map(_clean, head["suggestions"]) if s],
+        known = [i["issue"] for i in self.issues] + [a["task"] for a in self.actions]
+        suggestions = [x for x in map(_clean, head["suggestions"]) if x and not any(_overlaps(x, k) for k in known)]
+        return {**head, "suggestions": suggestions,
                 "key_moments": self._key_moments(), "topics": self.topics, "decisions": self.decisions,
                 "action_items": self.actions,
                 "open_issues": [f"{i['patient']}: {i['issue']}" for i in self.issues], "warnings": self.warnings}

@@ -152,11 +152,17 @@ ollama pull gemma4:e4b
 Output: `out/meeting.md` (for people), `out/meeting.json` (for automation), `out/meeting.meta.json` (timings).
 Meeting types: `medical`, `executive`, `administrative`.
 
-Optional speed-up: let Ollama decode 2 chunks at once (about 1.4x faster on an M4 with 16 GB; 4 was slower):
+Speed-up: let Ollama decode 2 chunks at once (about 1.4x faster on an M4 with 16 GB; 4 was slower). With
+`brew services`, add it to the service's environment and reload the service:
 
 ```bash
-OLLAMA_NUM_PARALLEL=2 ollama serve
+plutil -insert EnvironmentVariables.OLLAMA_NUM_PARALLEL -string 2 ~/Library/LaunchAgents/sh.brew.ollama.plist
+launchctl bootout gui/$(id -u)/sh.brew.ollama
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/sh.brew.ollama.plist
 ```
+
+`brew services restart ollama` rewrites that file and drops the setting; run the lines above again after it.
+Without brew services: `OLLAMA_NUM_PARALLEL=2 ollama serve`.
 
 How it works (`stt/minutes.py`): the transcript is normalized with a medical lexicon of ASR errors (e.g.
 "nor" -> noradrenaline, "80 pe 40" -> 80/40, "200 de oameni" -> 200 µmol/l). Code cuts it where the speakers
@@ -165,9 +171,14 @@ who. The model extracts each chunk's facts filed per patient; code merges them, 
 occur in the transcript (else "⚠ unverified") and finds each item's timestamp. One short final call writes
 title, summary and suggestions.
 
-Measured on an Apple M4 (16 GB) for the 11.7-min Medpark ICU handover: 34-37 of 44 reference facts under the
-right patient (before: 18 with 8 invented facts), ~80 s in total, ~20-25 s after the end of the transcript in
-live mode. Score an output with `python3 bench/eval_minutes.py out/meeting.md`.
+Measured on an Apple M4 (16 GB) with `OLLAMA_NUM_PARALLEL=2`, for the 11.7-min Medpark ICU handover: 33-35 of 44
+reference facts under the right patient, 0-1 invented (first version: 18 with 8 invented), ~65 s in total
+(first version: 123 s), ~20-25 s after the end of the transcript in live mode. Score an output with
+`python3 bench/eval_minutes.py out/meeting.md`.
+
+Tried and rejected (measured): a leaner output format and a shorter prompt (-20% tokens, but 4 facts fewer);
+a follow-up question for missed facts (+3 facts, +25 s); 600-word chunks (faster, but skims long patients);
+`gemma4:e2b` (2x faster, 19/44 facts).
 
 ## Project layout
 
