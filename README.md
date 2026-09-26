@@ -70,13 +70,26 @@ transcript as a dialog:
 ```bash
 .venv/bin/python main.py dialog Medpark_audio.m4a --lang ro --out Medpark_dialog.txt
 .venv/bin/python main.py dialog Medpark_audio.m4a --lang ro --format srt --out Medpark.srt
-.venv/bin/python main.py record --seconds 30 --dialog
+.venv/bin/python main.py record --seconds 30 --dialog --engine whisper-file
 ```
 
-How it works: pyannote first finds who speaks when; then every speaker turn is cut out and
-transcribed separately by Whisper (kept loaded in a local `whisper-server`), so each line's text
-comes only from that speaker's audio. Short remarks made while the other person talks ("Da.")
-get their own line. Whisper artifacts (repetition loops, subtitle credits) are filtered out.
+`dialog` uses **Whisper Large V3 in 8-bit** (`models/ggml-large-v3-q8_0.bin`, falls back to
+`ggml-large-v3.bin` if missing). Create it once (5 seconds, 1.6 GB):
+
+```bash
+whisper-quantize models/ggml-large-v3.bin models/ggml-large-v3-q8_0.bin q8_0
+```
+
+How it works (default, `--engine whisper-file`): pyannote first finds who speaks when; then Whisper
+transcribes the whole file in one run (silence skipped by VAD), and every sentence / Whisper segment
+goes to the speaker who talks most during it. On an Apple M4, 11m 43s of audio takes ~2m 50s
+(~1 min speaker detection + ~2 min Whisper). `--beam-size 5` is a bit more careful (~35% slower Whisper).
+
+Slower alternative (`--engine whisper`, `whisper-turbo`, `gemma`, `gemma-fast`): every speaker turn is
+cut out and transcribed separately, so each line's text comes only from that speaker's audio and short
+remarks made while the other person talks ("Da.") get their own line - but Whisper then runs once per
+turn (~170 times for 12 minutes instead of ~25), which takes much longer.
+Whisper artifacts (repetition loops, subtitle credits) are filtered out in both modes.
 
 The number of speakers is detected automatically. Limitations: when two people talk at the
 same time, words in the overlap may go to either speaker; labels (SPEAKER 1, 2...) are per file.

@@ -1,11 +1,14 @@
-"""Dialog pipeline: convert audio -> detect speakers -> transcribe each speaker turn separately.
+"""Dialog pipelines: convert audio -> detect speakers -> transcribe.
 
-Transcribing every turn on its own (instead of the whole file, then guessing who said which word)
-means each line's text comes only from that speaker's audio, so fast exchanges and interruptions
-are attributed correctly, and short clips give Whisper less room for repetition loops.
+transcribe_dialog_file (default, fast): one whisper-cli run over the whole file, then every sentence goes
+to the speaker who talks most during it. Whisper's encoder always processes a 30 s window, so one run over
+the file needs ~25 windows for 12 minutes, while transcribing every speaker turn separately needs one per
+turn (~170, most of them a few seconds long): ~3x more work for the same model.
 
-Speed: short clips don't saturate the GPU, so WORKERS clips are transcribed at the same time by
-separate whisper-server processes (results are still returned in order, so live output stays ordered).
+transcribe_dialog (per turn): every turn is transcribed on its own, so each line's text comes only from
+that speaker's audio - better for fast exchanges and interruptions, but much slower. Short clips don't
+saturate the GPU, so WORKERS clips are transcribed at the same time by separate whisper-server processes
+(results are still returned in order, so live output stays ordered).
 """
 import io
 import queue
@@ -16,12 +19,46 @@ from contextlib import ExitStack
 from pathlib import Path
 
 from .audio import to_wav16k
-from .dialog import Utterance, clean_text, is_duplicate, speaker_blocks, to_text
+from .dialog import (Utterance, build_dialog, clean_text, collapse_repeats, is_duplicate, segment_words,
+                     speaker_blocks, to_text)
 from .diarizer import diarize
 from .engines import make_engine
+from .transcriber import DEFAULT_MODEL, transcribe_wav
 
 PAD = 0.15   # seconds of context added around each clip so first/last syllables aren't cut
 WORKERS = 2  # parallel whisper-server processes (each holds a copy of the model: ~3.5 GB RAM)
+
+
+def transcribe_dialog_file(audio: Path, model: Path = DEFAULT_MODEL, language: str = "auto",
+                           translate: bool = False, beam_size: int = 1, live: bool = True):
+    """Return the dialog (list of Utterance) for any audio/video file, using one Whisper run over the file.
+
+    Speakers are detected first, so with live=True every line is printed to stdout with its speaker as
+    soon as Whisper recognizes it.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        print("[1/3] Converting audio...", file=sys.stderr)
+        wav = to_wav16k(Path(audio), Path(tmp) / "input.wav")
+        print("[2/3] Detecting speakers...", file=sys.stderr, flush=True)
+        turns = diarize(wav)
+        print(f"Found {len({t.speaker for t in turns})} speaker(s).", file=sys.stderr)
+        print(f"[3/3] Transcribing the whole file with {Path(model).name}...\n", file=sys.stderr, flush=True)
+
+        def show(start, end, text):
+            text = clean_text(text)
+            if text:
+                for u in build_dialog(segment_words(start, end, text), turns):
+                    print(to_text([u]), flush=True)
+
+        transcript = transcribe_wav(wav, Path(model), language, translate, beam_size=beam_size,
+                                    on_segment=show if live else None)
+    # Final dialog uses Whisper's word timestamps (more precise than the live approximation);
+    # segments that are only a Whisper artifact (subtitle credits, [BLANK_AUDIO]) are left out.
+    words = [w for s in transcript.segments if clean_text(s.text) for w in s.words]
+    dialog = build_dialog(words, turns)
+    for u in dialog:
+        u.text = collapse_repeats(u.text)
+    return dialog
 
 
 def transcribe_dialog(audio: Path, engine: str = "whisper", language: str = "auto",

@@ -28,7 +28,7 @@ models/whisperkit/
 *.flac
 *.webm
 *.aac
-
+*.claude
 # --- Transcription outputs ---
 *_transcript.txt
 *_dialog.txt

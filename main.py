@@ -50,7 +50,8 @@ def run(audio: Path, args):
             Path(args.out).write_text(text + "\n", encoding="utf-8")
             print(f"\nSaved to {args.out}", file=sys.stderr)
     else:
-        transcript = transcribe(audio, model=Path(args.model), language=args.lang, translate=args.translate)
+        transcript = transcribe(audio, model=Path(args.model), language=args.lang, translate=args.translate,
+                                beam_size=args.beam_size)
         print(f"[language: {transcript.language}]\n", file=sys.stderr)
         output(transcript, args.format, Path(args.out) if args.out else None)
         text = transcript.text
@@ -63,12 +64,16 @@ def run(audio: Path, args):
 
 def run_dialog(audio: Path, args):
     from stt import dialog as fmt
-    from stt.pipeline import transcribe_dialog
+    from stt.pipeline import transcribe_dialog, transcribe_dialog_file
 
     t0 = time.time()
     live = args.format in ("txt", "timestamps")  # txt is shown live; srt/json are printed at the end
-    utterances = transcribe_dialog(audio, engine=args.engine, language=args.lang,
-                                   translate=args.translate, live=live)
+    if args.engine == "whisper-file":
+        utterances = transcribe_dialog_file(audio, model=Path(args.model), language=args.lang,
+                                            translate=args.translate, beam_size=args.beam_size, live=live)
+    else:
+        utterances = transcribe_dialog(audio, engine=args.engine, language=args.lang,
+                                       translate=args.translate, live=live)
     formatter = {"srt": fmt.to_srt, "json": fmt.to_json}.get(args.format, fmt.to_text)
     result = formatter(utterances)
     if not live:
@@ -96,6 +101,8 @@ def main():
     common.add_argument("--out", help="save result to this file")
     common.add_argument("--summarize", action="store_true", help="summarize with a local LLM (Ollama)")
     common.add_argument("--llm-model", default="llama3.1:8b", help="Ollama model name")
+    common.add_argument("--beam-size", type=int, default=1,
+                        help="whisper-file engine: 1 = greedy (fast, default), 5 = beam search (~35%% slower)")
 
     t = sub.add_parser("transcribe", parents=[common], help="transcribe an audio/video file (no speakers)")
     t.add_argument("file")
@@ -107,13 +114,16 @@ def main():
     r = sub.add_parser("record", parents=[common], help="record from the microphone, then transcribe")
     r.add_argument("--seconds", type=float, default=10)
     r.add_argument("--dialog", action="store_true", help="also detect speakers")
-    r.add_argument("--engine", choices=ENGINES, default=DEFAULT_ENGINE, help="speech-to-text engine")
+    r.add_argument("--engine", choices=ENGINES + ("whisper-file",), default=DEFAULT_ENGINE,
+                   help="speech-to-text engine")
 
     d = sub.add_parser("dialog", parents=[common],
                        help="transcribe and split by speaker (SPEAKER 1, SPEAKER 2, ...)")
     d.add_argument("file")
-    d.add_argument("--engine", choices=ENGINES, default=DEFAULT_ENGINE,
-                   help="speech-to-text engine (default: %(default)s)")
+    d.add_argument("--engine", choices=ENGINES + ("whisper-file",), default="whisper-file",
+                   help="whisper-file = Whisper Large V3 over the whole file in one run, then sentences are "
+                        "assigned to speakers (fast, default); whisper / whisper-turbo / gemma / gemma-fast = "
+                        "transcribe every speaker turn separately (slower) (default: %(default)s)")
 
     args = p.parse_args()
     try:
