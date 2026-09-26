@@ -4,12 +4,11 @@ import { formatDate } from "@/shared/lib/date";
 import { Field, Input, Textarea } from "@/shared/ui";
 import { useMinutesStore } from "@/stores/minutes";
 
-/** Date, time, place and agenda of the next meeting: editable by the moderator. */
 export function NextMeetingSection({ isModerator }: { isModerator: boolean }) {
   const { next, updateNext } = useMinutesStore();
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="font-serif text-heading">Next meeting</h2>
+      <h2 className="font-sans text-3xl font-semibold">Next meeting</h2>
       {isModerator ? (
         <div className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-[160px_120px_minmax(0,1fr)]">
@@ -28,13 +27,13 @@ export function NextMeetingSection({ isModerator }: { isModerator: boolean }) {
               rows={4}
               value={next.agenda}
               onChange={(e) => updateNext({ agenda: e.target.value })}
-              className="font-serif text-reading"
+              className="font-sans text-lg"
             />
           </Field>
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          <dl className="flex flex-wrap gap-x-8 gap-y-3 text-body">
+          <dl className="flex flex-wrap gap-x-8 gap-y-3 text-md">
             {[
               { icon: CalendarDays, label: "Date", value: formatDate(next.date) },
               { icon: Clock, label: "Time", value: next.time },
@@ -47,7 +46,7 @@ export function NextMeetingSection({ isModerator }: { isModerator: boolean }) {
               </div>
             ))}
           </dl>
-          <p className="max-w-[68ch] font-serif text-lead text-pretty">{next.agenda}</p>
+          <p className="max-w-[68ch] font-sans text-xl font-semibold text-pretty">{next.agenda}</p>
         </div>
       )}
     </div>

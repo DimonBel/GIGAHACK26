@@ -18,7 +18,6 @@ interface TopicViewProps {
   editing: boolean;
 }
 
-/** One topic of the minutes: read-only, or editable by the moderator. */
 export function TopicView({ topic, number, count, isModerator, editing }: TopicViewProps) {
   return (
     <article>

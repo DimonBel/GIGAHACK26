@@ -8,7 +8,6 @@ import { CabinetSwitcher } from "./CabinetSwitcher";
 import { TabNav } from "./TabNav";
 import { UserMenu } from "./UserMenu";
 
-/** Signed-in frame: ink header (brand, cabinet, screens, language, account), then the screen. */
 export function AppShell() {
   const lang = useSessionStore((s) => s.lang);
   const setLang = useSessionStore((s) => s.setLang);
@@ -20,16 +19,16 @@ export function AppShell() {
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-20 bg-ink text-on-ink">
+      <header className="sticky top-0 z-20 bg-gradient-to-b from-[#1a2523] to-[#16201e] text-on-ink shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset,0_-1px_0_0_rgba(0,0,0,0.2)_inset]">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-3 px-4 sm:px-6 md:h-14 md:flex-nowrap">
-          <Wordmark className="flex h-14 items-center pr-1 text-white md:h-auto" />
-          <span aria-hidden className="hidden h-5 w-px bg-ink-line sm:block" />
+          <Wordmark className="flex h-14 items-center pr-2 text-white md:h-auto" />
+          <span aria-hidden className="hidden h-5 w-px bg-white/10 sm:block" />
           <CabinetSwitcher />
           <TabNav />
           <div className="ml-auto flex shrink-0 items-center gap-3">
-            <span className="hidden items-center gap-1.5 text-caption text-on-ink-muted md:flex">
+            <span className="hidden items-center gap-1.5 text-sm text-on-ink-muted md:flex">
               <Dot className="bg-ok" />
-              Offline · local
+              Offline
             </span>
             <Segmented
               label="Language"

@@ -9,7 +9,6 @@ import { useMinutesStore } from "@/stores/minutes";
 import { AddButton, Block } from "./Block";
 import { PeopleSelect } from "./PeopleSelect";
 
-/** Decisions and tasks with owner and due date (red when overdue, amber when due today). */
 export function ActionsBlock({ topic, editing }: { topic: Topic; editing: boolean }) {
   const { addAction, updateAction, removeAction } = useMinutesStore();
   return (
@@ -49,10 +48,10 @@ export function ActionsBlock({ topic, editing }: { topic: Topic; editing: boolea
           {topic.actions.map((a) => (
             <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-3 first:pt-0 last:pb-0">
               <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-body font-medium text-ink">{a.text}</span>
-                <span className="text-caption text-muted">{a.owner}</span>
+                <span className="text-md font-medium text-ink">{a.text}</span>
+                <span className="text-sm text-muted">{a.owner}</span>
               </span>
-              <span className={cn("text-small whitespace-nowrap tabular-nums", DUE_TEXT[dueTone(a.due)])}>
+              <span className={cn("text-base whitespace-nowrap tabular-nums", DUE_TEXT[dueTone(a.due)])}>
                 {dueLabel(a.due)}
               </span>
             </li>

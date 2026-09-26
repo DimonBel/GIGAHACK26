@@ -7,7 +7,7 @@ import { useMinutesStore } from "@/stores/minutes";
 const item = (active: boolean) =>
   cn(
     "rounded-md px-3 py-2.5 text-left transition-colors lg:w-full",
-    active ? "bg-white shadow-raised ring-1 ring-line" : "hover:bg-sunken",
+    active ? "bg-white shadow-sm ring-1 ring-line" : "hover:bg-sunken",
   );
 
 const GENERAL: { kind: "participants" | "next"; label: string; icon: LucideIcon }[] = [
@@ -15,7 +15,6 @@ const GENERAL: { kind: "participants" | "next"; label: string; icon: LucideIcon 
   { kind: "next", label: "Next meeting", icon: CalendarDays },
 ];
 
-/** Topics of the meeting (with pending suggestions for the moderator), then the general sections. */
 export function TopicSidebar({ isModerator }: { isModerator: boolean }) {
   const { topics, section, selectTopic, selectGeneral, addTopic } = useMinutesStore();
   return (
@@ -33,11 +32,18 @@ export function TopicSidebar({ isModerator }: { isModerator: boolean }) {
               type="button"
               aria-current={active ? "true" : undefined}
               onClick={() => selectTopic(topic.id)}
-              className={cn(item(active), "grid w-[240px] shrink-0 grid-cols-[20px_minmax(0,1fr)_auto] items-start gap-2 lg:w-full")}
+              className={cn(item(active), "grid w-[240px] shrink-0 grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-2.5 lg:w-full")}
             >
-              <span className="pt-px text-caption text-subtle tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+              <span
+                className={cn(
+                  "flex size-6 shrink-0 items-center justify-center rounded-md text-sm font-semibold tabular-nums",
+                  active ? "bg-primary text-white" : "bg-sunken text-subtle",
+                )}
+              >
+                {String(i + 1).padStart(2, "0")}
+              </span>
               <span className="flex min-w-0 flex-col gap-1">
-                <span className={cn("line-clamp-2 text-small font-medium", active ? "text-ink" : "text-ink-2")}>
+                <span className={cn("line-clamp-2 text-base font-medium", active ? "text-ink" : "text-ink-2")}>
                   {topic.title || "Untitled topic"}
                 </span>
                 <TypeBadge type={topic.tag} className="font-normal text-muted" />
@@ -46,7 +52,7 @@ export function TopicSidebar({ isModerator }: { isModerator: boolean }) {
                 <span
                   title={`${pending} suggestion(s) to review`}
                   aria-label={`${pending} suggestion(s) to review`}
-                  className="flex h-5 min-w-5 items-center justify-center rounded-full bg-warn-soft px-1.5 text-caption font-semibold text-warn tabular-nums"
+                  className="flex h-5 min-w-5 items-center justify-center rounded-full bg-warn-soft px-1.5 text-sm font-semibold text-warn tabular-nums"
                 >
                   {pending}
                 </span>
@@ -70,7 +76,7 @@ export function TopicSidebar({ isModerator }: { isModerator: boolean }) {
               type="button"
               aria-current={active ? "true" : undefined}
               onClick={() => selectGeneral(kind)}
-              className={cn(item(active), "flex shrink-0 items-center gap-2.5 text-small font-medium", active ? "text-ink" : "text-ink-2")}
+              className={cn(item(active), "flex shrink-0 items-center gap-2.5 text-base font-medium", active ? "text-ink" : "text-ink-2")}
             >
               <Icon aria-hidden className="size-4 text-muted" strokeWidth={1.75} />
               {label}

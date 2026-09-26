@@ -11,7 +11,7 @@ export function TwoFaStep() {
   const { email, code, setCode, verify, backToSignIn, fillBackupCode } = useSessionStore();
   return (
     <form
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-5"
       onSubmit={(e) => {
         e.preventDefault();
         verify();
@@ -22,7 +22,7 @@ export function TwoFaStep() {
       </StepHeader>
       <div className="flex flex-col gap-3">
         <CodeInput value={code} onChange={setCode} autoFocus />
-        <label className="flex items-center gap-2.5 text-small text-ink-2">
+        <label className="flex items-center gap-2.5 text-base text-ink-2">
           <Checkbox defaultChecked />
           Trust this workstation for 12 hours
         </label>

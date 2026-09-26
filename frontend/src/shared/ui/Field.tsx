@@ -16,15 +16,15 @@ export function Field({
 }) {
   return (
     <label className={cn("flex flex-col gap-1.5", className)}>
-      <span className="text-small font-medium text-ink-2">{label}</span>
+      <span className="text-base font-medium text-ink-2">{label}</span>
       {children}
-      {hint && <span className="text-caption text-muted">{hint}</span>}
+      {hint && <span className="text-sm text-muted">{hint}</span>}
     </label>
   );
 }
 
 const control =
-  "w-full rounded-md border border-line-strong bg-white text-body text-ink transition-colors placeholder:text-subtle " +
+  "w-full rounded-md border border-line-strong bg-white text-md text-ink transition-colors placeholder:text-subtle " +
   "hover:border-subtle focus:border-primary focus:ring-3 focus:ring-primary/15 focus:outline-none";
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {

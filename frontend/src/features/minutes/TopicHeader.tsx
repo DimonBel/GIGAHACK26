@@ -21,7 +21,7 @@ export function TopicHeader({ topic, number, count, isModerator, editing }: Topi
   return (
     <div className="flex flex-col gap-4 pb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 text-caption text-muted">
+        <div className="flex items-center gap-3 text-sm text-muted">
           <span className="tabular-nums">
             Topic {number} of {count}
           </span>
@@ -38,7 +38,7 @@ export function TopicHeader({ topic, number, count, isModerator, editing }: Topi
               </Button>
             )}
             {editing && confirmDelete && (
-              <span role="alert" className="flex items-center gap-1 rounded-md bg-danger-soft py-0.5 pr-0.5 pl-2.5 text-small text-danger-ink">
+              <span role="alert" className="flex items-center gap-1 rounded-md bg-danger-soft py-0.5 pr-0.5 pl-2.5 text-base text-danger-ink">
                 Delete this topic?
                 <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
                   Cancel
@@ -78,7 +78,7 @@ export function TopicHeader({ topic, number, count, isModerator, editing }: Topi
             placeholder="Topic title"
             aria-label="Topic title"
             autoFocus={!topic.title}
-            className="h-12 min-w-[240px] flex-1 font-serif text-title"
+            className="h-12 min-w-[240px] flex-1 font-sans text-2xl font-semibold"
           />
           <Select
             value={topic.tag}
@@ -94,7 +94,7 @@ export function TopicHeader({ topic, number, count, isModerator, editing }: Topi
           </Select>
         </div>
       ) : (
-        <h2 className="font-serif text-heading text-balance">{topic.title || "Untitled topic"}</h2>
+        <h2 className="font-sans text-3xl font-semibold text-balance">{topic.title || "Untitled topic"}</h2>
       )}
     </div>
   );

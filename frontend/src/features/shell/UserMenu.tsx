@@ -7,7 +7,6 @@ import { LANGS, useT } from "@/shared/i18n";
 import { Menu, MenuItem, MenuSeparator, Segmented } from "@/shared/ui";
 import { useAccount, useSessionStore } from "@/stores/session";
 
-/** Initials button: account & security, switch cabinet, sign out. */
 export function UserMenu() {
   const t = useT();
   const cabinet = useCabinet();
@@ -29,15 +28,15 @@ export function UserMenu() {
           aria-haspopup="menu"
           aria-expanded={open}
           onClick={() => toggleMenu("user")}
-          className="flex size-8 items-center justify-center rounded-full bg-ink-line text-caption font-semibold text-on-ink transition-colors hover:bg-ink-hover hover:ring-1 hover:ring-on-ink-muted"
+          className="flex size-8 items-center justify-center rounded-full bg-ink-line text-sm font-semibold text-on-ink transition-colors hover:bg-ink-hover hover:ring-1 hover:ring-on-ink-muted"
         >
           {account?.initials ?? "—"}
         </button>
       }
     >
       <div className="flex flex-col px-2.5 pt-2 pb-2.5">
-        <span className="text-body font-medium">{account?.name ?? "—"}</span>
-        <span className="truncate text-caption text-muted">{email}</span>
+        <span className="text-md font-medium">{account?.name ?? "—"}</span>
+        <span className="truncate text-sm text-muted">{email}</span>
       </div>
       <div className="px-2.5 pb-2.5 sm:hidden">
         <Segmented label="Language" options={LANGS} value={lang} onChange={setLang} size="sm" />

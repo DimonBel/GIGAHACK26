@@ -5,7 +5,6 @@ import { MEETING_TYPES } from "@/shared/lib/tones";
 import { Overline, PageHeader, Panel, PanelHeader, Segmented, Toggle } from "@/shared/ui";
 import { useAdminStore } from "@/stores/admin";
 
-/** Which blocks the minutes of each meeting type contain, with a live preview. */
 export function TemplatesPage() {
   const t = useT();
   const { templates, templateType, setTemplateType, toggleBlock } = useAdminStore();
@@ -31,7 +30,7 @@ export function TemplatesPage() {
           <ul className="divide-y divide-line-soft px-5">
             {TEMPLATE_BLOCKS.map((block, i) => (
               <li key={block} className="flex items-center justify-between py-3">
-                <span className={cn("text-body", on[i] ? "text-ink" : "text-subtle")}>{block}</span>
+                <span className={cn("text-md", on[i] ? "text-ink" : "text-subtle")}>{block}</span>
                 <Toggle on={on[i] ?? false} onToggle={() => toggleBlock(i)} label={block} />
               </li>
             ))}
@@ -40,7 +39,7 @@ export function TemplatesPage() {
         <Panel>
           <PanelHeader title="Preview" description="General sections always included: Participants, Next meeting." />
           <div className="flex flex-col gap-5 p-6">
-            <div className="font-serif text-title">Topic 1 · …</div>
+            <div className="font-sans text-2xl font-semibold">Topic 1 · …</div>
             {shown.map((block) => (
               <div key={block} className="grid gap-x-6 gap-y-2 sm:grid-cols-[120px_minmax(0,1fr)]">
                 <Overline>{block}</Overline>
@@ -50,7 +49,7 @@ export function TemplatesPage() {
                 </div>
               </div>
             ))}
-            {!shown.length && <p className="text-small text-subtle">All blocks are off.</p>}
+            {!shown.length && <p className="text-base text-subtle">All blocks are off.</p>}
           </div>
         </Panel>
       </div>

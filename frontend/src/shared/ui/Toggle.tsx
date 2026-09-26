@@ -1,6 +1,5 @@
 import { cn } from "@/shared/lib/cn";
 
-/** On/off switch. */
 export function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
     <button
@@ -16,7 +15,7 @@ export function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => v
     >
       <span
         className={cn(
-          "absolute top-0.5 size-4 rounded-full bg-white shadow-raised transition-[left]",
+          "absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-[left] duration-200",
           on ? "left-[18px]" : "left-0.5",
         )}
       />

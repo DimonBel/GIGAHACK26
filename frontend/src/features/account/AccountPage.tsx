@@ -6,7 +6,6 @@ import { Button, Dot, PageHeader, Panel, PanelHeader } from "@/shared/ui";
 import { useAccountStore } from "@/stores/account";
 import { useAccount, useSessionStore } from "@/stores/session";
 
-/** Own profile, 2FA with backup codes, and active sessions. */
 export function AccountPage() {
   const t = useT();
   const account = useAccount();
@@ -25,7 +24,7 @@ export function AccountPage() {
       <div className="grid max-w-[1000px] items-start gap-6 lg:grid-cols-2">
         <Panel>
           <PanelHeader title="Profile" description="Managed in the hospital directory." />
-          <dl className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-4 gap-y-3 p-5 text-body">
+          <dl className="grid grid-cols-[110px_minmax(0,1fr)] gap-x-4 gap-y-3 p-5 text-md">
             {profile.map(([label, value]) => (
               <div key={label} className="contents">
                 <dt className="text-muted">{label}</dt>
@@ -39,7 +38,7 @@ export function AccountPage() {
             title="Two-factor authentication"
             description={TWO_FA_ADDED}
             actions={
-              <span className="flex items-center gap-1.5 text-small text-ink-2">
+              <span className="flex items-center gap-1.5 text-base text-ink-2">
                 <Dot className="bg-ok" />
                 Enabled
               </span>
@@ -57,7 +56,7 @@ export function AccountPage() {
                 {showBackupCodes ? "Hide backup codes" : "Show backup codes"}
               </Button>
               {showBackupCodes && (
-                <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 rounded-md bg-sunken p-4 text-body font-medium tracking-wide tabular-nums select-all">
+                <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 rounded-md bg-sunken p-4 text-md font-medium tracking-wide tabular-nums select-all">
                   {BACKUP_CODES.map((code) => (
                     <li key={code}>{code}</li>
                   ))}
@@ -65,17 +64,17 @@ export function AccountPage() {
               )}
             </div>
             <div className="flex flex-col">
-              <span className="pb-1 text-small font-medium text-ink-2">Active sessions</span>
+              <span className="pb-1 text-base font-medium text-ink-2">Active sessions</span>
               <ul className="divide-y divide-line-soft">
                 {SESSIONS.map((s, i) => {
                   const isRevoked = revoked.includes(i);
                   return (
-                    <li key={s.label} className="flex items-center justify-between gap-3 py-2.5 text-small">
+                    <li key={s.label} className="flex items-center justify-between gap-3 py-2.5 text-base">
                       <span className={isRevoked ? "text-subtle line-through" : "text-ink-2"}>{s.label}</span>
                       {s.current ? (
-                        <span className="text-caption text-muted">This device</span>
+                        <span className="text-sm text-muted">This device</span>
                       ) : isRevoked ? (
-                        <span className="text-caption text-muted">Revoked</span>
+                        <span className="text-sm text-muted">Revoked</span>
                       ) : (
                         <Button variant="danger" size="sm" onClick={() => revoke(i)}>
                           Revoke

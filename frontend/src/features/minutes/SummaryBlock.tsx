@@ -14,10 +14,10 @@ export function SummaryBlock({ topic, editing }: { topic: Topic; editing: boolea
           value={topic.summary}
           onChange={(e) => updateTopic(topic.id, { summary: e.target.value })}
           aria-label="Summary"
-          className="font-serif text-reading"
+          className="font-sans text-lg"
         />
       ) : (
-        <p className="max-w-[68ch] font-serif text-lead text-pretty text-ink">{topic.summary || "—"}</p>
+        <p className="max-w-[68ch] font-sans text-xl font-semibold text-pretty text-ink">{topic.summary || "—"}</p>
       )}
     </Block>
   );

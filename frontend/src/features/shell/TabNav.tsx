@@ -6,7 +6,6 @@ import { useT } from "@/shared/i18n";
 import { cn } from "@/shared/lib/cn";
 import { useSessionStore } from "@/stores/session";
 
-/** The cabinet's screens; the active one is white with a green underline. */
 export function TabNav() {
   const t = useT();
   const cabinet = useCabinet();
@@ -23,7 +22,7 @@ export function TabNav() {
           onClick={closeMenu}
           className={({ isActive }) =>
             cn(
-              "relative flex items-center px-3 text-small font-medium whitespace-nowrap transition-colors",
+              "relative flex items-center px-3 text-base font-medium whitespace-nowrap transition-colors",
               "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full",
               isActive ? "text-white after:bg-ok" : "text-on-ink-muted after:bg-transparent hover:text-white",
             )

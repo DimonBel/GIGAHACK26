@@ -9,7 +9,6 @@ import { useAdminStore } from "@/stores/admin";
 
 const COLUMNS = "md:grid-cols-[minmax(0,1fr)_minmax(0,300px)_120px_112px]";
 
-/** Directory users: cabinet access (toggle per cabinet) and 2FA state. */
 export function UsersPage() {
   const t = useT();
   const { users, toggleCabinet, resetTwoFa } = useAdminStore();
@@ -40,19 +39,19 @@ export function UsersPage() {
           />
         </label>
         <Panel className="overflow-hidden">
-          <div className={`hidden gap-6 border-b border-line-soft bg-canvas px-5 py-2.5 text-caption font-medium text-muted md:grid ${COLUMNS}`}>
+          <div className={`hidden gap-6 border-b border-line-soft bg-canvas px-5 py-2.5 text-sm font-medium text-muted md:grid ${COLUMNS}`}>
             <span>Person</span>
             <span>Cabinet access</span>
             <span>2FA</span>
             <span aria-hidden />
           </div>
-          {shown.length === 0 && <EmptyState className="px-5 py-10">Nobody matches “{query}”.</EmptyState>}
+          {shown.length === 0 && <EmptyState className="px-5 py-10">Nobody matches "{query}".</EmptyState>}
           <ul className="divide-y divide-line-soft">
             {shown.map((u) => (
               <li key={u.email} className={`grid items-center gap-x-6 gap-y-3 px-5 py-3.5 ${COLUMNS}`}>
                 <span className="flex min-w-0 flex-col">
-                  <span className="text-body font-medium">{u.name}</span>
-                  <span className="truncate text-caption text-muted">
+                  <span className="text-md font-medium">{u.name}</span>
+                  <span className="truncate text-sm text-muted">
                     {u.email} · {u.dept}
                   </span>
                 </span>
@@ -66,7 +65,7 @@ export function UsersPage() {
                         aria-pressed={on}
                         onClick={() => toggleCabinet(u.email, cabinet)}
                         className={cn(
-                          "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-caption font-medium transition-colors",
+                          "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-sm font-medium transition-colors",
                           on
                             ? "border-primary/30 bg-primary-soft text-primary"
                             : "border-line text-subtle hover:border-line-strong hover:text-ink-2",
@@ -80,7 +79,7 @@ export function UsersPage() {
                 </span>
                 <span
                   className={cn(
-                    "flex items-center gap-1.5 text-small",
+                    "flex items-center gap-1.5 text-base",
                     u.twoFa === "on" ? "text-ink-2" : "text-warn",
                   )}
                 >

@@ -8,7 +8,6 @@ import { ParticipantsSection } from "./ParticipantsSection";
 import { TopicSidebar } from "./TopicSidebar";
 import { TopicView } from "./TopicView";
 
-/** Minutes by topic: the moderator edits and approves them ("editor"), a participant reads them ("read"). */
 export function MinutesPage() {
   const isModerator = useCabinet() === "moderator";
   const topics = useMinutesStore((s) => s.topics);

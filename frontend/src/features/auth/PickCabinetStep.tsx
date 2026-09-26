@@ -13,7 +13,7 @@ export function PickCabinetStep() {
   const enterCabinet = useSessionStore((s) => s.enterCabinet);
   const allowed = account?.cabinets ?? [];
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <StepHeader title={t.chooseCabinet}>
         Signed in as {account?.name ?? "—"}. You can switch later from the header.
       </StepHeader>
@@ -27,26 +27,26 @@ export function PickCabinetStep() {
                 disabled={!open}
                 onClick={() => enterCabinet(cabinet)}
                 className={cn(
-                  "group flex w-full items-center gap-4 rounded-lg border p-4 text-left transition-colors",
+                  "group flex w-full items-center gap-4 rounded-xl border p-4 text-left transition-all",
                   open
-                    ? "border-line bg-white hover:border-primary"
+                    ? "border-line bg-white shadow-sm hover:border-primary/50 hover:shadow-lg"
                     : "cursor-not-allowed border-line-soft bg-transparent",
                 )}
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className={cn("text-body font-semibold", !open && "text-subtle")}>{t[cabinet]}</span>
-                  <span className={cn("text-small", open ? "text-muted" : "text-subtle")}>
+                  <span className={cn("text-md font-semibold", !open && "text-subtle")}>{t[cabinet]}</span>
+                  <span className={cn("text-base", open ? "text-muted" : "text-subtle")}>
                     {CABINET_DESCRIPTION[cabinet]}
                   </span>
                 </span>
                 {open ? (
                   <ArrowRight
                     aria-hidden
-                    className="size-4 shrink-0 text-subtle transition-colors group-hover:text-primary"
+                    className="size-4 shrink-0 text-subtle transition-all group-hover:translate-x-0.5 group-hover:text-primary"
                     strokeWidth={1.75}
                   />
                 ) : (
-                  <span className="text-caption text-subtle">No access</span>
+                  <span className="text-sm text-subtle">No access</span>
                 )}
               </button>
             </li>

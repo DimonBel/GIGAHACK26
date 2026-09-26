@@ -12,7 +12,6 @@ import { useMinutesStore } from "@/stores/minutes";
 
 import { MeetingRow, MEETING_COLUMNS } from "./MeetingRow";
 
-/** Moderator "Meetings" and participant "My minutes": meetings filtered by type. */
 export function MeetingsListPage() {
   const t = useT();
   const cabinet = useCabinet();
@@ -21,7 +20,6 @@ export function MeetingsListPage() {
   const openFirstTopic = useMinutesStore((s) => s.openFirstTopic);
   const navigate = useNavigate();
 
-  // Participants only see meetings whose minutes exist.
   const visible = MEETINGS.filter((m) => isModerator || !m.processing);
   const shown = visible.filter((m) => filter === "All" || m.type === filter);
   const filters: { value: MeetingFilter; label: string; count: number }[] = [
@@ -50,7 +48,7 @@ export function MeetingsListPage() {
         <Segmented label="Filter by meeting type" options={filters} value={filter} onChange={setFilter} />
         <Panel className="overflow-hidden">
           <div
-            className={`hidden border-b border-line-soft bg-canvas px-5 py-2.5 text-caption font-medium text-muted md:grid ${MEETING_COLUMNS}`}
+            className={`hidden border-b border-line-soft bg-canvas px-5 py-2.5 text-sm font-medium text-muted md:grid ${MEETING_COLUMNS}`}
           >
             <span>Meeting</span>
             <span>Date</span>

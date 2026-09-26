@@ -5,13 +5,11 @@ interface SegmentedProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   label: string;
-  /** "inverse" sits on the ink header */
   tone?: "default" | "inverse";
   size?: "sm" | "md";
   className?: string;
 }
 
-/** A set of mutually exclusive options (filters, language, kind of suggestion). */
 export function Segmented<T extends string>({
   options,
   value,
@@ -27,7 +25,7 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={label}
       className={cn(
-        "inline-flex max-w-full gap-0.5 overflow-x-auto rounded-md p-0.5",
+        "inline-flex max-w-full gap-0.5 overflow-x-auto rounded-lg p-0.5",
         inverse ? "bg-ink-hover" : "bg-sunken",
         className,
       )}
@@ -42,14 +40,14 @@ export function Segmented<T extends string>({
             aria-checked={on}
             onClick={() => onChange(o.value)}
             className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-[5px] font-medium whitespace-nowrap transition-colors",
-              size === "sm" ? "h-7 px-2 text-caption" : "h-8 px-3 text-small",
+              "inline-flex shrink-0 items-center gap-1.5 rounded-md font-medium whitespace-nowrap transition-colors",
+              size === "sm" ? "h-7 px-2 text-sm" : "h-8 px-3 text-base",
               inverse
                 ? on
                   ? "bg-ink-line text-white"
                   : "text-on-ink-muted hover:text-white"
                 : on
-                  ? "bg-white text-ink shadow-raised"
+                  ? "bg-white text-ink shadow-sm"
                   : "text-muted hover:text-ink",
             )}
           >

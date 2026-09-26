@@ -4,7 +4,6 @@ import { useT } from "@/shared/i18n";
 import { Checkbox, PageHeader, Panel } from "@/shared/ui";
 import { useAdminStore } from "@/stores/admin";
 
-/** What each cabinet may do: permissions × cabinets. */
 export function PermissionsPage() {
   const t = useT();
   const { permissions, togglePermission } = useAdminStore();
@@ -14,7 +13,7 @@ export function PermissionsPage() {
       <Panel className="overflow-x-auto">
         <table className="w-full min-w-[560px] border-collapse text-left">
           <thead>
-            <tr className="border-b border-line-soft bg-canvas text-caption font-medium text-muted">
+            <tr className="border-b border-line-soft bg-canvas text-sm font-medium text-muted">
               <th scope="col" className="px-5 py-2.5 font-medium">
                 Permission
               </th>
@@ -28,7 +27,7 @@ export function PermissionsPage() {
           <tbody className="divide-y divide-line-soft">
             {PERMISSIONS.map((label, row) => (
               <tr key={label} className="transition-colors hover:bg-canvas">
-                <th scope="row" className="px-5 py-3 text-body font-normal">
+                <th scope="row" className="px-5 py-3 text-md font-normal">
                   {label}
                 </th>
                 {CABINETS.map((cabinet, column) => (

@@ -5,7 +5,6 @@ import { cn } from "@/shared/lib/cn";
 import { Button, Panel, PanelHeader } from "@/shared/ui";
 import { STAGE_COUNT, useProcessingStore } from "@/stores/processing";
 
-/** Processing stages as a vertical stepper: waiting, running, done. */
 export function PipelineCard({ onReview }: { onReview: () => void }) {
   const stage = useProcessingStore((s) => s.stage);
   const done = stage >= STAGE_COUNT;
@@ -28,7 +27,7 @@ export function PipelineCard({ onReview }: { onReview: () => void }) {
               )}
               <span
                 className={cn(
-                  "relative flex size-6 shrink-0 items-center justify-center rounded-full border text-caption font-medium tabular-nums",
+                  "relative flex size-6 shrink-0 items-center justify-center rounded-full border text-sm font-medium tabular-nums",
                   finished && "border-primary bg-primary text-white",
                   running && "border-warn bg-warn-bg text-warn",
                   !finished && !running && "border-line-strong bg-white text-subtle",
@@ -43,8 +42,8 @@ export function PipelineCard({ onReview }: { onReview: () => void }) {
                 )}
               </span>
               <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3 pt-0.5">
-                <span className={cn("text-body", stage >= i ? "font-medium text-ink" : "text-muted")}>{step.name}</span>
-                <span className="text-caption text-muted tabular-nums">
+                <span className={cn("text-md", stage >= i ? "font-medium text-ink" : "text-muted")}>{step.name}</span>
+                <span className="text-sm text-muted tabular-nums">
                   {finished ? step.duration : running ? "running" : ""}
                 </span>
               </span>

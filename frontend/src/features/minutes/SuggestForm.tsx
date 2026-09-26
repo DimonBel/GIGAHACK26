@@ -7,7 +7,6 @@ import { useAccount } from "@/stores/session";
 
 const KINDS: SuggestionKind[] = ["Point of view", "Task", "Attention point", "Diagnosis"];
 
-/** Participant: propose an addition to the topic; the moderator accepts or declines it. */
 export function SuggestForm() {
   const name = useAccount()?.name ?? "—";
   const { suggestionKind, suggestionText, suggestionsSent, setSuggestionKind, setSuggestionText, submitSuggestion } =
@@ -15,8 +14,8 @@ export function SuggestForm() {
   return (
     <section className="mt-6 flex flex-col gap-4 rounded-lg border border-line bg-canvas p-5">
       <div className="flex flex-col gap-0.5">
-        <h3 className="text-body font-semibold">Suggest an addition</h3>
-        <p className="text-small text-muted">The moderator reviews it before it appears in the minutes.</p>
+        <h3 className="text-md font-semibold">Suggest an addition</h3>
+        <p className="text-base text-muted">The moderator reviews it before it appears in the minutes.</p>
       </div>
       <Segmented
         label="Kind of suggestion"
@@ -35,7 +34,7 @@ export function SuggestForm() {
         }
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-caption text-muted">
+        <span className="text-sm text-muted">
           {suggestionsSent ? `${suggestionsSent} sent · waiting for the moderator` : `Sent as ${name}`}
         </span>
         <Button

@@ -13,7 +13,7 @@ export function SignInStep() {
   const { email, emailUnknown, setEmail, signIn } = useSessionStore();
   return (
     <form
-      className="flex flex-col gap-6"
+      className="flex flex-col gap-5"
       onSubmit={(e) => {
         e.preventDefault();
         signIn();
@@ -35,7 +35,7 @@ export function SignInStep() {
           <Input type="password" defaultValue="password123" autoComplete="current-password" />
         </Field>
         {emailUnknown && (
-          <p role="alert" className="flex items-center gap-2 text-small text-danger">
+          <p role="alert" className="flex items-center gap-2 text-base text-danger">
             <CircleAlert aria-hidden className="size-4" strokeWidth={1.75} />
             This account is not in the hospital directory.
           </p>
@@ -45,7 +45,7 @@ export function SignInStep() {
         {t.continue}
       </Button>
 
-      <div className="flex flex-col gap-2.5 pt-2">
+      <div className="flex flex-col gap-2.5 pt-1">
         <Overline>Demo accounts</Overline>
         <ul className="divide-y divide-line-soft overflow-hidden rounded-lg border border-line bg-white">
           {DEMO_ACCOUNTS.map((d) => {
@@ -59,8 +59,8 @@ export function SignInStep() {
                   className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-canvas"
                 >
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-body font-medium">{d.name}</span>
-                    <span className="text-caption text-muted">{d.cabinets}</span>
+                    <span className="text-md font-medium">{d.name}</span>
+                    <span className="text-sm text-muted">{d.cabinets}</span>
                   </span>
                   {on && <Check aria-hidden className="size-4 text-primary" strokeWidth={2} />}
                 </button>

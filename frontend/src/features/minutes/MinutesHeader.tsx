@@ -4,7 +4,6 @@ import { CURRENT_MINUTES } from "@/mocks/meetings";
 import { Button, PageHeader, StatusBadge, TypeBadge } from "@/shared/ui";
 import { useMinutesStore } from "@/stores/minutes";
 
-/** Meeting title and status; "Approve & send" for the moderator, "Download PDF" for a participant. */
 export function MinutesHeader({ isModerator }: { isModerator: boolean }) {
   const sent = useMinutesStore((s) => s.sent);
   const send = useMinutesStore((s) => s.send);

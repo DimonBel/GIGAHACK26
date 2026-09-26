@@ -7,7 +7,6 @@ import { useMinutesStore } from "@/stores/minutes";
 import { AddButton, Block } from "./Block";
 import { PeopleSelect } from "./PeopleSelect";
 
-/** Who said what about the topic. */
 export function ViewsBlock({ topic, editing }: { topic: Topic; editing: boolean }) {
   const { addView, updateView, removeView } = useMinutesStore();
   return (
@@ -26,7 +25,7 @@ export function ViewsBlock({ topic, editing }: { topic: Topic; editing: boolean 
                 value={v.text}
                 onChange={(e) => updateView(topic.id, v.id, { text: e.target.value })}
                 aria-label={`Point of view of ${v.name}`}
-                className="font-serif text-reading"
+                className="font-sans text-lg"
               />
               <IconButton icon={X} label="Remove point of view" onClick={() => removeView(topic.id, v.id)} className="mt-1" />
             </div>
@@ -37,8 +36,8 @@ export function ViewsBlock({ topic, editing }: { topic: Topic; editing: boolean 
         <ul className="flex flex-col divide-y divide-line-soft">
           {topic.views.map((v) => (
             <li key={v.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
-              <span className="text-small font-semibold text-ink-2">{v.name}</span>
-              <p className="max-w-[68ch] font-serif text-reading text-ink">{v.text}</p>
+              <span className="text-base font-semibold text-ink-2">{v.name}</span>
+              <p className="max-w-[68ch] font-sans text-lg text-ink">{v.text}</p>
             </li>
           ))}
         </ul>

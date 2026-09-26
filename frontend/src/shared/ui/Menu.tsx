@@ -12,7 +12,6 @@ interface MenuProps {
   panelClassName?: string;
 }
 
-/** A trigger with a dropdown below it; closes on Escape or a click outside. */
 export function Menu({ open, onClose, trigger, children, panelClassName }: MenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   useOutsideClick(ref, onClose, open);
@@ -30,7 +29,7 @@ export function Menu({ open, onClose, trigger, children, panelClassName }: MenuP
         <div
           role="menu"
           className={cn(
-            "absolute top-[calc(100%+6px)] z-30 flex min-w-56 flex-col rounded-lg border border-line bg-white p-1 text-ink shadow-pop",
+            "absolute top-[calc(100%+6px)] z-30 flex min-w-56 flex-col rounded-xl border border-line bg-white p-1 text-ink shadow-lg",
             panelClassName,
           )}
         >
@@ -52,7 +51,7 @@ export function MenuItem({ icon: Icon, hint, className, children, type = "button
       type={type}
       role="menuitem"
       className={cn(
-        "flex h-9 items-center gap-2.5 rounded-md px-2.5 text-left text-body transition-colors hover:bg-sunken",
+        "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-left text-md transition-colors hover:bg-sunken",
         "disabled:pointer-events-none disabled:opacity-45",
         className,
       )}
@@ -60,7 +59,7 @@ export function MenuItem({ icon: Icon, hint, className, children, type = "button
     >
       {Icon && <Icon aria-hidden className="size-4 shrink-0 text-muted" strokeWidth={1.75} />}
       <span className="flex-1">{children}</span>
-      {hint && <span className="text-caption text-muted">{hint}</span>}
+      {hint && <span className="text-sm text-muted">{hint}</span>}
     </button>
   );
 }

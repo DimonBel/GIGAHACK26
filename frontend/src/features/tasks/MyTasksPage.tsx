@@ -5,7 +5,6 @@ import { DUE_TEXT, dueLabel, dueTone } from "@/shared/lib/date";
 import { Checkbox, PageHeader, Panel } from "@/shared/ui";
 import { useTasksStore } from "@/stores/tasks";
 
-/** Participant: tasks assigned in the minutes, ticked off when done. */
 export function MyTasksPage() {
   const t = useT();
   const { done, toggle } = useTasksStore();
@@ -25,14 +24,14 @@ export function MyTasksPage() {
                 <label className="flex items-start gap-3.5 px-5 py-4 transition-colors hover:bg-canvas">
                   <Checkbox checked={isDone} onChange={() => toggle(task.id)} className="mt-0.5" />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className={cn("text-body font-medium", isDone ? "text-subtle line-through" : "text-ink")}>
+                    <span className={cn("text-md font-medium", isDone ? "text-subtle line-through" : "text-ink")}>
                       {task.text}
                     </span>
-                    <span className="text-caption text-muted">{task.from}</span>
+                    <span className="text-sm text-muted">{task.from}</span>
                   </span>
                   <span
                     className={cn(
-                      "pt-0.5 text-small whitespace-nowrap tabular-nums",
+                      "pt-0.5 text-base whitespace-nowrap tabular-nums",
                       isDone ? "text-subtle" : DUE_TEXT[dueTone(task.due)],
                     )}
                   >

@@ -37,7 +37,7 @@ export function NewMeetingPage() {
           >
             <SourcePicker />
             <div className="flex flex-col gap-1.5">
-              <span className="text-small font-medium text-ink-2">Meeting type</span>
+              <span className="text-base font-medium text-ink-2">Meeting type</span>
               <Segmented
                 label="Meeting type"
                 options={MEETING_TYPES.map((type) => ({ value: type, label: type }))}
@@ -45,7 +45,7 @@ export function NewMeetingPage() {
                 onChange={setNewType}
                 className="self-start"
               />
-              <span className="text-caption text-muted">Decides the minutes template and who receives them.</span>
+              <span className="text-sm text-muted">Decides the minutes template and who receives them.</span>
             </div>
             <Field label="Title">
               <Input defaultValue={NEW_MEETING_DEFAULTS.title} />

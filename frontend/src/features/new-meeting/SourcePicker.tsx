@@ -7,7 +7,6 @@ import { useProcessingStore } from "@/stores/processing";
 const tile =
   "flex flex-col items-start gap-3 rounded-lg border p-4 text-left transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary";
 
-/** Upload a recording or record the meeting now; both start processing. */
 export function SourcePicker() {
   const { recording, recordedSeconds, start, toggleRecording } = useProcessingStore();
   return (
@@ -15,8 +14,8 @@ export function SourcePicker() {
       <label className={cn(tile, "border-dashed border-line-strong bg-canvas hover:border-primary hover:bg-white")}>
         <Upload aria-hidden className="size-5 text-primary" strokeWidth={1.75} />
         <span className="flex flex-col gap-0.5">
-          <span className="text-body font-medium">Upload audio</span>
-          <span className="text-caption text-muted">.wav · .mp3 · .m4a, up to 2 hours</span>
+          <span className="text-md font-medium">Upload audio</span>
+          <span className="text-sm text-muted">.wav · .mp3 · .m4a, up to 2 hours</span>
         </span>
         <input
           type="file"
@@ -40,8 +39,8 @@ export function SourcePicker() {
           <Mic aria-hidden className="size-5 text-danger" strokeWidth={1.75} />
         )}
         <span className="flex flex-col gap-0.5">
-          <span className="text-body font-medium">{recording ? "Stop and process" : "Record now"}</span>
-          <span className={cn("text-caption tabular-nums", recording ? "text-danger" : "text-muted")}>
+          <span className="text-md font-medium">{recording ? "Stop and process" : "Record now"}</span>
+          <span className={cn("text-sm tabular-nums", recording ? "text-danger" : "text-muted")}>
             {recording ? `Recording · ${formatClock(recordedSeconds)}` : "Uses this workstation's microphone"}
           </span>
         </span>

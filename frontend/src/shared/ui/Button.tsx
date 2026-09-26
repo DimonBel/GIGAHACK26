@@ -4,21 +4,17 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/shared/lib/cn";
 
 const VARIANTS = {
-  /** the one main action of a view — teal, the 10 % */
-  primary: "bg-primary text-white hover:bg-primary-hover",
-  /** everything else that matters */
-  secondary: "border border-line-strong bg-white text-ink hover:border-subtle hover:bg-canvas",
-  /** low-emphasis actions inside content */
+  primary: "bg-primary text-white shadow-md hover:bg-primary-hover hover:shadow-sm",
+  secondary: "border border-line-strong bg-white text-ink hover:border-subtle hover:bg-sunken",
   ghost: "text-ink-2 hover:bg-sunken hover:text-ink",
   danger: "text-danger hover:bg-danger-soft",
-  /** on the ink header */
   inverse: "text-on-ink hover:bg-ink-hover hover:text-white",
 };
 
 const SIZES = {
-  sm: "h-8 gap-1.5 px-2.5 text-small",
-  md: "h-9 gap-2 px-3.5 text-body",
-  lg: "h-11 gap-2 px-5 text-body",
+  sm: "h-8 gap-1.5 px-2.5 text-base",
+  md: "h-9 gap-2 px-3.5 text-md",
+  lg: "h-11 gap-2 px-5 text-md",
 };
 
 export type ButtonVariant = keyof typeof VARIANTS;
@@ -27,7 +23,6 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: keyof typeof SIZES;
   icon?: LucideIcon;
-  /** icon after the label (e.g. an arrow) */
   trailingIcon?: LucideIcon;
 }
 
@@ -45,7 +40,7 @@ export function Button({
     <button
       type={type}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-md font-medium whitespace-nowrap transition-colors",
+        "inline-flex shrink-0 items-center justify-center rounded-md font-medium whitespace-nowrap transition-all duration-150",
         "disabled:pointer-events-none disabled:opacity-45",
         VARIANTS[variant],
         SIZES[size],
@@ -66,7 +61,6 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
 }
 
-/** Square button with only an icon; the label is for screen readers and the tooltip. */
 export function IconButton({ icon: Icon, label, variant = "ghost", className, type = "button", ...props }: IconButtonProps) {
   return (
     <button
