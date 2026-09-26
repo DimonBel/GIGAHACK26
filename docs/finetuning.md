@@ -7,7 +7,7 @@ pipeline. The pipeline itself doesn't need a GPU server: it runs on a Mac (MLX) 
 
 Stock Whisper (large-v3-turbo, our default) mishears Moldovan-accented and colloquial Romanian. On the Medpark
 meeting the opening "Pacientul patul 8, el a fost pe data de **unșpe** (11)…" comes out as "…pe data de
-**ustra**…", and terms like "miocardic" as "meocardia". The misheard-word correction (`stt/spelling.py`) only
+**ustra**…", and terms like "miocardic" as "meocardia". The misheard-word correction (`stt/text/spelling.py`) only
 fixes words a letter or two off; a word misheard as a different sound needs the model itself adapted.
 
 No public model covers this. The only Moldovan fine-tune we found,
@@ -65,10 +65,10 @@ How transcripts must be written (training teaches the model to write like this):
 - numbers in digits, also colloquial ones: "unșpe" → "11", "optzeci pe patruzeci" → "80 pe 40";
 - Romanian diacritics with comma below (ș, ț), not cedilla (ş, ţ);
 - Russian words in Cyrillic, as said: "короче", "так", "чисто";
-- medical terms and drug names spelled correctly (see `stt/medical_ro.txt`);
+- medical terms and drug names spelled correctly (see `stt/text/medical_ro.txt`);
 - normal sentence casing and punctuation.
 
-For our own meetings: cut them into speech segments with the pipeline's VAD (`stt/segments.py`), let the
+For our own meetings: cut them into speech segments with the pipeline's VAD (`stt/asr/vad.py`), let the
 current pipeline produce a draft (`main.py transcribe --format srt`), and have staff correct the draft; that
 is several times faster than transcribing from scratch.
 
@@ -85,13 +85,15 @@ is several times faster than transcribing from scratch.
 
 ## Bringing it back into the pipeline
 
-On a Mac (MLX, the default engine):
+On a Mac (MLX, the default engine), from the LoRA adapter (a `.tar` with `adapter/` and `merge_adapter.py`):
 
 ```bash
-git clone --depth 1 https://github.com/ml-explore/mlx-examples
-python mlx-examples/whisper/convert.py --torch-name-or-path <merged model folder> --mlx-path models/mlx-turbo-md
-.venv/bin/python main.py dialog meeting.m4a --ro-model models/mlx-turbo-md
+scripts/install_finetuned.sh path/to/turbo-md-adapter.tar
 ```
+
+It merges the adapter into `openai/whisper-large-v3-turbo` and converts the result for MLX (with a pinned
+mlx-examples commit) into `models/mlx-turbo-md`, in a throwaway environment. The web app and `main.py` then use
+it by default.
 
 For whisper.cpp (NVIDIA or CPU machines): convert with whisper.cpp's `models/convert-h5-to-ggml.py` (it needs
 `vocab.json` and `added_tokens.json` from `openai/whisper-large-v3-turbo`, and `mel_filters.npz` from the
