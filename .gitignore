@@ -17,7 +17,6 @@ env/
 # --- Whisper / VAD models (large, download separately — see README) ---
 models/
 
-*.claude
 # --- Audio / video inputs (large files, may contain patient data) ---
 *.m4a
 *.mp3
@@ -38,10 +37,14 @@ out/
 
 # --- Tools ---
 .omc/
-.claude/settings.local.json
+.claude/
 
 # --- OS / editors ---
 .DS_Store
 .idea/
 .vscode/
 *.swp
+
+# --- Benchmark outputs (contain transcripts); the scoring script stays in git ---
+/bench/*
+!/bench/eval_minutes.py

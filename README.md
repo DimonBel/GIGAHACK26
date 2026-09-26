@@ -17,10 +17,13 @@ Models are not in git (`models/` is gitignored). Download them once:
 
 | Model | Used for | Size | Required? |
 |---|---|---|---|
-| `models/ggml-large-v3.bin` (Whisper Large V3) | speech-to-text | 3.1 GB | yes |
+| `models/ggml-large-v3.bin` (Whisper Large V3) | speech-to-text (`--engine whisper`), source of the 8-bit copy | 3.1 GB | yes |
+| `models/ggml-large-v3-q8_0.bin` (Large V3, 8-bit) | `dialog` default (`--engine whisper-file`), ~20% faster | 1.6 GB | recommended (made from the file above) |
+| `models/ggml-large-v3-turbo-q8_0.bin` (Large V3 Turbo, 8-bit) | `transcribe` default (`--engine whisper-turbo`) | 0.8 GB | for `transcribe` |
 | `models/ggml-silero-v5.1.2.bin` (Silero VAD) | skips silence, fewer hallucinated words | 0.9 MB | recommended (used automatically if present) |
 | pyannote 3.1 (Hugging Face) | who said what (`dialog`) | ~30 MB | for `dialog` — see [Speaker dialog](#speaker-dialog-who-said-what) |
-| `gemma4:e4b` (Ollama) | Minutes of Meeting | 9.6 GB | for `--minutes` / `stt.minutes` |
+| `gemma4:e4b` (Ollama) | Minutes of Meeting; also `--engine gemma` (speech-to-text) | 9.6 GB | for `--minutes` / `stt.minutes` |
+| `gemma4:e2b` (Ollama) | `--engine gemma-fast` (speech-to-text) | 7.2 GB | optional |
 | `llama3.1:8b` (Ollama) | short summary (`--summarize`) | 4.9 GB | optional |
 
 ```bash
@@ -29,9 +32,14 @@ curl -L -o models/ggml-large-v3.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin
 curl -L -o models/ggml-silero-v5.1.2.bin \
   https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin
+whisper-quantize models/ggml-large-v3.bin models/ggml-large-v3-q8_0.bin q8_0            # 8-bit copy, seconds
+curl -L -o models/ggml-large-v3-turbo.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+whisper-quantize models/ggml-large-v3-turbo.bin models/ggml-large-v3-turbo-q8_0.bin q8_0
 
 brew services start ollama        # or: ollama serve &
-ollama pull gemma4:e4b            # minutes
+ollama pull gemma4:e4b            # minutes (and --engine gemma)
+ollama pull gemma4:e2b            # optional, only for --engine gemma-fast
 ollama pull llama3.1:8b           # optional, only for --summarize
 ollama list                       # check what is installed
 ```
@@ -46,7 +54,8 @@ Transcribe a file (mp3, m4a, wav, mp4, ogg, ...):
 
 ```bash
 .venv/bin/python main.py transcribe audio.mp3
-.venv/bin/python main.py transcribe audio.mp3 --lang ro --format srt --out audio.srt
+.venv/bin/python main.py transcribe audio.mp3 --lang ro --out audio.txt
+.venv/bin/python main.py transcribe audio.mp3 --engine whisper-file --format srt --out audio.srt
 .venv/bin/python main.py transcribe audio.mp3 --translate        # translate to English
 ```
 
@@ -56,7 +65,24 @@ Record from the microphone, then transcribe:
 .venv/bin/python main.py record --seconds 10
 ```
 
-Options: `--lang auto|en|ro|ru|...`, `--format txt|srt|timestamps`, `--out FILE`, `--model PATH`.
+Options: `--lang auto|en|ro|ru|...`, `--format txt|srt|timestamps`, `--out FILE`, `--model PATH`,
+`--engine whisper-turbo|whisper|gemma|gemma-fast|whisper-file`.
+
+`transcribe` uses **Whisper Large V3 Turbo** (8-bit, `models/ggml-large-v3-turbo-q8_0.bin`) by default. Create it once:
+
+```bash
+curl -L -o models/ggml-large-v3-turbo.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+whisper-quantize models/ggml-large-v3-turbo.bin models/ggml-large-v3-turbo-q8_0.bin q8_0
+```
+
+The audio is cut
+into ≤28 s pieces at quiet moments and 2 whisper-servers transcribe them in parallel.
+
+With `--lang auto` (default) the language is detected automatically — Romanian (incl. Moldovan), Russian
+or English. Whisper's per-piece guess is unreliable for Moldovan speech (Romanian often guessed as Russian at
+~50%), so the recording's main language is taken from all pieces together, a piece keeps a different
+language only when Whisper is ≥80% sure, and uncertain pieces are re-transcribed in the main language.
+`--format srt/timestamps` need `--engine whisper-file` (one whisper-cli run over the whole file).
 
 ## Speaker dialog (who said what)
 
@@ -78,11 +104,29 @@ transcript as a dialog:
 ```bash
 .venv/bin/python main.py dialog Medpark_audio.m4a --lang ro --out Medpark_dialog.txt
 .venv/bin/python main.py dialog Medpark_audio.m4a --lang ro --format srt --out Medpark.srt
-.venv/bin/python main.py record --seconds 30 --dialog
+.venv/bin/python main.py record --seconds 30 --dialog --engine whisper-file
 ```
 
+`dialog` uses **Whisper Large V3 in 8-bit** (`models/ggml-large-v3-q8_0.bin`, falls back to
+`ggml-large-v3.bin` if missing). Create it once (5 seconds, 1.6 GB):
+
+```bash
+whisper-quantize models/ggml-large-v3.bin models/ggml-large-v3-q8_0.bin q8_0
+```
+
+How it works (default, `--engine whisper-file`): pyannote first finds who speaks when; then Whisper
+transcribes the whole file in one run (silence skipped by VAD), and every sentence / Whisper segment
+goes to the speaker who talks most during it. On an Apple M4, 11m 43s of audio takes ~2m 50s
+(~1 min speaker detection + ~2 min Whisper). `--beam-size 5` is a bit more careful (~35% slower Whisper).
+
+Slower alternative (`--engine whisper`, `whisper-turbo`, `gemma`, `gemma-fast`): every speaker turn is
+cut out and transcribed separately, so each line's text comes only from that speaker's audio and short
+remarks made while the other person talks ("Da.") get their own line - but Whisper then runs once per
+turn (~170 times for 12 minutes instead of ~25), which takes much longer.
+Whisper artifacts (repetition loops, subtitle credits) are filtered out in both modes.
+
 The number of speakers is detected automatically. Limitations: when two people talk at the
-same time, the words go to the dominant speaker; labels (SPEAKER 1, 2...) are per file.
+same time, words in the overlap may go to either speaker; labels (SPEAKER 1, 2...) are per file.
 
 ## Optional: summarize with a local LLM (Ollama)
 
@@ -130,14 +174,17 @@ live mode. Score an output with `python3 bench/eval_minutes.py out/meeting.md`.
 ```
 main.py              CLI entry point
 stt/audio.py         ffmpeg → 16 kHz mono WAV
-stt/transcriber.py   runs whisper-cli (Large V3), parses segments + word timestamps
+stt/transcriber.py   runs whisper-cli (Large V3) on a whole file
 stt/diarizer.py      pyannote 3.1 speaker detection
-stt/dialog.py        assigns words to speakers, dialog txt/srt/json output
-stt/pipeline.py      convert -> transcribe -> diarize -> align
+stt/dialog.py        speaker turns -> blocks, text cleanup, dialog txt/srt/json output
+stt/pipeline.py      convert -> diarize -> transcribe (whole file, or each turn), feeds the live minutes
+stt/engines.py       speech-to-text engines: whisper, whisper-turbo, gemma, gemma-fast
+stt/whisper_server.py keeps Whisper loaded in a local whisper-server
 tests/               unit tests (.venv/bin/python -m pytest tests)
 stt/recorder.py      microphone recording (sounddevice)
 stt/llm.py           optional Ollama summarization
 stt/minutes.py       Minutes of Meeting (chunked extraction with gemma4:e4b)
 models/              Whisper / VAD model files (gitignored, see Models to install)
 bench/eval_minutes.py scores minutes against the Medpark reference facts
+scripts/bench.py     speech-to-text engine benchmark
 ```

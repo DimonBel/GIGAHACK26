@@ -43,3 +43,13 @@ def _to_wav16k_pyav(src: Path, dst: Path) -> Path:
         for chunk in resampler.resample(None):
             out.writeframes(chunk.to_ndarray().tobytes())
     return dst
+
+
+def duration(src: Path) -> float:
+    """Length of an audio/video file in seconds (0 if it can't be read)."""
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(src)],
+                         capture_output=True, text=True)
+    try:
+        return float(out.stdout.strip())
+    except ValueError:
+        return 0.0
