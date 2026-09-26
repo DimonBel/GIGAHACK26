@@ -1,54 +1,99 @@
 import { create } from "zustand";
 
-import { PIPELINE } from "@/mocks/meetings";
+import { ApiError } from "@/api/client";
+import { createMeeting, getProgress, retryMeeting, type Meeting, type NewMeeting } from "@/api/meetings";
+import type { Line, Progress } from "@/api/types";
 
-const STAGE_MS = 900;
-const TICK_MS = 1000;
+const POLL_MS = 1000;
+const RETRY_MS = 3000;
 
 interface ProcessingState {
-  /** -1 = not started, 0..n-1 = running that stage, n = done. */
-  stage: number;
-  recording: boolean;
-  recordedSeconds: number;
-  /** Simulated processing: one stage every 900 ms. */
-  start: () => void;
-  /** Start recording, or stop it and process the recording. */
-  toggleRecording: () => void;
-  stop: () => void;
+  /** The upload of a new meeting, while it runs. */
+  upload: { name: string; fraction: number } | null;
+  uploadError: string | null;
+  /** The meeting whose processing is followed (the processing view), its progress and transcript so far. */
+  watching: number | null;
+  progress: Progress | null;
+  lines: Line[];
+  pollError: string | null;
+
+  /** Uploads the recording; the server queues it. Returns the new meeting, or null on failure. */
+  create: (meeting: NewMeeting) => Promise<Meeting | null>;
+  watch: (meetingId: number) => void;
+  unwatch: () => void;
+  retry: (meetingId: number) => Promise<void>;
 }
 
-// Timers live with the store, not a component: processing keeps running while you look at another screen.
-let stageTimer: ReturnType<typeof setInterval> | undefined;
-let recordTimer: ReturnType<typeof setInterval> | undefined;
+// One poll loop at a time; a new watch() (or unwatch) makes an older loop stop at its next step.
+let timer: ReturnType<typeof setTimeout> | undefined;
+let generation = 0;
 
-export const STAGE_COUNT = PIPELINE.length;
+const finished = (p: Progress) => p.status !== "queued" && p.status !== "processing";
 
-export const useProcessingStore = create<ProcessingState>()((set, get) => ({
-  stage: -1,
-  recording: false,
-  recordedSeconds: 0,
-
-  start: () => {
-    clearInterval(stageTimer);
-    set({ stage: 0 });
-    stageTimer = setInterval(() => {
-      const { stage } = get();
-      if (stage >= STAGE_COUNT) clearInterval(stageTimer);
-      else set({ stage: stage + 1 });
-    }, STAGE_MS);
-  },
-  toggleRecording: () => {
-    if (get().recording) {
-      clearInterval(recordTimer);
-      set({ recording: false });
-      get().start();
-      return;
+export const useProcessingStore = create<ProcessingState>()((set, get) => {
+  async function poll(meetingId: number, gen: number) {
+    try {
+      const p = await getProgress(meetingId, get().lines.length);
+      if (gen !== generation) return;
+      set((s) => ({
+        progress: p,
+        lines: p.lines.length ? [...s.lines, ...p.lines] : s.lines,
+        pollError: null,
+      }));
+      if (!finished(p)) timer = setTimeout(() => void poll(meetingId, gen), POLL_MS);
+    } catch (e) {
+      if (gen !== generation) return;
+      set({ pollError: e instanceof ApiError ? e.message : "Lost the connection to the server." });
+      timer = setTimeout(() => void poll(meetingId, gen), RETRY_MS);
     }
-    set({ recording: true, recordedSeconds: 0 });
-    recordTimer = setInterval(() => set((s) => ({ recordedSeconds: s.recordedSeconds + 1 })), TICK_MS);
-  },
-  stop: () => {
-    clearInterval(stageTimer);
-    clearInterval(recordTimer);
-  },
-}));
+  }
+
+  return {
+    upload: null,
+    uploadError: null,
+    watching: null,
+    progress: null,
+    lines: [],
+    pollError: null,
+
+    create: async (meeting) => {
+      set({ upload: { name: meeting.file.name, fraction: 0 }, uploadError: null });
+      try {
+        const created = await createMeeting(meeting, (fraction) =>
+          set({ upload: { name: meeting.file.name, fraction } }),
+        );
+        set({ upload: null });
+        return created;
+      } catch (e) {
+        set({ upload: null, uploadError: e instanceof ApiError ? e.message : "The upload failed." });
+        return null;
+      }
+    },
+    watch: (meetingId) => {
+      const { watching, progress } = get();
+      if (watching === meetingId && (!progress || !finished(progress))) return; // already following it
+      clearTimeout(timer);
+      generation += 1;
+      set({ watching: meetingId, progress: null, lines: [], pollError: null });
+      void poll(meetingId, generation);
+    },
+    unwatch: () => {
+      clearTimeout(timer);
+      timer = undefined;
+      generation += 1;
+      set({ watching: null, progress: null, lines: [], pollError: null });
+    },
+    retry: async (meetingId) => {
+      try {
+        await retryMeeting(meetingId);
+      } catch (e) {
+        set({ pollError: e instanceof ApiError ? e.message : "Could not retry." });
+        return;
+      }
+      clearTimeout(timer);
+      timer = undefined;
+      set({ watching: null });
+      get().watch(meetingId);
+    },
+  };
+});

@@ -1,11 +1,9 @@
 import { cn } from "@/shared/lib/cn";
-import type { AuthStep } from "@/stores/session";
 
-const STEPS = ["Account", "Verification", "Cabinet"];
-const ORDER: Record<Exclude<AuthStep, "in">, number> = { signin: 0, "2fa": 1, setup: 1, pick: 2 };
+const STEPS = ["Account", "Cabinet"];
 
-export function AuthSteps({ step }: { step: Exclude<AuthStep, "in"> }) {
-  const order = ORDER[step];
+export function AuthSteps({ step }: { step: "signin" | "pick" }) {
+  const order = step === "signin" ? 0 : 1;
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-1.5" aria-hidden>

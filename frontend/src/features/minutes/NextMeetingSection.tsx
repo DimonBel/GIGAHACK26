@@ -1,17 +1,19 @@
 import { CalendarDays, Clock, MapPin } from "lucide-react";
 
+import type { NextMeeting } from "@/api/types";
 import { formatDate } from "@/shared/lib/date";
-import { Field, Input, Textarea } from "@/shared/ui";
+import { EmptyState, Field, Input, Textarea } from "@/shared/ui";
 import { useMinutesStore } from "@/stores/minutes";
 
-export function NextMeetingSection({ isModerator }: { isModerator: boolean }) {
-  const { next, updateNext } = useMinutesStore();
+export function NextMeetingSection({ next, editing }: { next: NextMeeting; editing: boolean }) {
+  const updateNext = useMinutesStore((s) => s.updateNext);
+  const empty = !next.date && !next.time && !next.place && !next.agenda;
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="font-sans text-3xl font-semibold">Next meeting</h2>
-      {isModerator ? (
+      <h2 className="font-sans text-3xl font-bold">Next meeting</h2>
+      {editing ? (
         <div className="flex flex-col gap-4">
-          <div className="grid gap-4 sm:grid-cols-[160px_120px_minmax(0,1fr)]">
+          <div className="grid gap-4 sm:grid-cols-[170px_130px_minmax(0,1fr)]">
             <Field label="Date">
               <Input type="date" value={next.date} onChange={(e) => updateNext({ date: e.target.value })} />
             </Field>
@@ -19,7 +21,11 @@ export function NextMeetingSection({ isModerator }: { isModerator: boolean }) {
               <Input type="time" value={next.time} onChange={(e) => updateNext({ time: e.target.value })} />
             </Field>
             <Field label="Place">
-              <Input value={next.place} onChange={(e) => updateNext({ place: e.target.value })} />
+              <Input
+                value={next.place}
+                onChange={(e) => updateNext({ place: e.target.value })}
+                maxLength={200}
+              />
             </Field>
           </div>
           <Field label="Agenda">
@@ -27,17 +33,19 @@ export function NextMeetingSection({ isModerator }: { isModerator: boolean }) {
               rows={4}
               value={next.agenda}
               onChange={(e) => updateNext({ agenda: e.target.value })}
-              className="font-sans text-lg"
+              className="text-lg"
             />
           </Field>
         </div>
+      ) : empty ? (
+        <EmptyState>Not planned yet.</EmptyState>
       ) : (
         <div className="flex flex-col gap-5">
           <dl className="flex flex-wrap gap-x-8 gap-y-3 text-md">
             {[
-              { icon: CalendarDays, label: "Date", value: formatDate(next.date) },
-              { icon: Clock, label: "Time", value: next.time },
-              { icon: MapPin, label: "Place", value: next.place },
+              { icon: CalendarDays, label: "Date", value: next.date ? formatDate(next.date) : "—" },
+              { icon: Clock, label: "Time", value: next.time || "—" },
+              { icon: MapPin, label: "Place", value: next.place || "—" },
             ].map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-center gap-2">
                 <Icon aria-hidden className="size-4 text-muted" strokeWidth={1.75} />
@@ -46,7 +54,9 @@ export function NextMeetingSection({ isModerator }: { isModerator: boolean }) {
               </div>
             ))}
           </dl>
-          <p className="max-w-[68ch] font-sans text-xl font-semibold text-pretty">{next.agenda}</p>
+          {next.agenda && (
+            <p className="max-w-[68ch] text-xl text-pretty whitespace-pre-line">{next.agenda}</p>
+          )}
         </div>
       )}
     </div>

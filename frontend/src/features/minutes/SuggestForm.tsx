@@ -1,16 +1,29 @@
 import { Send } from "lucide-react";
+import { useState } from "react";
 
-import type { SuggestionKind } from "@/shared/types/domain";
 import { Button, Segmented, Textarea } from "@/shared/ui";
 import { useMinutesStore } from "@/stores/minutes";
 import { useAccount } from "@/stores/session";
 
-const KINDS: SuggestionKind[] = ["Point of view", "Task", "Attention point", "Diagnosis"];
+const KINDS = ["Addition", "Correction", "Task"] as const;
+type Kind = (typeof KINDS)[number];
 
-export function SuggestForm() {
+/** Participant: suggest an addition to a topic while the minutes are a draft. */
+export function SuggestForm({ topicId }: { topicId: string }) {
   const name = useAccount()?.name ?? "—";
-  const { suggestionKind, suggestionText, suggestionsSent, setSuggestionKind, setSuggestionText, submitSuggestion } =
-    useMinutesStore();
+  const sendSuggestion = useMinutesStore((s) => s.sendSuggestion);
+  const suggestions = useMinutesStore((s) => s.suggestions);
+  const sent = suggestions.filter((x) => x.topicId === topicId);
+  const [kind, setKind] = useState<Kind>("Addition");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    if (await sendSuggestion(topicId, kind, text)) setText("");
+    setBusy(false);
+  }
+
   return (
     <section className="mt-6 flex flex-col gap-4 rounded-lg border border-line bg-canvas p-5">
       <div className="flex flex-col gap-0.5">
@@ -20,29 +33,32 @@ export function SuggestForm() {
       <Segmented
         label="Kind of suggestion"
         options={KINDS.map((k) => ({ value: k, label: k }))}
-        value={suggestionKind}
-        onChange={setSuggestionKind}
+        value={kind}
+        onChange={setKind}
         className="self-start"
       />
       <Textarea
         rows={3}
-        value={suggestionText}
-        onChange={(e) => setSuggestionText(e.target.value)}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
         aria-label="Suggestion"
+        maxLength={2000}
         placeholder={
-          suggestionKind === "Diagnosis" ? "ICD-10 code and term, e.g. N18.3 Chronic kidney disease" : "Write your addition…"
+          kind === "Correction" ? "What is wrong, and what it should say…" : "Write your addition…"
         }
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-muted">
-          {suggestionsSent ? `${suggestionsSent} sent · waiting for the moderator` : `Sent as ${name}`}
+          {sent.length
+            ? `${sent.length} sent · ${sent.filter((s) => s.state === "accepted").length} added by the moderator`
+            : `Sent as ${name}`}
         </span>
         <Button
           variant="primary"
           size="sm"
           icon={Send}
-          disabled={!suggestionText.trim()}
-          onClick={() => submitSuggestion(name)}
+          disabled={!text.trim() || busy}
+          onClick={() => void submit()}
         >
           Send to moderator
         </Button>

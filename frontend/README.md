@@ -1,25 +1,29 @@
 # Frontend — Verbal
 
-React 19 + TypeScript + Tailwind CSS 4 (Vite). Demo data only, no backend calls yet.
+React 19 + TypeScript + Tailwind CSS 4 (Vite). Meetings, minutes and sign-in come from the server
+(`../server`, `python -m api`); the admin screens and My tasks still use demo data.
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:5173 — /api is forwarded to http://127.0.0.1:8000 (API_URL to change)
 npm test           # store + routing tests (Vitest)
 npm run build      # typecheck + production build in dist/
 npm run lint
 ```
 
-Demo accounts are listed on the sign-in screen; any 6-digit code passes 2FA.
+Start the server first (`cd ../server && .venv/bin/python -m api`). Sign in with a demo account from the list
+on the sign-in screen and the password set on the server (`SEED_PASSWORD`, default `demo`). Recording in the
+browser needs `localhost` or HTTPS.
 
 ## Structure
 
 ```
 src/
-├── app/          router, route guards, screen registry (which page each /:cabinet/:screen shows)
+├── api/          the only code that calls the server: fetch/upload client, typed endpoints, response types
+├── app/          router, route guards, screen registry (which page each /:cabinet/:screen[/:meetingId] shows)
 ├── features/     one folder per area: auth, shell, meetings, new-meeting, minutes, tasks, admin, account
-├── stores/       zustand stores: all state and actions (session, minutes, processing, admin, …)
-├── mocks/        demo data; only stores import it, so the API can replace it later
+├── stores/       zustand stores: all state and actions (session, meetings, processing, minutes + autosave, …)
+├── mocks/        demo data of the screens not connected yet (admin, tasks)
 ├── shared/
 │   ├── ui/       design-system primitives (Button, Panel, Field, Segmented, Menu, PageHeader, …)
 │   ├── config/   cabinets, their tabs and home screens
@@ -29,7 +33,17 @@ src/
 └── styles/index.css   design tokens (@theme)
 ```
 
-Features import `shared/` and `stores/`, never each other.
+Features import `shared/`, `stores/` and `api/` types, never each other. Stores call `api/`.
+
+## Minutes
+
+The server sends the minutes as a document: overview (title, summary, key moments, AI follow-ups, warnings),
+participants (voices the moderator can name), topics, next meeting. Each topic is a list of **blocks** —
+text, list, tasks or codes — that the moderator renames, reorders, adds and deletes in edit mode
+(`features/minutes/blocks/`). Edits autosave 800 ms after the last change with the document's version; a newer
+version on the server stops saving and offers a reload. Times in the minutes open the topic's transcript at that
+line. Approving locks the document and emails it to the attendees chosen in Participants (through the server's
+local Mailpit; the header shows when every email was sent, and offers a retry if one failed).
 
 ## Design rules
 

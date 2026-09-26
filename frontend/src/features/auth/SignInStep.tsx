@@ -1,4 +1,5 @@
-import { ArrowRight, Check, CircleAlert } from "lucide-react";
+import { ArrowRight, Check, CircleAlert, LoaderCircle } from "lucide-react";
+import { useRef } from "react";
 
 import { DEMO_ACCOUNTS } from "@/mocks/accounts";
 import { useT } from "@/shared/i18n";
@@ -10,13 +11,14 @@ import { StepHeader } from "./StepHeader";
 
 export function SignInStep() {
   const t = useT();
-  const { email, emailUnknown, setEmail, signIn } = useSessionStore();
+  const { email, password, error, busy, setEmail, setPassword, signIn } = useSessionStore();
+  const passwordRef = useRef<HTMLInputElement>(null);
   return (
     <form
       className="flex flex-col gap-5"
       onSubmit={(e) => {
         e.preventDefault();
-        signIn();
+        void signIn();
       }}
     >
       <StepHeader title={t.signIn}>Use your hospital directory account.</StepHeader>
@@ -27,22 +29,41 @@ export function SignInStep() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"
-            aria-invalid={emailUnknown}
-            className={cn(emailUnknown && "border-danger")}
+            autoFocus={!email}
+            required
+            aria-invalid={!!error}
+            className={cn(error && "border-danger")}
           />
         </Field>
         <Field label="Password">
-          <Input type="password" defaultValue="password123" autoComplete="current-password" />
+          <Input
+            ref={passwordRef}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+            aria-invalid={!!error}
+            className={cn(error && "border-danger")}
+          />
         </Field>
-        {emailUnknown && (
+        {error && (
           <p role="alert" className="flex items-center gap-2 text-base text-danger">
-            <CircleAlert aria-hidden className="size-4" strokeWidth={1.75} />
-            This account is not in the hospital directory.
+            <CircleAlert aria-hidden className="size-4 shrink-0" strokeWidth={1.75} />
+            {error}
           </p>
         )}
       </div>
-      <Button type="submit" variant="primary" size="lg" trailingIcon={ArrowRight} className="w-full">
-        {t.continue}
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        disabled={busy}
+        icon={busy ? LoaderCircle : undefined}
+        trailingIcon={busy ? undefined : ArrowRight}
+        className={cn("w-full", busy && "[&_svg]:animate-spin")}
+      >
+        {busy ? "Signing in…" : t.signIn}
       </Button>
 
       <div className="flex flex-col gap-2.5 pt-1">
@@ -55,7 +76,10 @@ export function SignInStep() {
                 <button
                   type="button"
                   aria-pressed={on}
-                  onClick={() => setEmail(d.email)}
+                  onClick={() => {
+                    setEmail(d.email);
+                    passwordRef.current?.focus();
+                  }}
                   className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-canvas"
                 >
                   <span className="flex min-w-0 flex-1 flex-col">

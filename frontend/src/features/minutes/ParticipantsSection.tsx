@@ -1,59 +1,83 @@
-import { Check } from "lucide-react";
+import type { Participant } from "@/api/types";
+import { Dot, EmptyState, Input } from "@/shared/ui";
+import { formatSeconds, useMinutesStore } from "@/stores/minutes";
 
-import { ATTENDEES } from "@/mocks/people";
-import { cn } from "@/shared/lib/cn";
-import { useMinutesStore } from "@/stores/minutes";
+import { AttendeesPicker } from "./AttendeesPicker";
+import { speakerColor } from "./speakers";
 
-export function ParticipantsSection({ isModerator }: { isModerator: boolean }) {
-  const { absent, toggleAbsent } = useMinutesStore();
-  const present = ATTENDEES.length - absent.length;
+export function ParticipantsSection({
+  participants,
+  editing,
+}: {
+  participants: Participant[];
+  editing: boolean;
+}) {
+  const updateParticipant = useMinutesStore((s) => s.updateParticipant);
+  const attendees = useMinutesStore((s) => s.attendeeList);
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-sans text-3xl font-semibold">Participants</h2>
-        <p className="text-base text-muted tabular-nums">
-          {present} of {ATTENDEES.length} present
-          {isModerator && " · click a status to change it"}
+    <div className="flex flex-col gap-8">
+      <h2 className="font-sans text-3xl font-bold">Participants</h2>
+      <AttendeesPicker editing={editing} />
+      <datalist id="attendee-names">
+        {attendees.map((a) => (
+          <option key={a.id} value={a.name} />
+        ))}
+      </datalist>
+      <div className="flex flex-col gap-1 border-t border-line-soft pt-6">
+        <h3 className="text-md font-semibold">Voices in the recording</h3>
+        <p className="max-w-[64ch] text-base text-muted">
+          Longest talk time first. Roles are the AI's guess from what each one says;
+          {editing
+            ? " name them from the attendees so the transcript shows who is who."
+            : " the moderator can name them."}
         </p>
       </div>
-      <ul className="flex flex-col divide-y divide-line-soft border-y border-line-soft">
-        {ATTENDEES.map((p) => {
-          const away = absent.includes(p.name);
-          const status = (
-            <>
-              {!away && <Check aria-hidden className="size-3.5" strokeWidth={2.5} />}
-              {away ? "Absent" : "Present"}
-            </>
-          );
-          const pill = cn(
-            "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-sm font-medium",
-            away ? "bg-sunken text-muted" : "bg-primary-soft text-primary",
-          );
-          return (
-            <li key={p.name} className="flex items-center justify-between gap-3 py-3">
-              <span className="flex flex-col">
-                <span className="text-md font-medium">{p.name}</span>
-                <span className="text-sm text-muted">
-                  {p.dept} · {p.role}
+      {participants.length ? (
+        <ul className="flex flex-col divide-y divide-line-soft border-y border-line-soft">
+          {participants.map((p) => (
+            <li
+              key={p.speaker}
+              className="grid items-center gap-3 py-3.5 sm:grid-cols-[150px_minmax(0,1fr)_minmax(0,1fr)]"
+            >
+              <span className="flex items-center gap-2.5">
+                <Dot className={speakerColor(p.speaker)} />
+                <span className="flex flex-col">
+                  <span className="text-md font-medium">{p.speaker.replace(/^SPEAKER/, "Speaker")}</span>
+                  <span className="text-sm text-muted tabular-nums">talks {formatSeconds(p.seconds)}</span>
                 </span>
               </span>
-              {isModerator ? (
-                <button
-                  type="button"
-                  aria-pressed={!away}
-                  aria-label={`${p.name}: ${away ? "absent" : "present"}`}
-                  onClick={() => toggleAbsent(p.name)}
-                  className={cn(pill, "transition-colors hover:ring-1 hover:ring-line-strong")}
-                >
-                  {status}
-                </button>
+              {editing ? (
+                <>
+                  <Input
+                    value={p.name}
+                    onChange={(e) => updateParticipant(p.speaker, { name: e.target.value })}
+                    list="attendee-names"
+                    placeholder="Name, e.g. Dr. Elena Rusu"
+                    aria-label={`Name of ${p.speaker}`}
+                    maxLength={200}
+                  />
+                  <Input
+                    value={p.role}
+                    onChange={(e) => updateParticipant(p.speaker, { role: e.target.value })}
+                    placeholder="Role"
+                    aria-label={`Role of ${p.speaker}`}
+                    maxLength={200}
+                  />
+                </>
               ) : (
-                <span className={pill}>{status}</span>
+                <>
+                  <span className={p.name ? "text-md font-medium" : "text-md text-subtle"}>
+                    {p.name || "Not named"}
+                  </span>
+                  <span className="text-md text-ink-2">{p.role || "—"}</span>
+                </>
               )}
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState>No speakers were detected.</EmptyState>
+      )}
     </div>
   );
 }

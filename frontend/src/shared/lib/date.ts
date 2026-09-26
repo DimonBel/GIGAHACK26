@@ -30,3 +30,25 @@ export function dueLabel(iso: string) {
   if (tone === "today") return "Due today";
   return `${tone === "overdue" ? "Overdue ·" : "Due"} ${formatDate(iso)}`;
 }
+
+/** Unix seconds -> "26.09.2026". */
+export function formatDay(unix: number) {
+  const d = new Date(unix * 1000);
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
+/** Unix seconds -> "14:05". */
+export function formatTimeOfDay(unix: number) {
+  const d = new Date(unix * 1000);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Seconds of audio -> "42 s", "11 min", "1 h 02 min" ("—" when unknown). */
+export function formatDuration(seconds: number | null | undefined) {
+  if (!seconds) return "—";
+  if (seconds < 60) return `${Math.round(seconds)} s`;
+  if (seconds < 600) return `${Math.floor(seconds / 60)} min ${String(Math.round(seconds % 60)).padStart(2, "0")} s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
+}

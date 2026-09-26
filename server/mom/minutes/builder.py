@@ -40,6 +40,8 @@ class MinutesBuilder:
         self.samples = max(1, min(samples, len(SAMPLE_TEMPERATURES) + 1))
         self.final_model = final_model or model
         self.default_owner = "ICU team" if meeting_type == "medical" else "Team"
+        # Name of a topic nobody named: "Patient 3" at a ward round, "Item 3" on an agenda.
+        self.unnamed = "Patient" if meeting_type == "medical" else "Item"
         self.num_thread, self.verbose = num_thread, verbose
         # The system prompt is identical for every chunk (the per-chunk note goes into the user message),
         # so Ollama reuses its cached prompt instead of re-reading it on every call.
@@ -176,7 +178,7 @@ class MinutesBuilder:
         if i == 0 and continues:
             idx = len(self.topics) - 1
             name = self._checked_name(t["name"], chunk_text)
-            if name and self.topics[idx]["name"].startswith("Patient "):
+            if name and self.topics[idx]["name"].startswith(self.unnamed + " "):
                 self.topics[idx]["name"] = name
             return idx
         if i == 0 and cue_name:
@@ -184,7 +186,7 @@ class MinutesBuilder:
                 if topic["name"] == cue_name:
                     return idx
         name = (cue_name if i == 0 else None) or self._checked_name(t["name"], chunk_text)
-        self.topics.append({"name": name or f"Patient {len(self.topics) + 1}", "time": chunk_time,
+        self.topics.append({"name": name or f"{self.unnamed} {len(self.topics) + 1}", "time": chunk_time,
                             "status": "", "findings": []})
         return len(self.topics) - 1
 

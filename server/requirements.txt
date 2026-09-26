@@ -8,5 +8,10 @@ pyannote.audio>=4,<5
 torch>=2.2
 torchaudio>=2.2
 soundfile
+# HTTP API for the web app (python -m api)
+fastapi>=0.141
+uvicorn>=0.54
+python-multipart>=0.0.32
 # Tests
 pytest
+httpx

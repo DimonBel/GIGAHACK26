@@ -29,6 +29,9 @@ models/
 *.webm
 *.aac
 
+# --- Web app storage: uploaded recordings, transcripts, minutes, accounts (patient data) ---
+/server/storage/
+
 # --- Transcription outputs ---
 *_transcript.txt
 *_dialog.txt

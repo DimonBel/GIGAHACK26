@@ -1,4 +1,4 @@
-import { LogOut, Repeat2, ShieldCheck } from "lucide-react";
+import { LogOut, Repeat2, UserRound } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { cabinetPath } from "@/shared/config/cabinets";
@@ -11,7 +11,6 @@ export function UserMenu() {
   const t = useT();
   const cabinet = useCabinet();
   const account = useAccount();
-  const email = useSessionStore((s) => s.email);
   const open = useSessionStore((s) => s.menu === "user");
   const { toggleMenu, closeMenu, openCabinetPicker, signOut, lang, setLang } = useSessionStore();
   const navigate = useNavigate();
@@ -36,14 +35,14 @@ export function UserMenu() {
     >
       <div className="flex flex-col px-2.5 pt-2 pb-2.5">
         <span className="text-md font-medium">{account?.name ?? "—"}</span>
-        <span className="truncate text-sm text-muted">{email}</span>
+        <span className="truncate text-sm text-muted">{account?.email}</span>
       </div>
       <div className="px-2.5 pb-2.5 sm:hidden">
         <Segmented label="Language" options={LANGS} value={lang} onChange={setLang} size="sm" />
       </div>
       <MenuSeparator />
       <MenuItem
-        icon={ShieldCheck}
+        icon={UserRound}
         onClick={() => {
           closeMenu();
           navigate(cabinetPath(cabinet, "account"));
@@ -55,7 +54,7 @@ export function UserMenu() {
         {t.chooseCabinet}
       </MenuItem>
       <MenuSeparator />
-      <MenuItem icon={LogOut} onClick={signOut} className="text-danger [&_svg]:text-danger">
+      <MenuItem icon={LogOut} onClick={() => void signOut()} className="text-danger [&_svg]:text-danger">
         {t.signOut}
       </MenuItem>
     </Menu>

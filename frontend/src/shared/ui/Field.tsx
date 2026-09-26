@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ComponentProps, InputHTMLAttributes, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/cn";
 
@@ -27,15 +27,15 @@ const control =
   "w-full rounded-md border border-line-strong bg-white text-md text-ink transition-colors placeholder:text-subtle " +
   "hover:border-subtle focus:border-primary focus:ring-3 focus:ring-primary/15 focus:outline-none";
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input className={cn(control, "h-10 px-3", className)} {...props} />;
 }
 
-export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return <textarea className={cn(control, "px-3 py-2.5", className)} {...props} />;
 }
 
-export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({ className, ...props }: ComponentProps<"select">) {
   return <select className={cn(control, "h-10 px-2.5", className)} {...props} />;
 }
 

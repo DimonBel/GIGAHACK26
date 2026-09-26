@@ -15,7 +15,7 @@ export const ru: Messages = {
   security: "Безопасность",
   templates: "Шаблоны",
   routing: "Маршрутизация",
-  account: "Аккаунт и безопасность",
+  account: "Аккаунт",
   signIn: "Вход",
   continue: "Продолжить",
   twoFa: "Двухфакторная проверка",

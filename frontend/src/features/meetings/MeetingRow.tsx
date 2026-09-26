@@ -1,11 +1,15 @@
 import { ChevronRight } from "lucide-react";
 
-import type { Meeting } from "@/shared/types/domain";
+import type { Meeting } from "@/api/meetings";
+import { formatDay, formatDuration, formatTimeOfDay } from "@/shared/lib/date";
+import { meetingStatus } from "@/shared/lib/meetingStatus";
 import { StatusBadge, TypeBadge } from "@/shared/ui";
 
-export const MEETING_COLUMNS = "md:grid-cols-[minmax(0,1fr)_110px_80px_170px_16px] md:gap-6";
+export const MEETING_COLUMNS = "md:grid-cols-[minmax(0,1fr)_120px_80px_170px_16px] md:gap-6";
 
 export function MeetingRow({ meeting: m, onOpen }: { meeting: Meeting; onOpen: () => void }) {
+  const status = meetingStatus(m);
+  const topics = m.topicCount === null ? null : `${m.topicCount} topic${m.topicCount === 1 ? "" : "s"}`;
   return (
     <button
       type="button"
@@ -16,17 +20,20 @@ export function MeetingRow({ meeting: m, onOpen }: { meeting: Meeting; onOpen: (
         <span className="truncate text-md font-medium text-ink">{m.title}</span>
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
           <TypeBadge type={m.type} />
-          <span>{m.topicCount} topics</span>
-          <span>{m.langs}</span>
+          {topics && <span>{topics}</span>}
+          {m.createdBy && <span className="hidden sm:inline">{m.createdBy}</span>}
           <span className="tabular-nums md:hidden">
-            {m.date} · {m.length}
+            {formatDay(m.created)} · {formatDuration(m.duration)}
           </span>
         </span>
       </span>
-      <span className="hidden text-base text-ink-2 tabular-nums md:block">{m.date}</span>
-      <span className="hidden text-base text-ink-2 tabular-nums md:block">{m.length}</span>
-      <StatusBadge tone={m.statusTone} className="justify-self-end md:justify-self-start">
-        {m.status}
+      <span className="hidden flex-col text-base text-ink-2 tabular-nums md:flex">
+        {formatDay(m.created)}
+        <span className="text-sm text-muted">{formatTimeOfDay(m.created)}</span>
+      </span>
+      <span className="hidden text-base text-ink-2 tabular-nums md:block">{formatDuration(m.duration)}</span>
+      <StatusBadge tone={status.tone} className="justify-self-end md:justify-self-start">
+        {status.label}
       </StatusBadge>
       <ChevronRight
         aria-hidden

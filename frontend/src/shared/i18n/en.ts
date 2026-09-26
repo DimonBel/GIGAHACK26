@@ -13,7 +13,7 @@ export const en = {
   security: "Security",
   templates: "Templates",
   routing: "Routing",
-  account: "Account & security",
+  account: "Account",
   signIn: "Sign in",
   continue: "Continue",
   twoFa: "Two-factor verification",

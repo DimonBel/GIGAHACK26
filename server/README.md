@@ -225,13 +225,68 @@ Tried and rejected (measured): a leaner output format and a shorter prompt (-20%
 a follow-up question for missed facts (+3 facts, +25 s); 600-word chunks (faster, but skims long patients);
 `gemma4:e2b` (2x faster, 19/44 facts).
 
+## Web app API (`python -m api`)
+
+The web app in `../frontend` talks to this server over HTTP. The API calls the same pipeline as
+`dialog --minutes` (whole-file Whisper + pyannote in parallel, minutes built live) and keeps everything in
+`storage/` (gitignored: it holds recordings, transcripts and patient data).
+
+```bash
+.venv/bin/python -m api                 # http://127.0.0.1:8000  (--host / --port to change)
+cd ../frontend && npm run dev           # http://localhost:5173, forwards /api to the server
+```
+
+Sign-in is email + password; the session is an HttpOnly cookie (12 h, extended while used). On first start the
+four demo accounts (Elena Rusu, Ion Bivol, Natalia Popescu, Igor Munteanu, `@medpark.md`) are created with the
+password from `SEED_PASSWORD` in `.env` (default `demo`) — change it before real use.
+
+| Route | Who | What |
+|---|---|---|
+| `POST /api/auth/login` · `GET /api/auth/me` · `POST /api/auth/logout` | everyone | sign in, restore after reload, sign out |
+| `POST /api/meetings` (multipart `file`, `title`, `type`, `language`, `speakers`) | moderator | upload; queued for processing |
+| `GET /api/meetings` · `GET /api/meetings/{id}` | everyone | participants only see ready minutes |
+| `GET /api/meetings/{id}/progress?after=N` | moderator | stages, % transcribed, transcript lines after N |
+| `POST /api/meetings/{id}/retry` · `DELETE /api/meetings/{id}` | moderator | after a failure (only the minutes are redone when the transcript exists) |
+| `GET` / `PUT /api/meetings/{id}/minutes` | read: everyone · save: moderator | the editable document; `PUT` needs the current `version` (409 otherwise) |
+| `POST /api/meetings/{id}/approve` | moderator | locks the minutes and emails the attendees |
+| `GET /api/meetings/{id}/deliveries` · `POST …/deliveries/retry` | moderator | email status per attendee, resend failed |
+| `GET /api/users` · `GET /api/meetings/{id}/attendees` | moderator · everyone who can open it | directory, who attended |
+| `GET /api/meetings/{id}/transcript` · `/audio` | everyone who can open it | dialog lines, the recording |
+| `GET` / `POST /api/meetings/{id}/suggestions` · `POST …/{sid}/resolve` | participants suggest, moderator resolves | |
+
+### Emailing the approved minutes (local Mailpit only)
+
+When the moderator approves minutes, every attendee (ticked in the Participants section) gets them by email:
+HTML with the summary, their own tasks and every topic, a plain-text copy and the minutes as a `.md` file.
+Mail only ever goes to a **local** relay: [Mailpit](https://mailpit.axllent.org) on this computer catches it and
+shows it in a web inbox, nothing leaves the machine.
+
+```bash
+brew install mailpit        # once
+scripts/mailpit.sh          # SMTP 127.0.0.1:1025, inbox http://127.0.0.1:8025 (both bound to this computer)
+```
+
+`SMTP_HOST` / `SMTP_PORT` / `MAIL_FROM` / `APP_URL` in `.env` change the relay, the sender and the link in the
+email. The API **refuses to start** with a relay that is not local (loopback, private network, or a `.local` /
+`.internal` name that also resolves to a local address): Gmail, Outlook, SendGrid or any other external SMTP
+would be an external call. If the relay is down, the emails show as failed in the minutes header and can be
+retried there (`POST /api/meetings/{id}/deliveries/retry`).
+
+Participants see only the meetings they are ticked as attendees of.
+
+Meetings are processed one at a time (the GPU is shared), in upload order. The minutes are stored as a
+document of topics, each with blocks (text, list, tasks, codes) that the moderator edits in the browser;
+`api/convert.py` turns the `mom` minutes into that shape (status, findings, decisions, tasks, open issues;
+values not found in the transcript are marked). If Ollama is down, the transcript is kept and the meeting can be
+retried once it is back. Interactive API docs: http://127.0.0.1:8000/docs.
+
 ## Code layout
 
 The code is the `mom` package, in layers. A layer only imports the layers below it, so the building blocks
 can be reused (by the CLI today, by an HTTP API for the frontend later) without pulling in the CLI.
 
 ```
-cli/            command line: arguments, commands, printing and saving results
+cli/  api/      command line · HTTP API for the web app (api/ is its own package next to mom/)
   ↓
 pipeline/       audio file -> transcript / speaker dialog      minutes/   dialog -> Minutes of Meeting
   ↓                                                               ↓
@@ -244,6 +299,10 @@ config.py       paths, model files, settings (.env)
 ```
 server/
 ├── main.py                   shortcut for `python -m mom`
+├── api/                      HTTP API (python -m api): app · routes/ · db (SQLite) · jobs (queue) · convert
+│                             mailer (local-only SMTP) · email_render (minutes -> email)
+├── scripts/mailpit.sh        local mail catcher for the minutes emails
+├── storage/                  web app data: app.db + meetings/<id>/ (gitignored, patient data)
 ├── pyproject.toml            pytest settings
 ├── requirements.txt
 ├── .env.example              HF_TOKEN (copy to .env)

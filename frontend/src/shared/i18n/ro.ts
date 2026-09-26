@@ -15,7 +15,7 @@ export const ro: Messages = {
   security: "Securitate",
   templates: "Șabloane",
   routing: "Rutare",
-  account: "Cont și securitate",
+  account: "Cont",
   signIn: "Autentificare",
   continue: "Continuă",
   twoFa: "Verificare în doi pași",

@@ -73,8 +73,8 @@ export const ROUTING: RoutingRule[] = [
   { type: "Administrative", list: "Administrație", recipients: 14, emails: "admin.staff@ · hr@ · attendees", rule: "Auto-send 15 min after draft" },
 ];
 
-export const SMTP_RELAY = "smtp://mail.medpark.local:1025";
-export const ROUTING_NOTE = "· n8n workflow mom-routing · external SMTP blocked";
+export const SMTP_RELAY = "smtp://127.0.0.1:1025";
+export const ROUTING_NOTE = "· local Mailpit (inbox http://127.0.0.1:8025) · external SMTP blocked";
 
 export const SESSIONS: Session[] = [
   { label: "This workstation · WS-C102 · now", current: true },

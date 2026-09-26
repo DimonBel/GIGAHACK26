@@ -1,73 +1,173 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TOPICS } from "@/mocks/topics";
+import { ApiError } from "@/api/client";
+import * as meetingsApi from "@/api/meetings";
+import * as minutesApi from "@/api/minutes";
+import type { Line, Suggestion } from "@/api/types";
+import { doc, meeting } from "@/test/fixtures";
 
-import { applySuggestion, parseSuggestion, searchCatalog, selectedTopic, useMinutesStore } from "./minutes";
+import { acceptInto, move, searchCatalog, timeToSeconds, topicLines, useMinutesStore } from "./minutes";
 
-const initial = useMinutesStore.getState();
-const minutes = () => useMinutesStore.getState();
-const first = TOPICS[0]!;
+vi.mock("@/api/meetings");
+vi.mock("@/api/minutes");
 
-describe("minutes", () => {
-  beforeEach(() => useMinutesStore.setState(initial, true));
+const state = () => useMinutesStore.getState();
 
-  it("searches the catalog by code, label and RO/RU terms, without codes already present", () => {
-    expect(searchCatalog("", first)).toEqual([]);
-    expect(searchCatalog("rinichi", first).map((c) => c.code)).toEqual(["N18.3"]);
-    expect(searchCatalog("I21", first)).toEqual([]); // already on the topic
-    expect(searchCatalog("i", undefined).length).toBeLessThanOrEqual(5);
+async function open(status: "draft" | "approved" = "draft") {
+  vi.mocked(meetingsApi.getMeeting).mockResolvedValue(meeting({ status }));
+  vi.mocked(minutesApi.getMinutes).mockResolvedValue(doc());
+  vi.mocked(minutesApi.getTranscript).mockResolvedValue([]);
+  vi.mocked(minutesApi.listSuggestions).mockResolvedValue([]);
+  vi.mocked(minutesApi.listAttendees).mockResolvedValue([]);
+  await state().load(7);
+}
+
+describe("minutes helpers", () => {
+  it("reads times and slices the transcript per topic", () => {
+    expect(timeToSeconds("03:52")).toBe(232);
+    expect(timeToSeconds("01:00:05")).toBe(3605);
+    expect(timeToSeconds("soon")).toBeNull();
+    const lines: Line[] = [0, 100, 180, 400].map((start) => ({
+      start,
+      end: start + 5,
+      speaker: "SPEAKER 1",
+      text: `at ${start}`,
+    }));
+    const topics = doc().topics;
+    expect(topicLines(lines, topics, "t1").map((l) => l.start)).toEqual([0, 100]);
+    expect(topicLines(lines, topics, "t2").map((l) => l.start)).toEqual([180, 400]);
   });
 
-  it("turns an accepted suggestion into the right kind of item", () => {
-    const base = { ...first, suggestions: [] };
-    const view = parseSuggestion("Olga Sîrbu", "Point of view", "Agree");
-    expect(applySuggestion({ ...base, suggestions: [view] }, view).views.at(-1)).toMatchObject({ name: "Olga Sîrbu", text: "Agree" });
-    const attention = parseSuggestion("Olga Sîrbu", "Attention point", "Check allergy");
-    expect(applySuggestion(base, attention).attention.at(-1)?.text).toBe("Check allergy");
-    const task = parseSuggestion("Olga Sîrbu", "Task", "Call lab");
-    expect(applySuggestion(base, task).actions.at(-1)).toMatchObject({ text: "Call lab", owner: "Olga Sîrbu" });
-    const diagnosis = parseSuggestion("Olga Sîrbu", "Diagnosis", "e11.9 Type 2 diabetes");
-    expect(diagnosis.code).toEqual({ system: "ICD-10", code: "E11.9", label: "Type 2 diabetes" });
-    expect(applySuggestion(base, diagnosis).codes.at(-1)?.code).toBe("E11.9");
+  it("moves an entry and ignores moves past the ends", () => {
+    expect(move([1, 2, 3], 0, 1)).toEqual([2, 1, 3]);
+    expect(move([1, 2, 3], 0, -1)).toEqual([1, 2, 3]);
   });
 
-  it("accepting removes the suggestion from the inbox", () => {
-    const suggestion = first.suggestions[0]!;
-    minutes().acceptSuggestion(first.id, suggestion.id);
-    const topic = minutes().topics[0]!;
-    expect(topic.suggestions).toEqual([]);
-    expect(topic.codes.map((c) => c.code)).toContain("N18.3");
+  it("searches the catalog without codes the block has", () => {
+    expect(searchCatalog("", [])).toEqual([]);
+    const hits = searchCatalog("I21", []);
+    expect(hits[0]?.code).toBe("I21.4");
+    expect(
+      searchCatalog("I21", [{ id: "c", system: "ICD-10", code: "I21.4", label: "" }]).map((c) => c.code),
+    ).not.toContain("I21.4");
   });
 
-  it("adds a topic in edit mode and selects it; deleting goes back to the first topic", () => {
-    minutes().addTopic();
-    const added = selectedTopic(minutes());
-    expect(added?.title).toBe("");
-    expect(minutes().editing).toBe(true);
-    minutes().deleteTopic(added!.id);
-    expect(minutes().section).toEqual({ kind: "topic", id: first.id });
-    expect(minutes().editing).toBe(false);
+  it("files an accepted suggestion into the chosen block, or a new one", () => {
+    const s: Suggestion = {
+      id: 1,
+      topicId: "t1",
+      author: "Dr. N",
+      kind: "Addition",
+      text: "Call family",
+      state: "open",
+      created: 0,
+    };
+    const into = acceptInto(doc(), s, "b2").topics[0]!.blocks[1]!;
+    expect(into.kind === "list" && into.items.at(-1)).toMatchObject({ text: "Call family", who: "Dr. N" });
+    const task = acceptInto(doc(), { ...s, kind: "Task" }, null).topics[0]!.blocks.at(-1)!;
+    expect(task.kind).toBe("tasks");
+  });
+});
+
+describe("minutes store", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.useFakeTimers();
+    state().reset();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("edits blocks and autosaves once, 800 ms after the last change", async () => {
+    await open();
+    vi.mocked(minutesApi.saveMinutes).mockResolvedValue({ version: 2 });
+    const blockId = state().addBlock("t1", "tasks");
+    const itemId = state().addItem("t1", blockId)!;
+    state().updateItem("t1", blockId, itemId, { text: "Echo tomorrow", priority: "high" });
+    state().moveBlock("t1", blockId, -1);
+    expect(state().save).toBe("dirty");
+    await vi.advanceTimersByTimeAsync(800);
+    expect(minutesApi.saveMinutes).toHaveBeenCalledTimes(1);
+    const saved = vi.mocked(minutesApi.saveMinutes).mock.calls[0]![1];
+    expect(saved.topics[0]!.blocks.map((b) => b.kind)).toEqual(["text", "tasks", "list"]);
+    expect(state()).toMatchObject({ save: "saved" });
+    expect(state().doc?.version).toBe(2);
   });
 
-  it("a participant's suggestion lands on the open topic and is counted", () => {
-    minutes().setSuggestionKind("Diagnosis");
-    minutes().setSuggestionText("N18.3 Chronic kidney disease");
-    minutes().submitSuggestion("Dr. Natalia Popescu");
-    expect(minutes().topics[0]!.suggestions).toHaveLength(2);
-    expect(minutes().suggestionsSent).toBe(1);
-    expect(minutes().suggestionText).toBe("");
+  it("stops saving on a version conflict", async () => {
+    await open();
+    vi.mocked(minutesApi.saveMinutes).mockRejectedValue(new ApiError(409, "changed elsewhere"));
+    state().updateDoc({ summary: "New" });
+    await vi.advanceTimersByTimeAsync(800);
+    expect(state().save).toBe("conflict");
+    state().updateDoc({ summary: "Newer" });
+    expect(state().doc?.summary).toBe("New");
   });
 
-  it("does not send an empty suggestion", () => {
-    minutes().setSuggestionText("   ");
-    minutes().submitSuggestion("x");
-    expect(minutes().suggestionsSent).toBe(0);
+  it("does not edit approved minutes", async () => {
+    await open("approved");
+    state().updateDoc({ summary: "Changed" });
+    expect(state().doc?.summary).toBe("Two patients reviewed.");
+    expect(state().save).toBe("saved");
   });
 
-  it("toggles attendance by name", () => {
-    minutes().toggleAbsent("Maria Lungu");
-    expect(minutes().absent).toEqual(["Maria Lungu"]);
-    minutes().toggleAbsent("Maria Lungu");
-    expect(minutes().absent).toEqual([]);
+  it("ticks attendees from the directory and autosaves them", async () => {
+    await open();
+    useMinutesStore.setState({
+      directory: [
+        {
+          id: 3,
+          email: "n@medpark.md",
+          name: "Dr. Natalia Popescu",
+          initials: "NP",
+          dept: "ATI",
+          cabinets: ["participant"],
+        },
+        {
+          id: 4,
+          email: "i@medpark.md",
+          name: "Dr. Igor Munteanu",
+          initials: "IM",
+          dept: "Imagistică",
+          cabinets: ["participant"],
+        },
+      ],
+    });
+    vi.mocked(minutesApi.saveMinutes).mockResolvedValue({ version: 2 });
+    state().setAttendees([4, 3, 4]);
+    expect(state().attendeeList.map((a) => a.id)).toEqual([3, 4]);
+    await vi.advanceTimersByTimeAsync(800);
+    expect(vi.mocked(minutesApi.saveMinutes).mock.calls[0]![1].attendees).toEqual([4, 3]);
+  });
+
+  it("keeps the emails queued by the approval", async () => {
+    await open();
+    const delivery = {
+      id: 1,
+      userId: 3,
+      name: "Dr. N",
+      email: "n@medpark.md",
+      status: "queued" as const,
+      error: null,
+      created: 0,
+      sent: null,
+    };
+    vi.mocked(minutesApi.approveMinutes).mockResolvedValue({ version: 1, deliveries: [delivery] });
+    vi.mocked(meetingsApi.getMeeting).mockResolvedValue(meeting({ status: "approved" }));
+    expect(await state().approve()).toBe(true);
+    expect(state().deliveries).toEqual([delivery]);
+    vi.mocked(minutesApi.retryDeliveries).mockResolvedValue([{ ...delivery, status: "sent" }]);
+    await state().retryDeliveries();
+    expect(state().deliveries[0]?.status).toBe("sent");
+  });
+
+  it("saves pending edits before approving", async () => {
+    await open();
+    vi.mocked(minutesApi.saveMinutes).mockResolvedValue({ version: 2 });
+    vi.mocked(minutesApi.approveMinutes).mockResolvedValue({ version: 2, deliveries: [] });
+    state().updateTopic("t1", { title: "Bed 3" });
+    vi.mocked(meetingsApi.getMeeting).mockResolvedValue(meeting({ status: "approved" }));
+    expect(await state().approve()).toBe(true);
+    expect(minutesApi.saveMinutes).toHaveBeenCalledTimes(1);
+    expect(state().meeting?.status).toBe("approved");
   });
 });
