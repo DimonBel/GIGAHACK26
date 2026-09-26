@@ -55,8 +55,13 @@ transcript as a dialog:
 .venv/bin/python main.py record --seconds 30 --dialog
 ```
 
+How it works: pyannote first finds who speaks when; then every speaker turn is cut out and
+transcribed separately by Whisper (kept loaded in a local `whisper-server`), so each line's text
+comes only from that speaker's audio. Short remarks made while the other person talks ("Da.")
+get their own line. Whisper artifacts (repetition loops, subtitle credits) are filtered out.
+
 The number of speakers is detected automatically. Limitations: when two people talk at the
-same time, the words go to the dominant speaker; labels (SPEAKER 1, 2...) are per file.
+same time, words in the overlap may go to either speaker; labels (SPEAKER 1, 2...) are per file.
 
 ## Optional: summarize with a local LLM (Ollama)
 
@@ -71,10 +76,11 @@ ollama pull llama3.1:8b
 ```
 main.py              CLI entry point
 stt/audio.py         ffmpeg → 16 kHz mono WAV
-stt/transcriber.py   runs whisper-cli (Large V3), parses segments + word timestamps
+stt/transcriber.py   runs whisper-cli (Large V3) on a whole file
 stt/diarizer.py      pyannote 3.1 speaker detection
-stt/dialog.py        assigns words to speakers, dialog txt/srt/json output
-stt/pipeline.py      convert -> transcribe -> diarize -> align
+stt/dialog.py        speaker turns -> blocks, text cleanup, dialog txt/srt/json output
+stt/pipeline.py      convert -> diarize -> transcribe each turn
+stt/whisper_server.py keeps Whisper loaded in a local whisper-server
 tests/               unit tests (.venv/bin/python -m pytest tests)
 stt/recorder.py      microphone recording (sounddevice)
 stt/llm.py           optional Ollama summarization

@@ -6,6 +6,7 @@ from pathlib import Path
 
 PIPELINE_NAME = "pyannote/speaker-diarization-3.1"
 ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+DEVICE = os.environ.get("STT_DIARIZE_DEVICE", "mps")  # "mps" (Apple GPU) or "cpu"
 
 
 @dataclass
@@ -27,7 +28,7 @@ def _hf_token():
     return None
 
 
-def diarize(wav: Path) -> list:
+def diarize(wav: Path, device: str = DEVICE) -> list:
     """Return speaker turns for a 16 kHz mono WAV. The number of speakers is detected automatically."""
     warnings.filterwarnings("ignore", module="pyannote")
     warnings.filterwarnings("ignore", module="torchaudio")
@@ -54,7 +55,9 @@ def diarize(wav: Path) -> list:
             "  https://huggingface.co/pyannote/segmentation-3.0\n"
             "then put HF_TOKEN=hf_... in the .env file (or export HF_TOKEN). After that it runs offline."
         )
-    pipeline.to(torch.device("mps" if torch.backends.mps.is_available() else "cpu"))
+    if device == "mps" and not torch.backends.mps.is_available():
+        device = "cpu"
+    pipeline.to(torch.device(device))
 
     # Pass the audio in memory, so pyannote doesn't need its own audio decoder.
     audio, sample_rate = sf.read(str(wav), dtype="float32", always_2d=True)
@@ -67,4 +70,9 @@ def diarize(wav: Path) -> list:
     for segment, _, label in annotation.itertracks(yield_label=True):
         name = names.setdefault(label, f"SPEAKER {len(names) + 1}")
         turns.append(Turn(segment.start, segment.end, name))
+
+    # Free the models' memory before transcription starts (16 GB Macs are tight with Whisper/Gemma loaded).
+    del pipeline
+    if device == "mps":
+        torch.mps.empty_cache()
     return turns

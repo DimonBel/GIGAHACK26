@@ -15,3 +15,13 @@ def to_wav16k(src: Path, dst: Path) -> Path:
         check=True,
     )
     return dst
+
+
+def duration(src: Path) -> float:
+    """Length of an audio/video file in seconds (0 if it can't be read)."""
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(src)],
+                         capture_output=True, text=True)
+    try:
+        return float(out.stdout.strip())
+    except ValueError:
+        return 0.0

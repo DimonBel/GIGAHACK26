@@ -44,3 +44,6 @@ models/*.gguf
 .idea/
 .vscode/
 *.swp
+
+# --- Benchmark outputs (contain transcripts) ---
+/bench/
