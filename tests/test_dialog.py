@@ -1,8 +1,8 @@
 import json
 
-from stt.dialog import build_dialog, to_json, to_srt, to_text
-from stt.diarizer import Turn
-from stt.transcriber import Word
+from stt.speakers.dialog import build_dialog, to_json, to_srt, to_text
+from stt.speakers.diarizer import Turn
+from stt.asr.transcript import Word
 
 
 def words(*items):

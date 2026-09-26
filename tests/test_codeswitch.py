@@ -1,5 +1,5 @@
-from stt.codeswitch import cyrillic_readings, tag_words
-from stt.transcriber import Word
+from stt.text.codeswitch import cyrillic_readings, tag_words
+from stt.asr.transcript import Word
 
 
 def tagged(text: str, lang: str = "ro") -> list:
@@ -69,8 +69,8 @@ def test_cyrillic_readings_cover_vowel_reduction():
 
 
 def test_russian_words_in_latin_letters_take_the_russian_transcripts_spelling():
-    from stt.codeswitch import russian_words_heard
-    from stt.transcriber import Word
+    from stt.text.codeswitch import russian_words_heard
+    from stt.asr.transcript import Word
     # "Dinamica e pozitivă, cisto, tak" with "чисто, так" said inside a Romanian sentence.
     words = [Word(0, 1, "Dinamica"), Word(1, 2, "e"), Word(2, 3, "pozitivă,"), Word(3, 4, "cisto,"), Word(4, 5, "tak.")]
     russian = [Word(0, 1, "Динамика"), Word(1.1, 2, "есть"), Word(2, 3, "позитивная,"), Word(3.1, 4, "чисто,"),
@@ -81,8 +81,8 @@ def test_russian_words_in_latin_letters_take_the_russian_transcripts_spelling():
 
 
 def test_a_russian_word_must_sound_alike_and_be_said_at_the_same_time():
-    from stt.codeswitch import russian_words_heard
-    from stt.transcriber import Word
+    from stt.text.codeswitch import russian_words_heard
+    from stt.asr.transcript import Word
     words = [Word(0, 1, "Uzgrăci"), Word(1, 2, "vot")]
     # A translation ("одиннадцать") doesn't sound alike; "вот" was said 3 s later.
     assert russian_words_heard(words, [Word(0, 1, "одиннадцать"), Word(4.5, 5, "вот")]) == 0
@@ -90,8 +90,8 @@ def test_a_russian_word_must_sound_alike_and_be_said_at_the_same_time():
 
 
 def test_misheard_romanian_words_are_corrected_and_real_ones_left_alone():
-    from stt.spelling import correct_words
-    from stt.transcriber import Word
+    from stt.text.spelling import correct_words
+    from stt.asr.transcript import Word
     said = "Pocentul mitrala fraccia gluconazol cordajul Popescu EKS lecă disiunea pacientului"
     words = [Word(i, i + 1, text, lang="ro") for i, text in enumerate(said.split())]
     assert correct_words(words) == 3
@@ -102,7 +102,7 @@ def test_misheard_romanian_words_are_corrected_and_real_ones_left_alone():
 
 
 def test_only_romanian_words_are_corrected():
-    from stt.spelling import correct_words
-    from stt.transcriber import Word
+    from stt.text.spelling import correct_words
+    from stt.asr.transcript import Word
     words = [Word(0, 1, "deadlinul", lang="en"), Word(1, 2, "pocentul", lang="ru")]
     assert correct_words(words) == 0

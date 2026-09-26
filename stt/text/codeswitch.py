@@ -1,15 +1,5 @@
-"""Word-level language tags for mixed Romanian/Russian/English speech (Moldovan code-switching).
-
-When Whisper transcribes a Romanian segment, the Russian words inserted into it come out in Latin letters,
-spelled the way they sound: "pacientul, căroce, are nevoie" ("короче"). Such a word is read back into
-Cyrillic with Romanian and English spelling rules; when that gives one of the Russian words Moldovans
-commonly use (russianisms.txt), it is written in Cyrillic and tagged "ru".
-
-Precision comes first: a wrongly rewritten Romanian word is worse than a Russian word left in Latin
-letters. So only listed words are rewritten, and never a word that is Romanian (also without diacritics,
-as Whisper sometimes writes them). Clear English words ("deadline", "meeting") are tagged "en".
-Word lists and frequencies come from wordfreq, which ships its data (works offline).
-"""
+"""Word languages in Moldovan code-switched speech: Russian words that Whisper wrote in Latin letters go back
+to Cyrillic (listed ones, or confirmed by the chunk transcribed in Russian), English terms are tagged."""
 import re
 import unicodedata
 from collections import Counter

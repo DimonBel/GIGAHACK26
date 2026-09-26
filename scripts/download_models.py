@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from huggingface_hub import snapshot_download  # noqa: E402
 
-from stt.accent import ACCENT_MODEL  # noqa: E402
+from stt.config import ACCENT_MODEL  # noqa: E402
 
 MODELS = {
     ACCENT_MODEL: "Jzuluaga/accent-id-commonaccent_ecapa",  # English accent ID, 16 accents (~83 MB)
@@ -19,7 +19,7 @@ MODELS = {
 
 def main():
     if "--mlx" in sys.argv:
-        from stt.mlx_backend import MLX_MODELS
+        from stt.asr.mlx import MLX_MODELS
         for repo in sorted(set(MLX_MODELS.values())):
             print(f"{repo} -> Hugging Face cache")
             snapshot_download(repo)

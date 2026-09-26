@@ -1,4 +1,4 @@
-"""Keep Whisper Large V3 loaded in a local whisper-server, so many short clips can be transcribed fast."""
+"""whisper.cpp's whisper-server on localhost, keeping the model loaded between clips."""
 import http.client
 import json
 import shutil
@@ -9,7 +9,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 
-from .transcriber import DEFAULT_MODEL
+from ..config import DEFAULT_MODEL
 
 # Talk to the local server directly: urllib would otherwise send even 127.0.0.1 requests (with the audio)
 # through a proxy configured in the environment or in macOS settings.

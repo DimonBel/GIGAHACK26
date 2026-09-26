@@ -23,7 +23,9 @@ import soundfile as sf
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from stt.transcriber import DEFAULT_MODEL, parse_verbose, wav_bytes  # noqa: E402
+from stt.audio import wav_bytes  # noqa: E402
+from stt.asr.decode import parse_verbose  # noqa: E402
+from stt.config import DEFAULT_MODEL, offline  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("evaluate", ROOT / "scripts/evaluate.py")
 evaluate = importlib.util.module_from_spec(spec)
@@ -55,6 +57,7 @@ def clips(parquet: Path, dialect: str, minutes: float) -> list:
 
 
 def main():
+    offline()
     p = argparse.ArgumentParser()
     p.add_argument("--engine", choices=["whisper.cpp", "mlx"], default="whisper.cpp")
     p.add_argument("--model", default=str(DEFAULT_MODEL))
@@ -68,13 +71,13 @@ def main():
     args = p.parse_args()
 
     if args.engine == "mlx":
-        from stt import mlx_backend
+        from stt.asr import mlx as mlx_backend
         mlx_backend.BEAM_SIZE = args.beam if args.beam > 1 else None
         server = mlx_backend.MlxWhisper(args.model, prompts={"ro": args.prompt} if args.prompt else None)
     elif args.prompt:
         p.error("--prompt needs --engine mlx")
     else:
-        from stt.whisper_server import WhisperServer
+        from stt.asr.whisper_cpp import WhisperServer
         server = WhisperServer(Path(args.model))
 
     test = clips(Path(args.data), args.dialect, args.minutes)

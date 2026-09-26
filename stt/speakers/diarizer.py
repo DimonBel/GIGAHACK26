@@ -1,11 +1,12 @@
-"""Speaker diarization ("who spoke when") with pyannote 3.1, running locally."""
+"""Who spoke when, with pyannote 3.1 (local, offline once downloaded)."""
 import os
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
+from ..config import ENV_FILE
+
 PIPELINE_NAME = "pyannote/speaker-diarization-3.1"
-ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 
 @dataclass

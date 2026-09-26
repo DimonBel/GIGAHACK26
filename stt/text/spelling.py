@@ -1,13 +1,5 @@
-"""Romanian words Whisper misheard by a letter or two ("Pocentul" -> "Pacientul", "focuta" -> "făcută",
-"metrala" -> "mitrala"), corrected to the closest real word.
-
-Only a word that is no word at all is corrected: not in wordfreq's Romanian list (also without diacritics or
-inflected), not a medical term (medical_ro.txt), not Russian, English or a name. The closest word is found by
-an edit distance in which vowels, and consonants that differ only in voicing (p/b, t/d, f/v...), cost less:
-Whisper mixes those up far more often than other letters, so "pocentul" is closer to "pacientul" than to
-"procentul". The correction must be a common word or a medical term. In doubt nothing changes: a word left
-misspelled is better than a wrong one.
-"""
+"""Misheard Romanian words ("Pocentul", "metrala") corrected to the closest real or medical word; vowels and
+similar consonants count as closer. Only non-words change, and only when one correction clearly wins."""
 from functools import lru_cache
 from pathlib import Path
 

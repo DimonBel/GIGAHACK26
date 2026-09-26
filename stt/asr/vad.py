@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from .transcriber import VAD_MODEL
+from ..config import VAD_MODEL
 
 MIN_SILENCE_MS = 250  # a pause this long ends a segment (pauses between sentences; breaths inside one are shorter)
 MAX_SEGMENT_S = 15    # longer speech is cut, so one segment rarely holds two languages

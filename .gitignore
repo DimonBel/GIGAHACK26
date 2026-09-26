@@ -13,6 +13,7 @@ env/
 # --- Environment / secrets ---
 .env
 .env.*
+!.env.example
 
 # --- Whisper / VAD models (large, download separately — see README) ---
 models/*.bin
@@ -49,3 +50,10 @@ models/mlx-*/
 .idea/
 .vscode/
 *.swp
+
+# --- Web app, automation, server data ---
+web/node_modules/
+web/dist/
+automation/.env
+automation/n8n_data/
+server/.env

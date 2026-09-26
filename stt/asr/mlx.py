@@ -1,12 +1,5 @@
-"""Whisper on Apple's MLX (the Apple GPU), in this process: the same Whisper models as whisper.cpp, faster on
-Apple Silicon. Most of Whisper's cost is encoding a clip; whisper-server encodes it again for every request, here
-it is encoded once for everything asked about it (the language guess, the Romanian and Russian transcripts,
-retries, word timings). Same interface as whisper_server.WhisperServer.
-
-Beam search like whisper.cpp (mlx-whisper itself only decodes greedily: _BeamSearch adds it), which keeps
-noisy speech from looping. Apple Silicon only (pip install mlx-whisper); the models are downloaded once by
-scripts/download_models.py.
-"""
+"""Whisper on Apple Silicon with MLX, in process: each clip is encoded once for every request on it, and
+beam search is added (mlx-whisper decodes greedily). Same interface as whisper_cpp.WhisperServer."""
 import dataclasses
 import io
 from pathlib import Path

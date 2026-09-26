@@ -1,12 +1,11 @@
-"""English accent ID (American, British, Australian, Indian, ...) with the local CommonAccent ECAPA model."""
+"""English accent (American, British, Indian, ...) with the local CommonAccent model."""
 import sys
 import warnings
 
 import numpy as np
 
-from .transcriber import MODELS_DIR
+from ..config import ACCENT_MODEL
 
-ACCENT_MODEL = MODELS_DIR / "speechbrain" / "accent-id-commonaccent_ecapa"
 ACCENT_NAMES = {
     "us": "American", "england": "British", "australia": "Australian", "canada": "Canadian",
     "indian": "Indian", "scotland": "Scottish", "ireland": "Irish", "wales": "Welsh", "african": "African",

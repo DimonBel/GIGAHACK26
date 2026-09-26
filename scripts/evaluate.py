@@ -65,7 +65,7 @@ def main():
         print(f"{label:22} {errors / max(len(ref), 1):6.1%}  ({errors} errors / {len(ref)} reference words)")
 
     ref, hyp = words(ref_text), words(hyp_text)
-    print(f"\nWorst stretches (reference -> transcript):")
+    print("\nWorst stretches (reference -> transcript):")
     for said, written in worst_stretches(ref, cut_to_reference(ref, hyp), args.show):
         print(f"  - {said or '(nothing)'}\n    {written or '(nothing)'}")
 

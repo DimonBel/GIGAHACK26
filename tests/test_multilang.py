@@ -6,9 +6,12 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from stt.segments import parse_segments
-from stt.transcriber import (Chunk, Segment, Transcript, Word, _capitalize, _looping, _to_recording, chunk_audio,
-                             confidence, pad_segments, parse_verbose, plan_chunks, transcribe_chunk, transcribe_wav)
+from stt.asr.chunks import Chunk, chunk_audio, pad_segments, plan_chunks, to_recording
+from stt.asr.decode import capitalize, confidence, looping, parse_verbose
+from stt.asr.languages import transcribe_chunk
+from stt.asr.transcriber import transcribe_wav
+from stt.asr.transcript import Segment, Transcript, Word
+from stt.asr.vad import parse_segments
 
 
 def test_vad_output_is_parsed_from_centiseconds():
@@ -34,7 +37,7 @@ def test_times_in_a_joined_clip_are_moved_back_to_the_recording():
     audio = np.zeros(16000 * 20, dtype=np.float32)
     clip, timeline = chunk_audio(Chunk([(2.0, 4.0), (10.0, 11.0)]), audio, 16000)
     assert len(clip) == 3 * 16000 and timeline == [(0.0, 2.0), (2.0, 10.0)]
-    [(start, end, [first, second])] = _to_recording([[0.5, 2.5, [Word(0.5, 1.0, "a"), Word(2.2, 2.5, "b")]]],
+    [(start, end, [first, second])] = to_recording([[0.5, 2.5, [Word(0.5, 1.0, "a"), Word(2.2, 2.5, "b")]]],
                                                     timeline)
     assert (start, end) == (2.5, 10.5)
     assert (first.start, first.end, second.start, second.end) == (2.5, 3.0, pytest.approx(10.2), 10.5)
@@ -202,22 +205,22 @@ def test_repetition_loops_are_cut():
 
 def test_a_loop_spelled_differently_each_time_is_detected():
     words = [w for i in range(12) for w in (" dacă", " ea", " o", " măș" if i % 2 else " mă", " năzale,")]
-    assert _looping({"segments": [{"words": [tok(w, 0, 1) for w in words]}]})
+    assert looping({"segments": [{"words": [tok(w, 0, 1) for w in words]}]})
     speech = ("Pacientul din patul 8, el a fost pe data de 11 octombrie cu infarct miocardic, a fost tromboaspirație "
               "făcută, mitrala 3, fracția de 38-40. Da, el e pacient cardiac și trivascular, nu? Trivascular, da.")
-    assert not _looping({"segments": [seg(0, 20, speech)]})
+    assert not looping({"segments": [seg(0, 20, speech)]})
 
 
 def test_sentence_starts_are_capitalized():
     words = [Word(0, 1, "pacientul"), Word(1, 2, "e"), Word(2, 3, "stabil."), Word(3, 4, "da,"), Word(4, 5, "bine")]
-    assert _capitalize(words, True) is False
+    assert capitalize(words, True) is False
     assert [w.text for w in words] == ["Pacientul", "e", "stabil.", "Da,", "bine"]
     words = [Word(0, 1, "iar"), Word(1, 2, "ECG-ul.")]
-    assert _capitalize(words, False) is True and words[0].text == "iar"  # continues the sentence before
+    assert capitalize(words, False) is True and words[0].text == "iar"  # continues the sentence before
 
 
 def test_sentences_in_other_scripts_are_invented():
-    from stt.transcriber import OTHER_SCRIPTS
+    from stt.asr.decode import OTHER_SCRIPTS
     assert not OTHER_SCRIPTS.search("Pacientul, короче, e în ședință de reanimare. Deadline Friday, 38-40%!")
     assert OTHER_SCRIPTS.search("Și asta acum cinqρού stron") and OTHER_SCRIPTS.search("봐요")
 
@@ -327,8 +330,8 @@ def fake_pipeline(monkeypatch, tmp_path):
         audio[int(start * 16000):int(end * 16000)] = level
     wav = tmp_path / "meeting.wav"
     sf.write(str(wav), audio, 16000, subtype="PCM_16")
-    monkeypatch.setattr("stt.segments.speech_segments", lambda path: [(s, e) for s, e, _ in SPEECH])
-    monkeypatch.setattr("stt.whisper_server.WhisperServer", FakeServer)
+    monkeypatch.setattr("stt.asr.vad.speech_segments", lambda path: [(s, e) for s, e, _ in SPEECH])
+    monkeypatch.setattr("stt.asr.whisper_cpp.WhisperServer", FakeServer)
     FakeServer.requests, FakeServer.models = [], []
     return wav
 
@@ -358,7 +361,7 @@ def test_forced_language_is_transcribed_once_and_translation_is_tagged_english(f
 
 
 def test_no_speech_gives_an_empty_transcript(fake_pipeline, monkeypatch):
-    monkeypatch.setattr("stt.segments.speech_segments", lambda path: [])
+    monkeypatch.setattr("stt.asr.vad.speech_segments", lambda path: [])
     t = transcribe_wav(fake_pipeline, on_segments=quiet)
     assert t.segments == [] and t.language == "" and FakeServer.requests == []
 
@@ -380,7 +383,7 @@ def test_a_chunk_the_romanian_model_loops_on_is_redone_with_the_main_model(fake_
 
 def test_mlx_beam_search_finds_the_likelier_sentence_greedy_would_miss():
     mx = pytest.importorskip("mlx.core")
-    from stt.mlx_backend import _BeamSearch
+    from stt.asr.mlx import _BeamSearch
 
     class Inference:
         def rearrange_kv_cache(self, sources):

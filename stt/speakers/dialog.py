@@ -1,9 +1,9 @@
-"""Combine whisper words with speaker turns into a dialog: who said what, when, and in which language."""
+"""Words plus speaker turns -> dialog lines: who said what, when, and in which language."""
 import json
 from collections import Counter
 from dataclasses import dataclass, field
 
-from .transcriber import language_tag, timestamp, word_languages
+from ..asr.transcript import language_tag, timestamp, word_languages
 
 PAUSE_SPLIT = 2.0  # seconds of silence that start a new line even for the same speaker
 CHUNK_PAUSE = 0.5  # a pause this long also ends a sentence chunk
