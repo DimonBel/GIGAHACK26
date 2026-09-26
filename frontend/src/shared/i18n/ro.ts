@@ -1,0 +1,25 @@
+import type { Messages } from "./en";
+
+export const ro: Messages = {
+  admin: "Administrator",
+  moderator: "Moderator",
+  participant: "Participant",
+  meetings: "Ședințe",
+  new: "Ședință nouă",
+  editor: "Proces-verbal",
+  moms: "Procesele mele",
+  read: "Proces-verbal",
+  tasks: "Sarcinile mele",
+  users: "Utilizatori",
+  roles: "Permisiuni",
+  security: "Securitate",
+  templates: "Șabloane",
+  routing: "Rutare",
+  account: "Cont și securitate",
+  signIn: "Autentificare",
+  continue: "Continuă",
+  twoFa: "Verificare în doi pași",
+  verify: "Verifică",
+  signOut: "Ieșire",
+  chooseCabinet: "Alegeți cabinetul",
+};

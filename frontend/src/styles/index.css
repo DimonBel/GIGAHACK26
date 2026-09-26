@@ -1,0 +1,120 @@
+@import "tailwindcss";
+
+/* Two typefaces, self-hosted (the app runs on the hospital network, no external calls):
+   Instrument Sans for everything you read and operate, Source Serif 4 only as an accent
+   (page and topic titles, summaries). */
+@import "@fontsource/instrument-sans/400.css";
+@import "@fontsource/instrument-sans/500.css";
+@import "@fontsource/instrument-sans/600.css";
+@import "@fontsource-variable/source-serif-4/opsz.css";
+
+/*
+ * Colour follows 60-30-10:
+ *   60  neutral  canvas + white surfaces           (bg-canvas, bg-white, bg-sunken, lines)
+ *   30  ink      header, text, structure            (ink, ink-2, muted, subtle, on-ink*)
+ *   10  teal     primary actions, active + focus    (primary, primary-soft)
+ * warn / danger / info are signals only: small dots, short labels, callouts.
+ */
+@theme {
+  --color-*: initial;
+  --color-white: #fff;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-canvas: #fafaf8;
+  --color-sunken: #f2f1ec;
+  --color-line: #e7e5df;
+  --color-line-strong: #d9d6cd;
+  --color-line-soft: #f0eee8;
+
+  --color-ink: #17201e;
+  --color-ink-2: #3e4744;
+  --color-muted: #5e6763;
+  --color-subtle: #8e9692;
+  --color-ink-hover: #232d2a;
+  --color-ink-line: #2d3835;
+  --color-on-ink: #e9ece8;
+  --color-on-ink-muted: #9aa6a1;
+
+  --color-primary: #1f5f55;
+  --color-primary-hover: #194d45;
+  --color-primary-soft: #e3eeea;
+  --color-ok: #1f8f6f;
+
+  --color-warn: #8a5a12;
+  --color-warn-soft: #f5ecdc;
+  --color-warn-line: #e3c88f;
+  --color-warn-bg: #fffbf3;
+  --color-info: #3b4a8c;
+  --color-info-soft: #e6e9f5;
+  --color-danger: #a23b2a;
+  --color-danger-soft: #f8ece8;
+  --color-danger-ink: #6e2519;
+
+  --font-*: initial;
+  --font-sans: "Instrument Sans", system-ui, sans-serif;
+  --font-serif: "Source Serif 4 Variable", Georgia, serif;
+
+  /* Type scale: one size per role. */
+  --text-*: initial;
+  --text-overline: 11px;
+  --text-overline--line-height: 14px;
+  --text-overline--letter-spacing: 0.08em;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-small: 13px;
+  --text-small--line-height: 18px;
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-reading: 15px;
+  --text-reading--line-height: 24px;
+  --text-lead: 17px;
+  --text-lead--line-height: 28px;
+  --text-title: 20px;
+  --text-title--line-height: 26px;
+  --text-heading: 28px;
+  --text-heading--line-height: 34px;
+  --text-display: 38px;
+  --text-display--line-height: 44px;
+
+  --radius-*: initial;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-full: 9999px;
+
+  --shadow-*: initial;
+  --shadow-raised: 0 1px 2px rgba(23, 32, 30, 0.08);
+  --shadow-pop: 0 1px 2px rgba(23, 32, 30, 0.06), 0 12px 32px rgba(23, 32, 30, 0.12);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-body text-ink antialiased;
+    font-optical-sizing: auto;
+  }
+
+  ::selection {
+    @apply bg-primary-soft text-ink;
+  }
+
+  /* One visible focus style for every control. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  label:has(input) {
+    cursor: pointer;
+  }
+}

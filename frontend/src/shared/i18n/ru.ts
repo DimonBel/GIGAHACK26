@@ -1,0 +1,25 @@
+import type { Messages } from "./en";
+
+export const ru: Messages = {
+  admin: "Администратор",
+  moderator: "Модератор",
+  participant: "Участник",
+  meetings: "Совещания",
+  new: "Новое совещание",
+  editor: "Протокол",
+  moms: "Мои протоколы",
+  read: "Протокол",
+  tasks: "Мои задачи",
+  users: "Пользователи",
+  roles: "Права",
+  security: "Безопасность",
+  templates: "Шаблоны",
+  routing: "Маршрутизация",
+  account: "Аккаунт и безопасность",
+  signIn: "Вход",
+  continue: "Продолжить",
+  twoFa: "Двухфакторная проверка",
+  verify: "Подтвердить",
+  signOut: "Выйти",
+  chooseCabinet: "Выберите кабинет",
+};

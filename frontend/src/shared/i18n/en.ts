@@ -1,0 +1,25 @@
+export const en = {
+  admin: "Admin",
+  moderator: "Moderator",
+  participant: "Participant",
+  meetings: "Meetings",
+  new: "New meeting",
+  editor: "Minutes",
+  moms: "My minutes",
+  read: "Minutes",
+  tasks: "My tasks",
+  users: "Users",
+  roles: "Permissions",
+  security: "Security",
+  templates: "Templates",
+  routing: "Routing",
+  account: "Account & security",
+  signIn: "Sign in",
+  continue: "Continue",
+  twoFa: "Two-factor verification",
+  verify: "Verify",
+  signOut: "Sign out",
+  chooseCabinet: "Choose a cabinet",
+};
+
+export type Messages = Record<keyof typeof en, string>;
