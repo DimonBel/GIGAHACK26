@@ -85,23 +85,28 @@ def _overview(minutes_language: str = "en", minutes: dict = MINUTES, template: d
 
 @pytest.mark.parametrize(("language", "note"), [
     ("en", ["Hello,", "Please find attached the minutes of the meeting “Board 26.09 Bcc: spy@example.com” held on",
-            "They were approved by Ion <i>Rusu</i>.", "Kind regards,\nAna Popescu"]),
+            "They were approved by Ion <i>Rusu</i>.", "Summary:\nFever.\n<img src=x onerror=alert(1)>\n\nKind regards,",
+            "Kind regards,\nAna Popescu"]),
     ("ro", ["Bună ziua,", "Vă transmitem atașat procesul-verbal al ședinței „Board 26.09 Bcc: spy@example.com” din",
-            "Acesta a fost aprobat de Ion <i>Rusu</i>.", "Cu stimă,\nAna Popescu"]),
+            "Acesta a fost aprobat de Ion <i>Rusu</i>.", "Rezumat:\nFever.", "Cu stimă,\nAna Popescu"]),
     ("ru", ["Здравствуйте!", "Во вложении — протокол совещания «Board 26.09 Bcc: spy@example.com» от",
-            "Протокол утверждён: Ion <i>Rusu</i>.", "С уважением,\nAna Popescu"]),
+            "Протокол утверждён: Ion <i>Rusu</i>.", "Краткое содержание:\nFever.", "С уважением,\nAna Popescu"]),
 ])
 def test_the_email_is_a_short_note_in_the_minutes_language(language, note):
-    """The minutes are the attached PDF: the email says what it carries, signed by who sends it, in one-line
-    subject and names escaped in the HTML."""
+    """The minutes are the attached PDF: the email says what it carries and sums up what was said (the minutes'
+    summary), signed by who sends it, in one-line subject and names and the summary escaped in the HTML."""
     email = compose(_meeting(minutes_language=language), MINUTES, "secure-mom@medpark.local", ["ana@medpark.md"], [],
                     signed_by="Ana Popescu")
     for line in note:
         assert line in email.text, line
     assert f'<html lang="{language}">' in email.html
     assert "Ion &lt;i&gt;Rusu&lt;/i&gt;" in email.html and "<i>Rusu" not in email.html
-    for content in ("Round", "Fever", "Blood tests", "Call cardiology"):  # the minutes are in the PDF only
+    assert "&lt;img src=x onerror=alert(1)&gt;" in email.html and "<img" not in email.html
+    for content in ("Round", "Blood tests", "Call cardiology"):  # the rest of the minutes is in the PDF only
         assert content not in email.html + email.text, content
+    no_summary = compose(_meeting(minutes_language=language), {**MINUTES, "summary": " "}, "secure-mom@medpark.local",
+                         ["ana@medpark.md"], [])
+    assert ":\n" not in no_summary.text  # no summary: no empty heading
     assert email.subject == "[Medical] Board 26.09 Bcc: spy@example.com"  # the web app shows the English type
 
 

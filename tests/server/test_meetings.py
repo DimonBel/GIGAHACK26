@@ -694,7 +694,8 @@ def test_email_preview_shows_what_would_be_sent(ready, login):
     assert set(body) == {"subject", "language", "html", "text", "attachment"}
     assert body["attachment"].startswith("Proces-verbal - ") and body["attachment"].endswith(".pdf")
     assert body["subject"].startswith("[Medical]") and body["language"] == meeting["minutes_language"]
-    assert body["text"].endswith("Moderator Test\n") and "Edited" not in body["text"]  # the note, signed
+    assert body["text"].endswith("Moderator Test\n")  # the note, signed, with the summary as it is now:
+    assert "Rezumat:\nEdited <b>summary</b>" in body["text"] and "Edited &lt;b&gt;summary" in body["html"]
     assert "Edited <b>summary</b>" in _pdf_text(moderator.get(f"{path}/minutes.pdf").content)  # the minutes now
     assert login("user").get(f"{path}/email-preview").status_code in (403, 404)
 

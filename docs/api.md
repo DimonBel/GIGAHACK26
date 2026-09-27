@@ -226,8 +226,8 @@ server also stops the transcription with everything it started (whisper-server).
 - `PUT /api/meetings/{id}/minutes` (owner moderator, admin; status `ready`) `Minutes` → `Minutes` as stored
 - `GET /api/meetings/{id}/email-preview` (owner moderator, admin; once there are minutes, a draft too) →
   `{"subject", "language", "html", "text", "attachment"}`: the email the minutes would be sent as now (its short
-  note, signed by this user, in the minutes' language), so the moderator sees what they approve (no recipients
-  yet); `attachment` is the file name of the PDF it carries: the minutes themselves (`minutes.pdf` above)
+  note with the minutes' summary, signed by this user, in the minutes' language), so the moderator sees what they
+  approve (no recipients yet); `attachment` is the file name of the PDF it carries: the minutes themselves (`minutes.pdf` above)
 - `POST /api/meetings/{id}/approve` (owner moderator, admin; status `ready`) → `Meeting` with status `approved`
   ("I agree": the minutes are frozen, the recipients step opens)
 - `POST /api/meetings/{id}/reopen` (owner moderator, admin; status `approved`) → back to `ready` for more edits (`approved_by` cleared)
@@ -309,8 +309,8 @@ MailHog's SMTP (`mailhog:1025` inside Docker) and answers `200 {"sent": true}`; 
 (payload or type) or `502 {"sent": false, "detail"}` (mail server down). A send only counts when n8n answers 2xx
 and `sent` isn't `false`. MailHog's inbox and API are at http://127.0.0.1:8025 behind basic auth (`MAILHOG_USER`
 / `MAILHOG_PASSWORD` in `automation/.env`). `html` and `text` are a short note in the meeting's `minutes_language`
-("Vă transmitem atașat procesul-verbal al ședinței „…” din 24.09.2026. Acesta a fost aprobat de …", signed by who
-sends it; `<html lang>`), rendered by the backend with escaping. The minutes themselves are the attached PDF,
+("Vă transmitem atașat procesul-verbal al ședinței „…” din 24.09.2026. Acesta a fost aprobat de …", then
+"Rezumat:" and the minutes' summary, signed by who sends it; `<html lang>`), rendered by the backend with escaping. The minutes themselves are the attached PDF,
 laid out by the meeting type's minutes template (sections, their order, topic fields), in the same language
 (LLM output is untrusted: escaped there too). The subject keeps the English type prefix.
 

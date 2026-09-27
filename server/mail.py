@@ -80,10 +80,10 @@ class Email:
 def compose(meeting: Meeting, minutes: dict, sender: str, to: list[str], cc: list[str],
             template: dict | None = None, pdf: bool = False, signed_by: str = "", note: str = "") -> Email:
     """The email of the meeting's approved minutes: a short note (the default one in the language of the minutes,
-    LABELS, signed by who sends it, or the moderator's own note) and, with pdf, the minutes themselves as the
-    attached PDF (minutes_pdf), laid out by the template of the meeting type. The subject keeps the English type
-    ("[Medical] ..."), as the web app shows it."""
-    paragraphs = _paragraphs(note) or default_note(meeting, signed_by)
+    LABELS, with the minutes' summary, signed by who sends it, or the moderator's own note) and, with pdf, the
+    minutes themselves as the attached PDF (minutes_pdf), laid out by the template of the meeting type. The subject
+    keeps the English type ("[Medical] ..."), as the web app shows it."""
+    paragraphs = _paragraphs(note) or default_note(meeting, signed_by, minutes.get("summary", ""))
     attachment = None
     if pdf:
         attachment = Attachment(pdf_filename(meeting), "application/pdf", minutes_pdf(meeting, minutes, template))
@@ -95,13 +95,17 @@ def compose(meeting: Meeting, minutes: dict, sender: str, to: list[str], cc: lis
                  html=html, text="\n\n".join(paragraphs) + "\n", sender=sender, attachment=attachment)
 
 
-def default_note(meeting: Meeting, signed_by: str = "") -> list[str]:
-    """The note's paragraphs: a greeting, what is attached (and who approved it), then the sender's name."""
+def default_note(meeting: Meeting, signed_by: str = "", summary: str = "") -> list[str]:
+    """The note's paragraphs: a greeting, what is attached (and who approved it), the summary of what was said
+    ("Rezumat:" and the minutes' summary, when they have one), then the sender's name."""
     labels = LABELS[meeting.minutes_language]
     title = _one_line(meeting.title)
     cover = labels["cover"].format(meeting=title, date=_local_day(meeting.created_at))
     approved = labels["cover_approved"].format(name=meeting.approved_by.full_name) if meeting.approved_by else ""
     paragraphs = [labels["greeting"], " ".join(filter(None, [cover, approved]))]
+    summary = "\n".join(line.strip() for line in summary.strip().splitlines() if line.strip())
+    if summary:
+        paragraphs.append(f"{labels['summary']}:\n{summary}")
     if _one_line(signed_by):
         paragraphs.append(f"{labels['regards']}\n{_one_line(signed_by)}")
     return paragraphs
