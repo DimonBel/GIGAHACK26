@@ -116,6 +116,32 @@ export interface Timings {
   total_s: number | null;
 }
 
+/** One line of the transcript as it is heard live, before the transcript is final. */
+export interface LiveLine {
+  start: number;
+  end: number;
+  /** "" until speakers are known. */
+  speaker: string;
+  languages: string[];
+  /** English accent ("American"), when the server detected one. */
+  accent?: string;
+  text: string;
+}
+
+/** What the server has heard and found so far while a meeting is queued or processing. */
+export interface LiveProcessing {
+  /** The newest lines, at most 40, oldest first. */
+  lines: LiveLine[];
+  /** Lines heard so far (can be more than lines.length): for the counter. */
+  total: number;
+  /** Speaker labels are known; before that every line's speaker is "". */
+  speakers: boolean;
+  /** Topic names the minutes found so far, in order. */
+  topics: string[];
+  decisions: number;
+  tasks: number;
+}
+
 export interface PersonRef {
   id: number;
   full_name: string;

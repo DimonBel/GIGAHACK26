@@ -10,10 +10,11 @@ import {
   Stack,
   Text,
   TextInput,
+  ThemeIcon,
   Title,
 } from '@mantine/core';
 import { Dropzone, type FileRejection } from '@mantine/dropzone';
-import { IconFileMusic, IconUpload, IconX } from '@tabler/icons-react';
+import { IconCheck, IconFileMusic, IconUpload, IconX } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -47,6 +48,15 @@ interface Selection {
   url: string;
 }
 
+/** A small numbered circle, so the two panels read as obvious steps rather than two unrelated cards. */
+function StepBadge({ n }: { n: number }) {
+  return (
+    <ThemeIcon radius="xl" size={26} className="step-badge">
+      {n}
+    </ThemeIcon>
+  );
+}
+
 export function NewMeetingPage() {
   const { t } = useTranslation(['meetings', 'common']);
   const navigate = useNavigate();
@@ -58,6 +68,7 @@ export function NewMeetingPage() {
   const [minutesLanguage, setMinutesLanguage] = useState<MinutesLanguage>('ro');
   const [title, setTitle] = useState('');
   const [uploaded, setUploaded] = useState(0);
+  const [unplayable, setUnplayable] = useState(false); // the browser can't decode it (Chrome: Apple Lossless)
   const upload = useRef<AbortController | null>(null);
   const guard = useLeaveGuard(recording || selection !== null, t('newMeetingPage.leaveGuard'));
 
@@ -66,7 +77,10 @@ export function NewMeetingPage() {
     return () => URL.revokeObjectURL(selection.url);
   }, [selection]);
 
-  const choose = (file: File) => setSelection({ file, url: URL.createObjectURL(file) });
+  const choose = (file: File) => {
+    setUnplayable(false);
+    setSelection({ file, url: URL.createObjectURL(file) });
+  };
 
   const reject = (rejections: FileRejection[]) =>
     notifyError(
@@ -106,7 +120,10 @@ export function NewMeetingPage() {
         <Grid.Col span={{ base: 12, lg: 7 }}>
           <Paper withBorder p="lg">
             <Stack>
-              <Title order={4}>{t('newMeetingPage.recordingStep')}</Title>
+              <Group gap="xs">
+                <StepBadge n={1} />
+                <Title order={4}>{t('newMeetingPage.recordingStep')}</Title>
+              </Group>
               <SegmentedControl
                 value={source}
                 onChange={(value) => setSource(value)}
@@ -125,6 +142,7 @@ export function NewMeetingPage() {
                   multiple={false}
                   disabled={uploading}
                   aria-label={t('newMeetingPage.dropzone.aria')}
+                  className="upload-dropzone"
                 >
                   <Stack
                     align="center"
@@ -135,13 +153,13 @@ export function NewMeetingPage() {
                     style={{ pointerEvents: 'none' }}
                   >
                     <Dropzone.Accept>
-                      <IconUpload size={44} color="var(--mantine-color-teal-6)" />
+                      <IconUpload size={44} className="upload-dropzone-icon" color="var(--mantine-color-teal-6)" />
                     </Dropzone.Accept>
                     <Dropzone.Reject>
-                      <IconX size={44} color="var(--mantine-color-red-6)" />
+                      <IconX size={44} className="upload-dropzone-icon" color="var(--mantine-color-red-6)" />
                     </Dropzone.Reject>
                     <Dropzone.Idle>
-                      <IconFileMusic size={44} color="var(--mantine-color-dimmed)" />
+                      <IconFileMusic size={44} className="upload-dropzone-icon" color="var(--mantine-color-dimmed)" />
                     </Dropzone.Idle>
                     <Text size="lg">{t('newMeetingPage.dropzone.title')}</Text>
                     <Text size="sm" c="dimmed">
@@ -153,7 +171,7 @@ export function NewMeetingPage() {
                 <Recorder onRecorded={choose} onRecordingChange={setRecording} />
               )}
               {selection && (
-                <Paper withBorder p="sm" bg="gray.0">
+                <Paper withBorder p="sm" bg="gray.0" className="selected-file-card">
                   <Group justify="space-between" wrap="nowrap" mb="xs">
                     <Group gap="xs" wrap="nowrap" miw={0}>
                       <IconFileMusic size={20} />
@@ -172,7 +190,19 @@ export function NewMeetingPage() {
                       onClick={() => setSelection(null)}
                     />
                   </Group>
-                  <audio controls src={selection.url} preload="metadata" style={{ width: '100%' }} />
+                  {unplayable ? (
+                    <Text size="xs" c="dimmed">
+                      {t('newMeetingPage.noPreview')}
+                    </Text>
+                  ) : (
+                    <audio
+                      controls
+                      src={selection.url}
+                      preload="metadata"
+                      onError={() => setUnplayable(true)}
+                      style={{ width: '100%' }}
+                    />
+                  )}
                 </Paper>
               )}
             </Stack>
@@ -181,7 +211,10 @@ export function NewMeetingPage() {
         <Grid.Col span={{ base: 12, lg: 5 }}>
           <Paper withBorder p="lg">
             <Stack>
-              <Title order={4}>{t('newMeetingPage.meetingStep')}</Title>
+              <Group gap="xs">
+                <StepBadge n={2} />
+                <Title order={4}>{t('newMeetingPage.meetingStep')}</Title>
+              </Group>
               <Select
                 label={t('newMeetingPage.meetingType.label')}
                 description={t('newMeetingPage.meetingType.description')}
@@ -220,12 +253,22 @@ export function NewMeetingPage() {
               />
               {uploading ? (
                 <Stack gap="xs">
-                  <Text size="sm">
-                    {uploaded < 1
-                      ? t('newMeetingPage.uploading', { percent: Math.round(uploaded * 100) })
-                      : t('newMeetingPage.checkingFile')}
-                  </Text>
-                  <Progress value={uploaded * 100} animated={uploaded >= 1} striped={uploaded >= 1} />
+                  <Group gap={6} wrap="nowrap">
+                    {uploaded >= 1 && <IconCheck size={16} color="var(--mantine-color-teal-6)" />}
+                    <Text size="sm">
+                      {uploaded < 1
+                        ? t('newMeetingPage.uploading', { percent: Math.round(uploaded * 100) })
+                        : t('newMeetingPage.checkingFile')}
+                    </Text>
+                  </Group>
+                  <Progress
+                    value={uploaded * 100}
+                    color={uploaded >= 1 ? 'teal' : undefined}
+                    animated={uploaded >= 1}
+                    striped={uploaded >= 1}
+                    transitionDuration={200}
+                    size="md"
+                  />
                   <Button variant="default" onClick={() => upload.current?.abort()}>
                     {t('newMeetingPage.cancelUpload')}
                   </Button>

@@ -32,6 +32,7 @@ class ResizeObserverStub {
 }
 window.ResizeObserver = ResizeObserverStub;
 window.HTMLElement.prototype.scrollIntoView = () => undefined;
+window.HTMLElement.prototype.scrollTo = () => undefined;
 Object.defineProperty(document, 'fonts', {
   value: { addEventListener: () => undefined, removeEventListener: () => undefined },
 });

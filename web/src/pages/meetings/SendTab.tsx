@@ -10,12 +10,14 @@ import {
   Select,
   Stack,
   Text,
+  Textarea,
   TextInput,
   Title,
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import {
   IconAlertTriangle,
+  IconArrowBackUp,
   IconCircleCheck,
   IconInfoCircle,
   IconMail,
@@ -41,8 +43,9 @@ import { domainList, inAllowedDomain, isEmail, normalizeEmail } from '../../lib/
 import { formatDateTime } from '../../lib/format';
 import { emailSubject, meetingTypeLabel } from '../../lib/meeting';
 import { buildRecipients, listsForType } from '../../lib/recipients';
-import { EmailNote } from './EmailPreview';
 
+/** The longest email note the server takes (schemas.MAX_NOTE). */
+const MAX_NOTE = 5000;
 function RecipientPills({
   label,
   emails,
@@ -94,7 +97,8 @@ function RecipientsForm({
   meeting: Meeting;
   active: boolean;
   sending: boolean;
-  onSend: (recipients: Recipients) => void;
+  /** note: the moderator's own email text, "" to send the default note. */
+  onSend: (recipients: Recipients, note: string) => void;
 }) {
   const { t } = useTranslation(['meetings', 'common']);
   const lists = useLists(active);
@@ -109,6 +113,7 @@ function RecipientsForm({
   const [colleagueSearch, setColleagueSearch] = useState('');
   const [ccInput, setCcInput] = useState('');
   const [ccError, setCcError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null); // null: the default note, as the preview shows it
 
   if (lists.isPending || directory.isPending || domains.isPending) return <LoadingState />;
   if (lists.isError) return <ErrorState error={lists.error} onRetry={() => void lists.refetch()} />;
@@ -196,6 +201,10 @@ function RecipientsForm({
     setExtraCc((current) => current.filter((item) => item !== email));
   };
 
+  const defaultNote = preview.data?.text.trim() ?? '';
+  // Sent only when it says something else than the default note (which the server writes in the same words).
+  const ownNote = note !== null && note.trim() !== defaultNote ? note.trim() : '';
+
   const confirmSend = () =>
     modals.openConfirmModal({
       title: t('sendTab.confirmSend.title'),
@@ -207,7 +216,7 @@ function RecipientsForm({
       ),
       labels: { confirm: t('sendTab.confirmSend.confirm'), cancel: t('common:action.cancel') },
       confirmProps: { leftSection: <IconSend size={16} /> },
-      onConfirm: () => onSend(recipients),
+      onConfirm: () => onSend(recipients, ownNote),
     });
 
   return (
@@ -364,7 +373,35 @@ function RecipientsForm({
             </Text>
           </Stack>
           <Divider />
-          {preview.data ? <EmailNote text={preview.data.text} /> : <LoadingState />}
+          {preview.data ? (
+            <Stack gap={6}>
+              <Textarea
+                label={t('sendTab.emailPreview.message')}
+                description={t('sendTab.emailPreview.messageDescription')}
+                autosize
+                minRows={5}
+                maxRows={14}
+                maxLength={MAX_NOTE}
+                value={note ?? defaultNote}
+                onChange={(event) => setNote(event.currentTarget.value)}
+                disabled={sending}
+              />
+              {ownNote && (
+                <Group justify="flex-end">
+                  <Button
+                    variant="subtle"
+                    size="xs"
+                    leftSection={<IconArrowBackUp size={14} />}
+                    onClick={() => setNote(null)}
+                  >
+                    {t('sendTab.emailPreview.restoreDefault')}
+                  </Button>
+                </Group>
+              )}
+            </Stack>
+          ) : (
+            <LoadingState />
+          )}
         </Stack>
       </Paper>
     </Stack>
@@ -395,7 +432,7 @@ export function SendTab({ meeting, active }: { meeting: Meeting; active: boolean
   const { t } = useTranslation('meetings');
   const send = useSendMinutes(meeting.id);
   if (meeting.status === 'sent')
-    return <SentSummary meeting={meeting} recipients={meeting.recipients ?? send.variables} />;
+    return <SentSummary meeting={meeting} recipients={meeting.recipients ?? send.variables?.recipients} />;
   if (meeting.status !== 'approved') {
     return (
       <Alert color="blue" icon={<IconInfoCircle />} title={t('sendTab.approveFirst.title')}>
@@ -408,7 +445,7 @@ export function SendTab({ meeting, active }: { meeting: Meeting; active: boolean
       meeting={meeting}
       active={active}
       sending={send.isPending}
-      onSend={(recipients) => send.mutate(recipients)}
+      onSend={(recipients, note) => send.mutate({ recipients, note })}
     />
   );
 }

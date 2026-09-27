@@ -146,7 +146,13 @@ export function Recorder({ onRecorded, onRecordingChange }: RecorderProps) {
       {active ? (
         <>
           <Group gap="sm" aria-live="polite">
-            <Box w={12} h={12} bg={status === 'recording' ? 'red.6' : 'gray.5'} style={{ borderRadius: '50%' }} />
+            <Box
+              w={12}
+              h={12}
+              bg={status === 'recording' ? 'red.6' : 'gray.5'}
+              className={status === 'recording' ? 'recording-pulse' : undefined}
+              style={{ borderRadius: '50%' }}
+            />
             <Text fw={700} ff="monospace" fz={32} lh={1}>
               {formatClock(elapsedMs / 1000)}
             </Text>

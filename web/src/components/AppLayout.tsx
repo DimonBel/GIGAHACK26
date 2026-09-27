@@ -41,6 +41,16 @@ import { roleLabel } from '../lib/roles';
 import { CANVAS } from '../theme';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
+/** Remounts on every path change, replaying its fade-in: a calm cue that the page really did change. */
+function AnimatedOutlet() {
+  const { pathname } = useLocation();
+  return (
+    <div key={pathname} className="route-fade">
+      <Outlet />
+    </div>
+  );
+}
+
 interface NavItem {
   to: string;
   label: ParseKeys<'common'>;
@@ -190,7 +200,7 @@ export function AppLayout() {
               </Paper>
             )}
             <div style={{ minWidth: 0 }}>
-              <Outlet />
+              <AnimatedOutlet />
             </div>
           </div>
         </Container>

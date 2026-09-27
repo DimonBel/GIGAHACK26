@@ -91,6 +91,47 @@ describe('SendTab', () => {
     expect(screen.getByRole('link', { name: 'Open PDF' })).toHaveAttribute('href', '/api/meetings/m1/minutes.pdf');
   });
 
+  it('sends the email note the moderator wrote, and can go back to the default one', async () => {
+    const calls: { url: string; body?: string }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        calls.push({ url, body: typeof init?.body === 'string' ? init.body : undefined });
+        const answer = url === '/api/meetings/m1/send' ? { ...meeting, status: 'sent' } : ANSWERS[url];
+        return Promise.resolve(new Response(JSON.stringify(answer), { status: 200 }));
+      }),
+    );
+    renderWithProviders(
+      <ModalsProvider>
+        <SendTab meeting={meeting} active />
+      </ModalsProvider>,
+    );
+
+    const message = await screen.findByRole('textbox', { name: 'Email message' });
+    expect(message).toHaveValue(
+      'Bună ziua,\n\nVă transmitem atașat procesul-verbal al ședinței „Medical board” din 26.09.2026.',
+    );
+    await userEvent.clear(message);
+    await userEvent.type(message, 'Stimați colegi, vedeți atașat.');
+    await userEvent.click(screen.getByRole('button', { name: 'Restore the default text' }));
+    expect(message).toHaveValue(
+      'Bună ziua,\n\nVă transmitem atașat procesul-verbal al ședinței „Medical board” din 26.09.2026.',
+    );
+    await userEvent.clear(message);
+    await userEvent.type(message, 'Stimați colegi, vedeți atașat.');
+
+    await userEvent.click(screen.getByLabelText('Remove friend@gmail.com'));
+    await userEvent.click(screen.getByRole('button', { name: 'Send minutes' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Send' }));
+
+    await vi.waitFor(() => expect(calls.some((call) => call.url === '/api/meetings/m1/send')).toBe(true));
+    const sent = calls.find((call) => call.url === '/api/meetings/m1/send');
+    expect(JSON.parse(sent?.body ?? '{}')).toMatchObject({
+      to: ['ana@medpark.md'],
+      note: 'Stimați colegi, vedeți atașat.',
+    });
+  });
+
   it('only sends to the allowed recipient domains', async () => {
     renderWithProviders(
       <ModalsProvider>

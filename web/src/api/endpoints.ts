@@ -6,6 +6,7 @@ import type {
   EmailPreview,
   DistributionList,
   DistributionListInput,
+  LiveProcessing,
   Meeting,
   MeetingType,
   Minutes,
@@ -88,14 +89,17 @@ export const meetingsApi = {
     if (title.trim()) form.append('title', title.trim());
     return upload<Meeting>('/meetings', form, options);
   },
+  /** What has been heard and found so far, while the meeting is queued or processing; polled by useLiveProcessing. */
+  live: (id: string) => request<LiveProcessing>(meetingPath(id, '/live')),
   transcript: (id: string) => request<Transcript>(meetingPath(id, '/transcript')),
   minutes: async (id: string) => completeMinutes(await request<Partial<Minutes>>(meetingPath(id, '/minutes'))),
   saveMinutes: async (id: string, minutes: Minutes) =>
     completeMinutes(await request<Partial<Minutes>>(meetingPath(id, '/minutes'), { method: 'PUT', body: minutes })),
   approve: (id: string) => request<Meeting>(meetingPath(id, '/approve'), { method: 'POST' }),
   reopen: (id: string) => request<Meeting>(meetingPath(id, '/reopen'), { method: 'POST' }),
-  send: (id: string, recipients: Recipients) =>
-    request<Meeting>(meetingPath(id, '/send'), { method: 'POST', body: recipients }),
+  /** note: the moderator's own email text; empty for the default note. */
+  send: (id: string, recipients: Recipients, note = '') =>
+    request<Meeting>(meetingPath(id, '/send'), { method: 'POST', body: { ...recipients, note } }),
   remove: (id: string) => request<void>(meetingPath(id), { method: 'DELETE' }),
   audioUrl: (id: string) => apiUrl(meetingPath(id, '/audio')),
   /** The minutes as the PDF that is emailed (opened in the browser's own viewer). */

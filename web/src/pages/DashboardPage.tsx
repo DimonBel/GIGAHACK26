@@ -22,12 +22,19 @@ import { useUser } from '../auth/context';
 import { MeetingStatusBadge, MeetingTypeBadge } from '../components/Badges';
 import { PageHeader } from '../components/PageHeader';
 import { ErrorState, LoadingState } from '../components/QueryState';
+import { useCountUp } from '../hooks/useCountUp';
 import { useNow } from '../hooks/useNow';
 import { formatDateTime, formatDay } from '../lib/format';
 import { isProcessing } from '../lib/meeting';
 
 const MINUTE_MS = 60_000;
 const RECENT = 6;
+/** Row fade-in stagger: how much later each following row starts, and how many rows still get their own delay. */
+const ROW_STAGGER_MS = 35;
+const MAX_STAGGERED_ROWS = 8;
+
+/** Inline animation-delay for the Nth fading-in row, capped so a long list doesn't take forever to finish. */
+const rowDelay = (index: number) => ({ animationDelay: `${Math.min(index, MAX_STAGGERED_ROWS) * ROW_STAGGER_MS}ms` });
 const ATTENTION: MeetingStatus[] = ['ready', 'approved', 'failed'];
 
 const newestFirst = (a: Meeting, b: Meeting) => b.created_at.localeCompare(a.created_at);
@@ -44,15 +51,16 @@ function useGreeting() {
 }
 
 function Stat({ label, value, icon: StatIcon, color }: { label: string; value: number; icon: Icon; color: string }) {
+  const count = useCountUp(value);
   return (
-    <Paper withBorder p="md">
+    <Paper withBorder p="md" className="stat-card">
       <Group justify="space-between" align="flex-start" wrap="nowrap">
         <Stack gap={2}>
           <Text size="sm" c="dimmed">
             {label}
           </Text>
           <Text fz={28} fw={700} lh={1.2}>
-            {value}
+            {count}
           </Text>
         </Stack>
         <ThemeIcon variant="light" color={color} size="lg" radius="md">
@@ -63,10 +71,17 @@ function Stat({ label, value, icon: StatIcon, color }: { label: string; value: n
   );
 }
 
-/** A meeting in a dashboard list: title, type, when, and its status (or what to do next). */
-function MeetingRow({ meeting, hint }: { meeting: Meeting; hint?: string }) {
+/** A meeting in a dashboard list: title, type, when, and its status (or what to do next); fades in with the rest
+ *  of its list, staggered by `index`. */
+function MeetingRow({ meeting, hint, index }: { meeting: Meeting; hint?: string; index: number }) {
   return (
-    <UnstyledButton component={Link} to={`/meetings/${meeting.id}`} className="dashboard-row" p="sm">
+    <UnstyledButton
+      component={Link}
+      to={`/meetings/${meeting.id}`}
+      className="dashboard-row fade-in-stagger"
+      p="sm"
+      style={rowDelay(index)}
+    >
       <Group justify="space-between" wrap="nowrap" gap="sm">
         <Stack gap={2} miw={0}>
           <Text size="sm" fw={600} truncate>
@@ -154,8 +169,8 @@ function StaffDashboard({ meetings }: { meetings: Meeting[] }) {
             <Section title={t('attention.title')}>
               {attention.length ? (
                 <Stack gap={0}>
-                  {attention.slice(0, RECENT).map((meeting) => (
-                    <MeetingRow key={meeting.id} meeting={meeting} hint={hint(meeting.status)} />
+                  {attention.slice(0, RECENT).map((meeting, index) => (
+                    <MeetingRow key={meeting.id} meeting={meeting} hint={hint(meeting.status)} index={index} />
                   ))}
                 </Stack>
               ) : (
@@ -177,8 +192,8 @@ function StaffDashboard({ meetings }: { meetings: Meeting[] }) {
             >
               {sorted.length ? (
                 <Stack gap={0}>
-                  {sorted.slice(0, RECENT).map((meeting) => (
-                    <MeetingRow key={meeting.id} meeting={meeting} />
+                  {sorted.slice(0, RECENT).map((meeting, index) => (
+                    <MeetingRow key={meeting.id} meeting={meeting} index={index} />
                   ))}
                 </Stack>
               ) : (
@@ -213,8 +228,15 @@ function ReceivedDashboard({ meetings }: { meetings: Meeting[] }) {
     >
       {sent.length ? (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-          {sent.slice(0, RECENT).map((meeting) => (
-            <Card key={meeting.id} withBorder component={Link} to={`/my-minutes/${meeting.id}`}>
+          {sent.slice(0, RECENT).map((meeting, index) => (
+            <Card
+              key={meeting.id}
+              withBorder
+              component={Link}
+              to={`/my-minutes/${meeting.id}`}
+              className="dashboard-card fade-in-stagger"
+              style={rowDelay(index)}
+            >
               <Group gap="sm" wrap="nowrap" align="flex-start">
                 <ThemeIcon variant="light" radius="md">
                   <IconFileText size={18} />

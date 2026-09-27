@@ -44,7 +44,7 @@ const meetings: Messages<typeof en> = {
     invalidFile: '{{name}} не является аудио- или видеофайлом.',
     unnamedFile: 'Этот файл',
     uploaded: 'Загружено. Расшифровка началась.',
-    recordingStep: '1. Запись',
+    recordingStep: 'Запись',
     source: { upload: 'Загрузить файл', record: 'Записать сейчас', aria: 'Источник записи' },
     dropzone: {
       aria: 'Файл записи',
@@ -52,7 +52,9 @@ const meetings: Messages<typeof en> = {
       hint: 'Аудио или видео: m4a, mp3, wav, ogg, webm, mp4, mov…',
     },
     removeRecording: 'Удалить запись',
-    meetingStep: '2. Совещание',
+    noPreview:
+      'Этот браузер не может воспроизвести формат файла (например, Apple Lossless), поэтому прослушать его нельзя. Запись будет обработана как обычно.',
+    meetingStep: 'Совещание',
     meetingType: {
       label: 'Тип совещания',
       description: 'Определяет, как составляется протокол и кто его получает.',
@@ -119,9 +121,37 @@ const meetings: Messages<typeof en> = {
 
   processingCard: {
     waiting: 'Ожидает начала',
+    queuedHint: 'Обработка начнётся, как только закончится предыдущее совещание.',
+    activity: {
+      converting: 'Готовим запись…',
+      transcribing: 'Переводим речь в текст, фразу за фразой…',
+      speakers: 'Определяем, кто что сказал…',
+      minutes: 'Составляем протокол по расшифровке…',
+    },
     timeSinceUpload: 'Время с момента загрузки',
     transcriptionProgress: 'Прогресс расшифровки',
     footer: 'Эта страница обновляется сама. Вы можете её покинуть: обработка продолжается на сервере.',
+    live: {
+      badge: 'Онлайн',
+      title: 'Расшифровка в реальном времени',
+      empty: 'Первые слова появятся здесь, как только начнётся распознавание записи.',
+      identifying: 'определяется…',
+      jumpToLatest: 'К последней реплике',
+      count_one: '{{count}} реплика пока',
+      count_few: '{{count}} реплики пока',
+      count_many: '{{count}} реплик пока',
+      count_other: '{{count}} реплики пока',
+    },
+    minutesPreview: {
+      title: 'Что войдёт в протокол',
+      empty: 'Темы появятся здесь по мере их выявления.',
+      decisions: 'Решения',
+      tasks: 'Задачи',
+    },
+    done: {
+      title: 'Готово!',
+      subtitle: 'Открывается протокол…',
+    },
   },
 
   transcriptTab: {
@@ -203,6 +233,9 @@ const meetings: Messages<typeof en> = {
       to: 'Кому:',
       cc: 'Копия:',
       attachment: 'Вложение:',
+      message: 'Текст письма',
+      messageDescription: 'Текст, который сопровождает протокол (во вложении, PDF). Его можно изменить.',
+      restoreDefault: 'Вернуть текст по умолчанию',
     },
   },
 

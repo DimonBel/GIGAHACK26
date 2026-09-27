@@ -7,6 +7,9 @@ import i18n from '../i18n';
 
 export const POLL_INTERVAL_MS = 2000;
 
+/** How often the live processing view refreshes while it is on screen: fast enough to feel live. */
+export const LIVE_POLL_INTERVAL_MS = 1000;
+
 export const MEETING_TYPE_VALUES: MeetingType[] = ['medical', 'executive', 'administrative'];
 
 export const MEETING_TYPE_COLORS: Record<MeetingType, MantineColor> = {

@@ -19,6 +19,7 @@ import { MeetingStatusBadge, MeetingTypeBadge } from '../../components/Badges';
 import { PageHeader } from '../../components/PageHeader';
 import { ErrorState, LoadingState } from '../../components/QueryState';
 import { ReceivedMinutes } from '../../components/ReceivedMinutes';
+import { useSuccessHold } from '../../hooks/useSuccessHold';
 import { formatDateTime, formatDuration } from '../../lib/format';
 import { isMinutesLanguage, languageLabel } from '../../lib/languages';
 import { hasMinutes, isProcessing } from '../../lib/meeting';
@@ -151,6 +152,8 @@ export function MeetingPage() {
   const { id = '' } = useParams();
   const user = useUser();
   const meeting = useMeeting(id);
+  // Keeps the processing card on screen a moment longer after it finishes, for its success beat.
+  const holding = useSuccessHold(meeting.data?.status);
   const back = { to: '/meetings', label: t('common:nav.meetings') };
 
   if (meeting.isPending) return <LoadingState />;
@@ -176,13 +179,13 @@ export function MeetingPage() {
         back={back}
       />
       <Stack gap="lg">
-        {isProcessing(data.status) && <ProcessingCard meeting={data} />}
+        {(isProcessing(data.status) || holding) && <ProcessingCard meeting={data} done={!isProcessing(data.status)} />}
         {data.status === 'failed' && (
           <Alert color="red" icon={<IconAlertTriangle />} title={t('processingFailed')}>
             {data.error ?? t('meetingPage.failedAlert.fallback')} {t('meetingPage.failedAlert.suffix')}
           </Alert>
         )}
-        {hasMinutes(data.status) && <MeetingTabs meeting={data} />}
+        {hasMinutes(data.status) && !holding && <MeetingTabs meeting={data} />}
       </Stack>
     </>
   );

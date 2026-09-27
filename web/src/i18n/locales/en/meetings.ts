@@ -42,7 +42,7 @@ const meetings = {
     invalidFile: '{{name}} is not an audio or video file.',
     unnamedFile: 'This file',
     uploaded: 'Uploaded. The transcription has started.',
-    recordingStep: '1. Recording',
+    recordingStep: 'Recording',
     source: { upload: 'Upload a file', record: 'Record now', aria: 'Recording source' },
     dropzone: {
       aria: 'Recording file',
@@ -50,7 +50,9 @@ const meetings = {
       hint: 'Audio or video: m4a, mp3, wav, ogg, webm, mp4, mov…',
     },
     removeRecording: 'Remove the recording',
-    meetingStep: '2. Meeting',
+    noPreview:
+      "This browser can't play this file's format (for example Apple Lossless), so there is no preview. The recording will be processed normally.",
+    meetingStep: 'Meeting',
     meetingType: {
       label: 'Meeting type',
       description: 'Chooses how the minutes are written and who receives them.',
@@ -116,9 +118,35 @@ const meetings = {
 
   processingCard: {
     waiting: 'Waiting to start',
+    queuedHint: 'Processing starts as soon as the meeting before it is done.',
+    activity: {
+      converting: 'Preparing the recording…',
+      transcribing: 'Turning speech into text, sentence by sentence…',
+      speakers: 'Working out who said what…',
+      minutes: 'Writing the minutes from the transcript…',
+    },
     timeSinceUpload: 'Time since upload',
     transcriptionProgress: 'Transcription progress',
     footer: 'This page updates by itself. You can leave it: the processing continues on the server.',
+    live: {
+      badge: 'Live',
+      title: 'Live transcript',
+      empty: 'The first words will appear here as soon as the recording starts being heard.',
+      identifying: 'identifying…',
+      jumpToLatest: 'Jump to latest',
+      count_one: '{{count}} line so far',
+      count_other: '{{count}} lines so far',
+    },
+    minutesPreview: {
+      title: 'What the minutes will cover',
+      empty: 'Topics appear here as they are identified.',
+      decisions: 'Decisions',
+      tasks: 'Action items',
+    },
+    done: {
+      title: 'Ready!',
+      subtitle: 'Opening the minutes…',
+    },
   },
 
   transcriptTab: {
@@ -192,6 +220,9 @@ const meetings = {
       to: 'To:',
       cc: 'CC:',
       attachment: 'Attachment:',
+      message: 'Email message',
+      messageDescription: 'The text that goes with the minutes (attached as a PDF). You can change it.',
+      restoreDefault: 'Restore the default text',
     },
   },
 

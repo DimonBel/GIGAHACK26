@@ -45,7 +45,7 @@ const meetings: Messages<typeof en> = {
     invalidFile: '{{name}} nu este un fișier audio sau video.',
     unnamedFile: 'Acest fișier',
     uploaded: 'Încărcat. Transcrierea a început.',
-    recordingStep: '1. Înregistrare',
+    recordingStep: 'Înregistrare',
     source: { upload: 'Încarcă un fișier', record: 'Înregistrează acum', aria: 'Sursa înregistrării' },
     dropzone: {
       aria: 'Fișierul înregistrării',
@@ -53,7 +53,9 @@ const meetings: Messages<typeof en> = {
       hint: 'Audio sau video: m4a, mp3, wav, ogg, webm, mp4, mov…',
     },
     removeRecording: 'Elimină înregistrarea',
-    meetingStep: '2. Ședință',
+    noPreview:
+      'Browserul nu poate reda formatul acestui fișier (de exemplu Apple Lossless), deci nu există previzualizare. Înregistrarea va fi procesată normal.',
+    meetingStep: 'Ședință',
     meetingType: {
       label: 'Tipul ședinței',
       description: 'Alege cum este redactat procesul-verbal și cine îl primește.',
@@ -119,9 +121,36 @@ const meetings: Messages<typeof en> = {
 
   processingCard: {
     waiting: 'Așteaptă să înceapă',
+    queuedHint: 'Procesarea începe imediat ce se termină ședința de dinaintea ei.',
+    activity: {
+      converting: 'Pregătim înregistrarea…',
+      transcribing: 'Transformăm vorbirea în text, propoziție cu propoziție…',
+      speakers: 'Stabilim cine ce a spus…',
+      minutes: 'Scriem procesul-verbal din transcriere…',
+    },
     timeSinceUpload: 'Timp de la încărcare',
     transcriptionProgress: 'Progresul transcrierii',
     footer: 'Această pagină se actualizează singură. O puteți părăsi: procesarea continuă pe server.',
+    live: {
+      badge: 'Live',
+      title: 'Transcriere live',
+      empty: 'Primele cuvinte apar aici de îndată ce înregistrarea începe să fie ascultată.',
+      identifying: 'se identifică…',
+      jumpToLatest: 'Sari la ultima replică',
+      count_one: '{{count}} replică până acum',
+      count_few: '{{count}} replici până acum',
+      count_other: '{{count}} de replici până acum',
+    },
+    minutesPreview: {
+      title: 'Ce va conține procesul-verbal',
+      empty: 'Subiectele apar pe măsură ce sunt identificate.',
+      decisions: 'Decizii',
+      tasks: 'Sarcini',
+    },
+    done: {
+      title: 'Gata!',
+      subtitle: 'Se deschide procesul-verbal…',
+    },
   },
 
   transcriptTab: {
@@ -199,6 +228,9 @@ const meetings: Messages<typeof en> = {
       to: 'Către:',
       cc: 'Cc:',
       attachment: 'Atașament:',
+      message: 'Mesajul e-mailului',
+      messageDescription: 'Textul care însoțește procesul-verbal (atașat ca PDF). Îl puteți modifica.',
+      restoreDefault: 'Revino la textul implicit',
     },
   },
 

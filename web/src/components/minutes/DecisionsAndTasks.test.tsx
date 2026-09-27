@@ -81,10 +81,12 @@ describe('decisions and action items', () => {
     await userEvent.click(sidebar().getByRole('button', { name: /Action items/ }));
     // The input, not its dropdown list, which carries the same label.
     const owner = screen.getAllByLabelText('Owner of action item 2').find((node) => node.tagName === 'INPUT')!;
-    await userEvent.type(owner, 'Elena Ceban');
+    // Pasted, not typed key by key: every key re-renders the whole document, too slow for a loaded test run.
+    await userEvent.click(owner);
+    await userEvent.paste('Elena Ceban');
 
     expect(fromFormValues(values!).action_items[1]).toMatchObject({ owner: 'Elena Ceban', owner_user_id: 7 });
-    await userEvent.type(owner, ' (locum)');
+    await userEvent.paste(' (locum)');
     expect(fromFormValues(values!).action_items[1]).toMatchObject({
       owner: 'Elena Ceban (locum)',
       owner_user_id: null,

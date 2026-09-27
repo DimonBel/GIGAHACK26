@@ -1,7 +1,7 @@
 /** React Query hooks over the API: cache keys, polling and the cache updates after each change. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { isProcessing, POLL_INTERVAL_MS } from '../lib/meeting';
+import { isProcessing, LIVE_POLL_INTERVAL_MS, POLL_INTERVAL_MS } from '../lib/meeting';
 import type { UploadOptions } from './client';
 import { auditApi, listsApi, meetingsApi, settingsApi, templatesApi, usersApi, type NewMeeting } from './endpoints';
 import type {
@@ -21,6 +21,7 @@ export const queryKeys = {
   session: ['session'] as const,
   meetings: ['meetings'] as const,
   meeting: (id: string) => ['meetings', id] as const,
+  live: (id: string) => ['meetings', id, 'live'] as const,
   transcript: (id: string) => ['meetings', id, 'transcript'] as const,
   minutes: (id: string) => ['meetings', id, 'minutes'] as const,
   emailPreview: (id: string) => ['meetings', id, 'email-preview'] as const,
@@ -49,6 +50,18 @@ export function useMeeting(id: string) {
     queryKey: queryKeys.meeting(id),
     queryFn: () => meetingsApi.get(id),
     refetchInterval: (query) => (query.state.data && isProcessing(query.state.data.status) ? POLL_INTERVAL_MS : false),
+  });
+}
+
+/** What has been heard and found so far: polled quickly while a meeting is queued or processing, and stopped as
+ *  soon as it is not (`enabled` false), so it never keeps polling a finished meeting. */
+export function useLiveProcessing(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.live(id),
+    queryFn: () => meetingsApi.live(id),
+    enabled,
+    refetchInterval: enabled ? LIVE_POLL_INTERVAL_MS : false,
+    staleTime: 0,
   });
 }
 
@@ -116,7 +129,8 @@ export function useReopenMeeting(id: string) {
 export function useSendMinutes(id: string) {
   const storeMeeting = useStoreMeeting();
   return useMutation({
-    mutationFn: (recipients: Recipients) => meetingsApi.send(id, recipients),
+    mutationFn: ({ recipients, note }: { recipients: Recipients; note: string }) =>
+      meetingsApi.send(id, recipients, note),
     onSuccess: storeMeeting,
   });
 }

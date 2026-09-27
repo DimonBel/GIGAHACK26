@@ -24,5 +24,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Whole-page tests that type and click take a few seconds on a busy machine: 5 s (the default) is too tight.
+    testTimeout: 15_000,
   },
 });
