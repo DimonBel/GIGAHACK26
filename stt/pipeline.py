@@ -8,17 +8,19 @@ from .asr.transcriber import print_segments, transcribe_wav
 from .audio import to_wav16k
 from .config import DEFAULT_MODEL, overlap_minutes
 from .minutes.ollama import DEFAULT_MODEL as DEFAULT_LLM
-from .speakers.dialog import build_dialog
+from .speakers.dialog import Utterance, build_dialog
 from .speakers.diarizer import diarize
 
 
 def transcribe_dialog(audio: Path, model: Path = DEFAULT_MODEL, language: str = "auto", translate: bool = False,
                       romanian_model: Path = None, engine: str = "whisper.cpp", fix_words: bool = True,
-                      on_progress=None, on_dialog=None, max_seconds: float = None):
+                      on_progress=None, on_dialog=None, on_live=None, max_seconds: float = None):
     """(main language, dialog utterances) for any audio/video file; speakers are found while Whisper runs.
     on_progress(stage, done, total): stages "converting", "transcribing", "speakers". on_dialog(dialog so far)
-    after each chunk once the speakers are known (to start on the minutes early). max_seconds: transcribe only
-    the start of longer recordings."""
+    after each chunk once the speakers are known (to start on the minutes early). on_live(lines, speakers) after
+    each chunk and at the end, to show the transcription as it happens: the dialog so far once the speakers are
+    known (speakers True), before that every sentence heard on a line of its own, without a speaker.
+    max_seconds: transcribe only the start of longer recordings."""
     progress = on_progress or (lambda stage, done=0, total=0: None)
     import soundfile as sf
 
@@ -30,13 +32,18 @@ def transcribe_dialog(audio: Path, model: Path = DEFAULT_MODEL, language: str = 
         wav = to_wav16k(Path(audio), Path(tmp) / "input.wav", max_seconds)
         print("[2/3] Detecting speakers while transcribing...\n", file=sys.stderr, flush=True)
         with ThreadPoolExecutor(max_workers=1) as pool:
-            speakers, words = pool.submit(diarize, wav), []
+            speakers, words, heard = pool.submit(diarize, wav), [], []
 
             def chunk_done(segments):
                 print_segments(segments)
                 words.extend(w for s in segments for w in s.words)
-                if on_dialog and speakers.done() and not speakers.exception():
-                    on_dialog(build_dialog(words, speakers.result()))
+                heard.extend(line for line in map(_heard, segments) if line)
+                known = speakers.done() and not speakers.exception()
+                dialog = build_dialog(words, speakers.result()) if known and (on_dialog or on_live) else None
+                if on_dialog and known:
+                    on_dialog(dialog)
+                if on_live:
+                    on_live(dialog if known else heard, known)
 
             transcript = transcribe_wav(wav, model, language, translate, accents=False, on_segments=chunk_done,
                                         romanian_model=romanian_model, engine=engine, fix_words=fix_words,
@@ -46,19 +53,30 @@ def transcribe_dialog(audio: Path, model: Path = DEFAULT_MODEL, language: str = 
         print(f"[3/3] Found {len({t.speaker for t in turns})} speaker(s); matching sentences to speakers.",
               file=sys.stderr, flush=True)
         dialog = build_dialog(transcript.words, turns)
+        if on_live:
+            on_live(dialog, True)
         if not translate:
             audio_data, sr = sf.read(str(wav), dtype="float32")
             label_speakers(dialog, audio_data, sr)
     return transcript.language, dialog
 
 
+def _heard(segment) -> Utterance | None:
+    """A sentence Whisper just wrote, as a line before its speaker is known."""
+    text = segment.text.strip() or " ".join(w.text for w in segment.words).strip()
+    if not text or not segment.words:
+        return None
+    return Utterance(segment.words[0].start, segment.words[-1].end, "", text, list(segment.words))
+
+
 def transcribe_minutes(audio: Path, meeting_type: str = "medical", llm: str = DEFAULT_LLM, overlap: bool = None,
-                       minutes_language: str = "ro", instructions: str = "", **options) -> tuple:
+                       minutes_language: str = "ro", instructions: str = "", on_found=None, **options) -> tuple:
     """(language, dialog, minutes or None without speech) for any audio/video file, the minutes written in
     minutes_language (ro, ru or en), following instructions (the hospital's own for the meeting type, if any). With
     overlap (default: on machines with enough memory, see config.overlap_minutes) the minutes are written while
     Whisper still transcribes, from the speakers' turns on. on_progress gets the "minutes" stage once the
-    transcript is ready. options: those of transcribe_dialog."""
+    transcript is ready; on_found(what the minutes have so far) after each part of the transcript they took in
+    (MinutesBuilder.found). options: those of transcribe_dialog."""
     from .minutes.builder import LiveMinutes, MinutesBuilder
     from .speakers.roles import label_roles
 
@@ -69,7 +87,7 @@ def transcribe_minutes(audio: Path, meeting_type: str = "medical", llm: str = DE
         _free_gpu_memory()
         if options.get("on_progress"):
             options["on_progress"]("minutes")
-        return language, dialog, meeting_minutes(dialog, meeting_type, llm, minutes_language, instructions)
+        return language, dialog, meeting_minutes(dialog, meeting_type, llm, minutes_language, instructions, on_found)
 
     live, fed = None, 0
 
@@ -77,7 +95,8 @@ def transcribe_minutes(audio: Path, meeting_type: str = "medical", llm: str = DE
         nonlocal live, fed
         ready = dialog if final else dialog[:-1]  # the newest line may still grow
         for utterance in ready[fed:]:
-            live = live or LiveMinutes(MinutesBuilder(meeting_type, llm, minutes_language, instructions=instructions))
+            live = live or LiveMinutes(MinutesBuilder(meeting_type, llm, minutes_language, instructions=instructions,
+                                                      on_update=on_found))
             live.feed(utterance)
         fed = max(fed, len(ready))
 
@@ -95,15 +114,15 @@ def transcribe_minutes(audio: Path, meeting_type: str = "medical", llm: str = DE
 
 
 def meeting_minutes(dialog: list, meeting_type: str = "medical", model: str = DEFAULT_LLM,
-                    language: str = "ro", instructions: str = "") -> dict:
+                    language: str = "ro", instructions: str = "", on_found=None) -> dict:
     """Minutes for dialog utterances, written in language (ro, ru or en) following instructions (if any); the
-    speakers' roles are guessed at the same time."""
+    speakers' roles are guessed at the same time. on_found: see transcribe_minutes."""
     from .minutes.builder import dialog_lines
     from .speakers.roles import label_roles
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         roles = pool.submit(label_roles, dialog, meeting_type, model, language)
-        result = _minutes(dialog_lines(dialog), meeting_type, model, language, instructions)
+        result = _minutes(dialog_lines(dialog), meeting_type, model, language, instructions, on_found)
         result["participants"] = roles.result()
     return result
 
@@ -120,10 +139,10 @@ def minutes_from_file(path: Path, meeting_type: str = "medical", model: str = DE
     return result
 
 
-def _minutes(lines: list, meeting_type: str, model: str, language: str, instructions: str) -> dict:
+def _minutes(lines: list, meeting_type: str, model: str, language: str, instructions: str, on_found=None) -> dict:
     from .minutes.builder import MinutesBuilder
 
-    builder = MinutesBuilder(meeting_type, model, language, instructions=instructions)
+    builder = MinutesBuilder(meeting_type, model, language, instructions=instructions, on_update=on_found)
     for line in lines:
         builder.add_line(line)
     return builder.finalize()

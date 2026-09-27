@@ -1,3 +1,4 @@
+import threading
 import time
 
 import numpy as np
@@ -34,7 +35,7 @@ class FakeBuilder:
     """MinutesBuilder that records how it was made."""
     made, instructions = [], []
 
-    def __init__(self, *args, instructions=""):
+    def __init__(self, *args, instructions="", on_update=None):
         FakeBuilder.made.append(args)
         FakeBuilder.instructions.append(instructions)
 
@@ -80,6 +81,44 @@ def test_minutes_are_fed_while_transcribing_and_each_line_once(monkeypatch, tmp_
     assert FakeBuilder.instructions == ["Name the beds."]  # the template's, for the builder only
 
 
+def test_the_lines_heard_are_shown_as_the_transcription_goes(monkeypatch, tmp_path):
+    """Before the speakers are known every sentence is a line without a speaker; once they are, the dialog so far;
+    at the end, the whole dialog."""
+    def to_wav16k(src, dst, max_seconds=None):
+        sf.write(str(dst), np.zeros(16000, dtype="float32"), 16000)
+        return dst
+
+    speakers_known = threading.Event()
+
+    def diarize(wav):
+        speakers_known.wait(5)
+        return TURNS
+
+    def transcribe_wav(wav, *args, on_segments=None, **kwargs):
+        words = []
+        for i, chunk in enumerate(CHUNKS):
+            words += chunk
+            on_segments([Segment("", "", "", "ro", "", chunk)])
+            if i == 1:
+                speakers_known.set()
+                time.sleep(0.2)  # the speakers are found while the third chunk is transcribed
+        return Transcript("ro", [], words)
+
+    monkeypatch.setattr(pipeline, "to_wav16k", to_wav16k)
+    monkeypatch.setattr(pipeline, "transcribe_wav", transcribe_wav)
+    monkeypatch.setattr(pipeline, "diarize", diarize)
+    monkeypatch.setattr("stt.speakers.accent.label_speakers", lambda *args: None)
+    shown = []
+
+    pipeline.transcribe_dialog(tmp_path / "meeting.m4a", on_live=lambda lines, speakers: shown.append(
+        ([(u.speaker, u.text) for u in lines], speakers)))
+
+    assert shown[0] == ([("", "Pacientul stabil.")], False)
+    assert shown[1] == ([("", "Pacientul stabil."), ("", "Da, bine.")], False)
+    whole = [("SPEAKER 1", "Pacientul stabil."), ("SPEAKER 2", "Da, bine."), ("SPEAKER 1", "Mergem mai departe.")]
+    assert shown[2:] == [(whole, True), (whole, True)]  # the last chunk, then the end
+
+
 def test_without_overlap_the_minutes_are_written_after_the_transcript(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(pipeline, "transcribe_dialog", lambda audio, **options: calls.append("dialog") or ("ro", ["u"]))
@@ -87,7 +126,7 @@ def test_without_overlap_the_minutes_are_written_after_the_transcript(monkeypatc
                         lambda dialog, *args: calls.append(("minutes", *args)) or {"title": "t"})
     language, dialog, minutes = pipeline.transcribe_minutes(tmp_path / "meeting.m4a", overlap=False,
                                                             minutes_language="en", instructions="Name the beds.")
-    assert calls == ["dialog", ("minutes", "medical", DEFAULT_LLM, "en", "Name the beds.")]
+    assert calls == ["dialog", ("minutes", "medical", DEFAULT_LLM, "en", "Name the beds.", None)]
     assert minutes == {"title": "t"}
     monkeypatch.setattr(pipeline, "transcribe_dialog", lambda audio, **options: ("ro", []))
     assert pipeline.transcribe_minutes(tmp_path / "meeting.m4a", overlap=False)[2] is None  # no speech: no LLM

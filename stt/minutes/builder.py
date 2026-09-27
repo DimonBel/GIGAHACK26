@@ -15,6 +15,7 @@ import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from .labels import LABELS
 from .ollama import DEFAULT_MODEL, chat
 
 MEETING_TYPES = ("medical", "executive", "administrative")
@@ -23,14 +24,17 @@ MINUTES_LANGUAGES = {"ro": "Romanian", "ru": "Russian", "en": "English"}  # code
 WORDS = {
     "en": {"bed": "Bed {n}", "box": "Box", "admissions": "Expected admissions", "item": "Item {n}",
            "patient": "Patient {n}", "icu_team": "ICU team", "team": "Team", "no_deadline": "Not specified",
+           "title_example": "Quarterly budget and staff training",
            "unverified": "⚠ unverified: {values}",
            "not_found": "value(s) {values} not found in the transcript: {text}"},
     "ro": {"bed": "Patul {n}", "box": "Boxa", "admissions": "Internări așteptate", "item": "Punctul {n}",
            "patient": "Pacientul {n}", "icu_team": "Echipa ATI", "team": "Echipa", "no_deadline": "Nespecificat",
+           "title_example": "Bugetul trimestrial și instruirea personalului",
            "unverified": "⚠ de verificat: {values}",
            "not_found": "valori negăsite în transcriere: {values} — {text}"},
     "ru": {"bed": "Койка {n}", "box": "Бокс", "admissions": "Ожидаемые поступления", "item": "Пункт {n}",
            "patient": "Пациент {n}", "icu_team": "Команда ОРИТ", "team": "Команда", "no_deadline": "Не указан",
+           "title_example": "Квартальный бюджет и обучение персонала",
            "unverified": "⚠ не проверено: {values}",
            "not_found": "значения, не найденные в транскрипте: {values} — {text}"},
 }
@@ -211,11 +215,18 @@ HINTS = {
         decisions_hint="what was approved, rejected or changed."),
 }
 
-FINAL_SYSTEM = """You write the header of the Minutes of a {meeting_type} meeting at Medpark hospital, in \
+FINAL_SYSTEM = """You write the header of the minutes of a {meeting_type} meeting at Medpark hospital, in \
 {language}, from the facts already extracted below. Use only these facts.
-- title: short, specific.
+- title: short and specific, entirely in {language}: what the meeting was about, its main topics (e.g. \
+"{title_example}"). Never start it with a word for "minutes" or "meeting": the document already says that.
 - summary: 2-3 sentences for a reader who missed the meeting: who was discussed and the main decisions.
 Never add details that are not in the facts (no age, sex, diagnoses or numbers of your own)."""
+
+# A title that only names the document ("Minutes ale Ședinței Administrative", "Протокол совещания"): small models
+# write it in English whatever the language, and the minutes' header already says what they are. Not "Protocolul de
+# tratament" or "Протокол лечения": a treatment protocol is a real topic.
+DOCUMENT_TITLE = re.compile(r"^\W*(minutes\b|mom\b|proces(ul)?\W*verbal|"
+                            r"протокол\w*\s+(совещани|заседани|собрани|встреч))", re.I)
 
 # Appended to both system prompts: the instructions of the meeting type's template, set by the hospital's admin.
 HOSPITAL_INSTRUCTIONS = "\n\nAdditional instructions from the hospital: {}"
@@ -397,7 +408,7 @@ class MinutesBuilder:
     key of MINUTES_LANGUAGES; instructions: the hospital's own for this meeting type, added to every prompt."""
 
     def __init__(self, meeting_type="medical", model=DEFAULT_MODEL, language="en", num_thread=10,
-                 verbose=True, final_model=None, samples=1, instructions=""):
+                 verbose=True, final_model=None, samples=1, instructions="", on_update=None):
         self.meeting_type, self.model, self.language = meeting_type, model, language
         self.instructions = HOSPITAL_INSTRUCTIONS.format(instructions.strip()) if instructions.strip() else ""
         self.words = WORDS[language]
@@ -419,6 +430,7 @@ class MinutesBuilder:
         self.topics, self.decisions, self.actions, self.issues = [], [], [], []
         self.warnings = []
         self.calls = []
+        self.on_update = on_update  # on_update(found()) after each part merged: to show the minutes taking shape
 
     def add_line(self, line: str):
         prefix, text = line.split(": ", 1)
@@ -508,6 +520,13 @@ class MinutesBuilder:
                       f"{' (' + cue_name + ')' if cue_name else ''}: {stats['wall']}s "
                       f"({stats['prompt_tokens']} in / {stats['output_tokens']} out)", file=sys.stderr, flush=True)
             self._merge(part, lines, continues, cue_name)
+            if self.on_update:
+                self.on_update(self.found())
+
+    def found(self) -> dict:
+        """What the minutes have so far: the topics' names, and how many decisions and action items."""
+        return {"topics": [t["name"] for t in self.topics], "decisions": len(self.decisions),
+                "tasks": len(self.actions)}
 
     def _check(self, text: str, source_numbers: set, chunk_time: str) -> str:
         """Flag doses / lab values that do not occur in the transcript chunk they were extracted from."""
@@ -617,8 +636,8 @@ class MinutesBuilder:
         return sorted(picked, key=lambda m: m["time"])
 
     def finalize(self) -> dict:
-        system = FINAL_SYSTEM.format(meeting_type=self.meeting_type,
-                                     language=MINUTES_LANGUAGES[self.language]) + self.instructions
+        system = FINAL_SYSTEM.format(meeting_type=self.meeting_type, language=MINUTES_LANGUAGES[self.language],
+                                     title_example=self.words["title_example"]) + self.instructions
         self._merge_ready(wait=True)
         if self.topics and self.buffer:
             # The header (title / summary) is written from everything before the last chunk,
@@ -642,10 +661,21 @@ class MinutesBuilder:
         if self.verbose:
             print(f"  finalize: {stats['wall']}s ({stats['prompt_tokens']} in / {stats['output_tokens']} out)",
                   file=sys.stderr, flush=True)
+        head["title"] = self._title(head.get("title", ""))
         return {**head, "key_moments": self._key_moments(), "topics": self.topics, "decisions": self.decisions,
                 "action_items": self.actions,
                 "open_issues": [f"{i['patient']}: {i['issue']}" for i in self.issues], "warnings": self.warnings,
                 "attendees": []}  # who was present: the moderator adds them
+
+
+    def _title(self, title: str) -> str:
+        """The model's title, or, when it only names the document, the meeting type and its first topics."""
+        title = " ".join(title.split())
+        if title and not DOCUMENT_TITLE.match(title):
+            return title
+        label = LABELS[self.language][self.meeting_type]
+        names = [t["name"] for t in self.topics[:2]]
+        return f"{label}: {', '.join(names)}" if names else label
 
 
 class LiveMinutes:

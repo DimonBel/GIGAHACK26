@@ -218,3 +218,40 @@ def test_the_markdown_leaves_out_empty_sections():
              "action_items": [], "open_issues": [], "warnings": [], "attendees": [], "participants": {}}
     assert to_markdown(empty, "medical", "en", SECTIONS) == ("# Round\n*Medical meeting · Minutes*\n\n"
                                                               "## Summary\nNothing to report.\n")
+
+
+def test_the_minutes_report_what_they_have_found_as_they_go(monkeypatch):
+    """After each part merged: the topics so far, and how many decisions and action items."""
+    def chat(model, system, user, schema, **options):
+        return copy.deepcopy({"topics": [PART["ro"]]} if schema is builder.CHUNK_SCHEMA else HEADER), dict(STATS)
+
+    monkeypatch.setattr(builder, "chat", chat)
+    found = []
+    minutes_builder = MinutesBuilder("medical", "gemma", "ro", verbose=False, on_update=found.append)
+    minutes_builder.add_line(LINE)
+    minutes_builder.finalize()
+    assert found == [{"topics": ["Patul 9"], "decisions": 2, "tasks": 1}]  # as merged, before the final pass
+
+
+@pytest.mark.parametrize(("language", "said", "title"), [
+    ("ro", "Minutes ale Ședinței Administrative", "Ședință administrativă: Patul 9"),
+    ("ro", "Procesul-verbal al ședinței", "Ședință administrativă: Patul 9"),
+    ("ru", "Протокол совещания отдела", "Административное совещание: Койка 9"),
+    ("en", "Minutes of the Administrative Meeting", "Administrative meeting: Bed 9"),
+    ("ro", "Bugetul trimestrial și instruirea personalului", "Bugetul trimestrial și instruirea personalului"),
+    ("ro", "Protocolul de tratament al sepsisului", "Protocolul de tratament al sepsisului"),
+    ("ru", "Протокол лечения сепсиса", "Протокол лечения сепсиса"),
+])
+def test_a_title_that_only_names_the_document_is_replaced(monkeypatch, language, said, title):
+    """Small models write "Minutes" whatever the language; the header already says it: the meeting type and its
+    first topics say more. A real topic that starts like it (a treatment protocol) stays."""
+    def chat(model, system, user, schema, **options):
+        if schema is builder.CHUNK_SCHEMA:
+            return copy.deepcopy({"topics": [PART[language]]}), dict(STATS)
+        assert "Never start it with a word for" in system  # the prompt asks for a real title first
+        return {**HEADER, "title": said}, dict(STATS)
+
+    monkeypatch.setattr(builder, "chat", chat)
+    minutes_builder = MinutesBuilder("administrative", "gemma", language, verbose=False)
+    minutes_builder.add_line(LINE)
+    assert minutes_builder.finalize()["title"] == title
