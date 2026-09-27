@@ -1,8 +1,10 @@
 # Secure MOM — on-premise meeting minutes for Medpark
 
-Upload a meeting recording (or press **Rec**), pick the meeting type, and get a structured Minutes of Meeting:
-summary, decisions, action items with owners and deadlines, per patient or agenda item. A moderator reviews and
-edits it, clicks **I agree**, picks the recipients, and it is emailed through the hospital's own mail server.
+Upload a meeting recording (or press **Rec**), pick the meeting type and the language of the minutes (Romanian,
+Russian or English), and get a structured Minutes of Meeting: summary, decisions, action items with owners and
+deadlines, per topic (a patient, an agenda item). A moderator reviews and edits it, clicks **I agree**, picks the
+recipients, and it is emailed through the hospital's own mail server: a short note with the minutes attached
+as a PDF.
 Everything runs on one machine, with **zero calls to the internet**: speech recognition (Whisper), speaker
 detection (pyannote), the minutes (a local LLM through Ollama), routing (n8n) and email (a local SMTP server,
 MailHog for the demo).
@@ -38,7 +40,7 @@ Browser (React)  ──>  FastAPI server (127.0.0.1:8000)  ──>  job queue, o
 Apple Silicon Mac (development) or a Linux server with a 16 GB GPU (or CPU-only, 32 GB RAM).
 
 ```bash
-brew install whisper-cpp ffmpeg ollama python@3.12 node   # plus Docker Desktop
+brew install whisper-cpp ffmpeg ollama python@3.12 node pango   # plus Docker Desktop; pango: the minutes PDF
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 mkdir -p models
 curl -L -o models/ggml-large-v3.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin
@@ -73,11 +75,13 @@ ollama serve                 # 127.0.0.1:11434
 
 | Role | What they do |
 |---|---|
-| **Admin** | people (role, position, email), distribution lists per meeting type (To / CC), settings (models, delivery, audio retention), audit log |
-| **Moderator** | **New meeting**: upload a file or record, pick Medical / Executive / Administrative → live progress → **Minutes**: edit everything (patients / agenda items, decisions, action items with owner, deadline and priority) → **I agree** → **Send**: lists fill To and CC, add members (To) and other people (CC) → emailed |
-| **User** (doctors, staff) | **My minutes**: the minutes sent to them |
+| **Admin** | people (role, position, email), distribution lists per meeting type (To / CC), minutes templates per meeting type (sections, their order, versions), settings (models, delivery, audio retention), audit log |
+| **Moderator** | **New meeting**: upload a file or record, pick Medical / Executive / Administrative and the minutes language (Română / Русский / English) → live progress → **Minutes**: an overview and one page per topic (every time opens the transcript at that moment); **Edit** changes anything (topics, decisions, action items with owner, deadline and priority, speakers' names), in place or **with preview** (the email next to the editor, updated while typing) → **Preview email** → **I agree** → **Send**: lists fill To and CC, add members (To) and other people (CC) → emailed in the minutes language |
+| **User** (doctors, staff) | **My minutes**: the minutes sent to them, printable |
 
-Not signed in: only the login page.
+Not signed in: only the login page. Everyone starts on a dashboard (what needs doing, recent meetings; for an admin,
+the accounts). The web app speaks Romanian, Russian and English (RO · RU · EN in the header); the minutes
+and their email are in the language chosen at upload.
 
 ## Command line
 
@@ -85,15 +89,16 @@ The same pipeline without the web app:
 
 ```bash
 .venv/bin/python main.py minutes meeting.m4a --type medical      # -> out/meeting.dialog.txt, .minutes.md, .minutes.json
-.venv/bin/python main.py minutes out/meeting.dialog.txt          # minutes again from a saved transcript
+.venv/bin/python main.py minutes out/meeting.dialog.txt --minutes-lang en   # again, in English, from a transcript
 .venv/bin/python main.py dialog meeting.m4a --format srt --out meeting.srt   # who said what
 .venv/bin/python main.py transcribe meeting.m4a --format json    # every word with its language
 .venv/bin/python main.py record --seconds 60 --then minutes
 ```
 
 Options: `--engine mlx|whisper.cpp` (MLX by default on Apple Silicon), `--model` (default: the Moldovan
-fine-tune, else Whisper turbo; Large V3 with whisper.cpp), `--lang auto|ro|ru|en`, `--no-fix-words`,
-`--llm` (Ollama model). Results are saved readable only by you: they are patient data.
+fine-tune, else Whisper turbo; Large V3 with whisper.cpp), `--lang auto|ro|ru|en` (the speech), `--no-fix-words`,
+`--llm` (Ollama model), `--minutes-lang ro|ru|en` (the language the minutes are written in, default `ro`).
+Results are saved readable only by you: they are patient data.
 
 ## Security
 
