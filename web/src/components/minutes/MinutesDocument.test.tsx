@@ -204,12 +204,41 @@ describe('attendees', () => {
 
     await openParticipants();
     await userEvent.click(screen.getByRole('button', { name: 'Add someone outside the directory' }));
-    await userEvent.type(screen.getByLabelText('Name of attendee 1'), 'Ion Vasile');
+    await userEvent.type(screen.getByRole('combobox', { name: 'Name of attendee 1' }), 'Ion Vasile');
     await userEvent.type(screen.getByLabelText('Function or role of attendee 1'), 'Family member');
 
     expect(screen.getByText('Present at the meeting (1)')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Ion Vasile')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Family member')).toBeInTheDocument();
+  });
+
+  it('links a visitor whose name is a user of the directory to that user', async () => {
+    vi.spyOn(usersApi, 'directory').mockResolvedValue([directoryEntry]);
+    renderWithProviders(<EditableDocument initial={toFormValues(minutes)} />);
+
+    await openParticipants();
+    await userEvent.click(screen.getByRole('button', { name: 'Add someone outside the directory' }));
+    await userEvent.type(screen.getByRole('combobox', { name: 'Name of attendee 1' }), 'elena rusu');
+    await userEvent.tab();
+
+    // Now the user of the directory: their details, no longer fields to type in.
+    expect(await screen.findByText('Head of cardiology · Doctor · Cardiology')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Name of attendee 1' })).not.toBeInTheDocument();
+  });
+
+  it('names a voice after a user of the directory: added as present, with their function', async () => {
+    vi.spyOn(usersApi, 'directory').mockResolvedValue([directoryEntry]);
+    renderWithProviders(<EditableDocument initial={toFormValues(minutes)} />);
+
+    await openParticipants();
+    const name = screen.getByRole('combobox', { name: 'Name of SPEAKER 1' });
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Elena');
+    await userEvent.click(await screen.findByRole('option', { name: 'Dr. Elena Rusu' }));
+
+    expect(screen.getByText('Present at the meeting (1)')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Name of SPEAKER 1' })).toHaveValue('Dr. Elena Rusu');
+    expect(screen.getByLabelText('Role of SPEAKER 1')).toHaveValue('Head of cardiology');
   });
 
   it('removes an attendee', async () => {

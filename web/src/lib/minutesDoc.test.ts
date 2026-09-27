@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Minutes, Utterance } from '../api/types';
-import { attendeeDetails, forRecipients, lineAt, speakerName, timeToSeconds, topicAt, topicLines } from './minutesDoc';
+import {
+  attendeeDetails,
+  directoryUser,
+  forRecipients,
+  lineAt,
+  speakerName,
+  timeToSeconds,
+  topicAt,
+  topicLines,
+} from './minutesDoc';
 import type { TopicRow } from './minutesForm';
 
 const topic = (key: string, time: string): TopicRow => ({ key, name: key, time, status: '', findings: [] });
@@ -71,5 +80,28 @@ describe('minutes document helpers', () => {
     expect(
       attendeeDetails({ job_title: 'Head of cardiology', position: 'Doctor', specialty: 'Cardiology' }, ', '),
     ).toBe('Head of cardiology, Doctor, Cardiology');
+  });
+});
+
+describe('directoryUser', () => {
+  const user = (id: number, full_name: string) => ({
+    id,
+    full_name,
+    position: '',
+    specialty: '',
+    job_title: '',
+    email: `u${id}@medpark.md`,
+  });
+
+  it('matches a name however it is written: accents, case, a title, spaces', () => {
+    const directory = [user(1, 'Dr. Ștefan Cojocaru'), user(2, 'Ana Popescu')];
+    expect(directoryUser('stefan  cojocaru', directory)?.id).toBe(1);
+    expect(directoryUser('ANA POPESCU', directory)?.id).toBe(2);
+    expect(directoryUser('Ana', directory)).toBeUndefined();
+    expect(directoryUser('  ', directory)).toBeUndefined();
+  });
+
+  it('does not guess between two users with the same name', () => {
+    expect(directoryUser('Ana Popescu', [user(1, 'Ana Popescu'), user(2, 'Dr. Ana Popescu')])).toBeUndefined();
   });
 });

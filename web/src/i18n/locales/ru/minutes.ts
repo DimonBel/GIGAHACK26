@@ -112,6 +112,8 @@ const minutes: Messages<typeof en> = {
     outsideRoleAria: 'Должность или роль участника {{index}}',
     removeAttendee: 'Удалить {{name}}',
     unnamed: 'этого человека',
+    groupPresent: 'Присутствуют на совещании',
+    groupDirectory: 'Сотрудники из справочника',
   },
   decisions: {
     descriptionView: 'Все решения совещания в том порядке, в каком их приняли.',

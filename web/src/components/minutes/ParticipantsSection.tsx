@@ -13,11 +13,22 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { useDirectory } from '../../api/queries';
-import type { Attendee } from '../../api/types';
+import type { Attendee, DirectoryEntry } from '../../api/types';
 import { formatDuration } from '../../lib/format';
-import { attendeeDetails, speakerColor, speakerLabel, speakerName } from '../../lib/minutesDoc';
+import { attendeeDetails, directoryUser, speakerColor, speakerLabel, speakerName } from '../../lib/minutesDoc';
 import { useMinutesDocument, type MinutesForm } from './context';
 import { Block, HAIRLINE, RemoveButton } from './parts';
+
+/** A user of the directory as an attendee: linked to their account, with what the directory knows of them. */
+function asAttendee(entry: DirectoryEntry): Attendee {
+  return {
+    user_id: entry.id,
+    name: entry.full_name,
+    job_title: entry.job_title,
+    position: entry.position,
+    specialty: entry.specialty,
+  };
+}
 
 /** Read mode: everyone present, whether or not they spoke. */
 function AttendeesList({ attendees }: { attendees: Attendee[] }) {
@@ -58,14 +69,13 @@ function AttendeesEditor({ form, attendees }: { form: MinutesForm; attendees: At
 
   const addFromDirectory = (value: string | null) => {
     const entry = available.find((candidate) => String(candidate.id) === value);
-    if (!entry) return;
-    form.insertListItem('attendees', {
-      user_id: entry.id,
-      name: entry.full_name,
-      job_title: entry.job_title,
-      position: entry.position,
-      specialty: entry.specialty,
-    });
+    if (entry) form.insertListItem('attendees', asAttendee(entry));
+  };
+
+  // Someone added from outside whose name is a user's (picked from the suggestions or typed in full): that user.
+  const linkIfUser = (index: number, name: string) => {
+    const entry = directoryUser(name, available);
+    if (entry) form.replaceListItem('attendees', index, asAttendee(entry));
   };
 
   const addOutside = () =>
@@ -91,11 +101,14 @@ function AttendeesEditor({ form, attendees }: { form: MinutesForm; attendees: At
               </Stack>
             ) : (
               <Group gap="xs" wrap="nowrap" align="flex-start" style={{ flex: 1 }}>
-                <TextInput
+                <Autocomplete
                   style={{ flex: 1 }}
                   placeholder={t('participants.outsideNamePlaceholder')}
                   aria-label={t('participants.outsideNameAria', { index: index + 1 })}
+                  data={[...new Set(available.map((entry) => entry.full_name))]}
                   {...form.getInputProps(`attendees.${index}.name`)}
+                  onOptionSubmit={(name) => linkIfUser(index, name)}
+                  onBlur={(event) => linkIfUser(index, event.currentTarget.value)}
                 />
                 <TextInput
                   style={{ flex: 1 }}
@@ -135,10 +148,29 @@ function AttendeesEditor({ form, attendees }: { form: MinutesForm; attendees: At
 export function ParticipantsSection() {
   const { t } = useTranslation('minutes');
   const { values, form } = useMinutesDocument();
+  const directory = useDirectory();
   const voices = values.participants
     .map((participant, index) => ({ participant, index }))
     .sort((a, b) => b.participant.seconds - a.participant.seconds);
   const attendeeNames = [...new Set(values.attendees.map((attendee) => attendee.name.trim()).filter(Boolean))];
+  const users = (directory.data ?? []).filter((entry) => !attendeeNames.includes(entry.full_name));
+  const nameOptions = [
+    { group: t('participants.groupPresent'), items: attendeeNames },
+    { group: t('participants.groupDirectory'), items: [...new Set(users.map((entry) => entry.full_name))] },
+  ].filter((group) => group.items.length);
+
+  // A voice named after a user of the directory: that user is at the meeting (added once), and the role the AI
+  // guessed gives way to what the directory knows.
+  const nameVoice = (index: number, name: string) => {
+    if (!form) return;
+    const entry = directoryUser(name, directory.data ?? []);
+    if (!entry) return;
+    if (!values.attendees.some((attendee) => attendee.user_id === entry.id)) {
+      form.insertListItem('attendees', asAttendee(entry));
+    }
+    const role = entry.job_title || entry.position;
+    if (role) form.setFieldValue(`participants.${index}.role`, role);
+  };
 
   return (
     <Stack gap="lg">
@@ -194,10 +226,11 @@ export function ParticipantsSection() {
               {form ? (
                 <>
                   <Autocomplete
-                    data={attendeeNames}
+                    data={nameOptions}
                     placeholder={t('participants.namePlaceholder')}
                     aria-label={t('participants.nameLabel', { speaker: participant.speaker })}
                     {...form.getInputProps(`participants.${index}.name`)}
+                    onOptionSubmit={(name) => nameVoice(index, name)}
                   />
                   <TextInput
                     placeholder={t('participants.rolePlaceholder')}

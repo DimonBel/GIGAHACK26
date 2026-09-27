@@ -103,6 +103,8 @@ const minutes = {
     outsideRoleAria: 'Function or role of attendee {{index}}',
     removeAttendee: 'Remove {{name}}',
     unnamed: 'this person',
+    groupPresent: 'Present at the meeting',
+    groupDirectory: 'People in the directory',
   },
   decisions: {
     descriptionView: 'Every decision of the meeting, in the order they were taken.',

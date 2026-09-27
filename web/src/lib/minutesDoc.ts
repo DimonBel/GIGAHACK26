@@ -1,7 +1,7 @@
 /** Where things are in the minutes: times, the topic discussed at a time, its transcript lines, the voices. */
 import type { MantineColor } from '@mantine/core';
 
-import type { Attendee, Minutes, Priority, TemplateSection, Utterance } from '../api/types';
+import type { Attendee, DirectoryEntry, Minutes, Priority, TemplateSection, Utterance } from '../api/types';
 import i18n from '../i18n';
 import { PRIORITIES } from './meeting';
 import type { ParticipantRow, TopicRow } from './minutesForm';
@@ -106,4 +106,23 @@ export function attendeeDetails(
   separator = ' · ',
 ): string {
   return [attendee.job_title, attendee.position, attendee.specialty].filter((part) => part.trim()).join(separator);
+}
+
+/** A name as people write it: without accents, case, a title ("Dr.") or extra spaces, to match it to a user. */
+function comparable(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/^(dr|prof|conf)\.?\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** The one user of the directory with this name, if there is exactly one. */
+export function directoryUser(name: string, directory: DirectoryEntry[]): DirectoryEntry | undefined {
+  const wanted = comparable(name);
+  if (!wanted) return undefined;
+  const found = directory.filter((entry) => comparable(entry.full_name) === wanted);
+  return found.length === 1 ? found[0] : undefined;
 }

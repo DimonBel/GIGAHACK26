@@ -108,6 +108,8 @@ const minutes: Messages<typeof en> = {
     outsideRoleAria: 'Funcția sau rolul persoanei {{index}}',
     removeAttendee: 'Elimină {{name}}',
     unnamed: 'această persoană',
+    groupPresent: 'Prezenți la ședință',
+    groupDirectory: 'Persoane din listă',
   },
   decisions: {
     descriptionView: 'Toate deciziile ședinței, în ordinea în care au fost luate.',
