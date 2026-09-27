@@ -205,6 +205,13 @@ server also stops the transcription with everything it started (whisper-server).
 - `GET /api/meetings/{id}/audio` (owner moderator, admin) → the recording for playback (Range requests: `206`);
   `404` once it is no longer kept. Each playback is audited (`view_audio`) by its first request: no `Range`, or
   `bytes=0-`.
+- `GET /api/meetings/{id}/live` (owner moderator, admin) → what the processing heard and found so far, to show it
+  as it happens (polled while `queued`/`processing`; kept in memory only, never stored):
+  `{"lines": [Utterance], "total": 143, "speakers": true, "topics": ["Patul 8"], "decisions": 3, "tasks": 5}` —
+  the newest lines (at most 40, oldest first; `speaker` is `""` until the speakers are known, then the lines are
+  regrouped by speaker), how many lines so far, whether the speakers are known, the topics the minutes found so far
+  (in order) and how many decisions and action items. Before anything is heard and once the meeting is no longer
+  processing: `{"lines": [], "total": 0, "speakers": false, "topics": [], "decisions": 0, "tasks": 0}`.
 - `GET /api/meetings/{id}/minutes` → `Minutes` (the edited version if there is one; `409` before they exist);
   recipients (users, other moderators) only after `sent`, as emailed (without the "⚠ unverified" notes), each
   reading audited (`view_minutes`)
@@ -220,8 +227,9 @@ server also stops the transcription with everything it started (whisper-server).
 - `POST /api/meetings/{id}/approve` (owner moderator, admin; status `ready`) → `Meeting` with status `approved`
   ("I agree": the minutes are frozen, the recipients step opens)
 - `POST /api/meetings/{id}/reopen` (owner moderator, admin; status `approved`) → back to `ready` for more edits (`approved_by` cleared)
-- `POST /api/meetings/{id}/send` (owner moderator, admin; status `approved`) `{to: [email], cc: [email]}` → `Meeting` with status
-  `sent`. `to` must not be empty (at most 200 each); addresses are validated (`400`), lower-cased and
+- `POST /api/meetings/{id}/send` (owner moderator, admin; status `approved`) `{to: [email], cc: [email], note}` → `Meeting`
+  with status `sent`. `note` (optional, at most 5000 characters) is the moderator's own email text instead of the
+  default note (paragraphs at blank lines; the audit entry then ends with `; own note`). `to` must not be empty (at most 200 each); addresses are validated (`400`), lower-cased and
   deduplicated, and `cc` drops the ones already in `to`; every address must be in `allowed_recipient_domains`
   (`400 {"detail": "Not in an allowed recipient domain (medpark.md, medpark.local): ana@gmail.com"}`). Delivery
   goes through n8n (or SMTP if configured), with the minutes attached as a PDF (`minutes.pdf` above). If it fails: `502 {"detail": "The email could not be sent: n8n is not
