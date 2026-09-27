@@ -20,6 +20,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import sessionmaker
 
 from stt.config import ROOT, overlap_minutes
+from stt.minutes.ollama import unload_all
 
 from .config import Config
 from .db import Meeting, Minutes, Transcript, utcnow
@@ -88,6 +89,10 @@ class SttPipeline:
                         f"--llm={settings['llm_model']}"]
             if instructions:
                 command.append(f"--instructions={instructions}")
+        elif not overlap_minutes():  # the LLM of the last minutes (Ollama keeps it 30 min) and Whisper: too big
+            freed = unload_all()
+            if freed:
+                log.info("Unloaded %s from Ollama: Whisper needs the memory", ", ".join(freed))
         result, error = None, None
         # stdin stays open (the child exits when it closes); stderr gets every transcript line: discarded.
         with subprocess.Popen(command, cwd=ROOT, env={**os.environ, "TMPDIR": str(self.temp_dir)},
@@ -113,6 +118,9 @@ class SttPipeline:
                     self._child = None
                     _kill_group(child)  # what a crashed child left running
         if error or result is None:
+            if not error and child.returncode == -signal.SIGABRT:  # MLX aborts when the GPU has no memory left
+                error = ("The transcription stopped: the speech model ran out of memory. Close other programs "
+                         "and upload the file again.")
             raise ProcessingError(error or f"The transcription stopped unexpectedly (exit code {child.returncode})")
         return Transcription(result["language"], result["utterances"], result.get("minutes"))
 

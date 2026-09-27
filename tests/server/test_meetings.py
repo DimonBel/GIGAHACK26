@@ -410,6 +410,27 @@ def test_transcription_child_reports_errors(tmp_path, monkeypatch):
     assert list(scratch.iterdir()) == []
 
 
+def test_the_transcription_first_frees_the_llm_memory_and_names_a_crash_for_lack_of_it(tmp_path, monkeypatch,
+                                                                                          no_ollama):
+    """With too little memory for both, Ollama's model (kept 30 min after the last minutes) is unloaded before
+    Whisper starts; if the speech model still aborts (MLX does when the GPU has no memory left), the moderator is
+    told what to do."""
+    monkeypatch.setattr("server.jobs.overlap_minutes", lambda: False)
+    popen = subprocess.Popen
+    monkeypatch.setattr(subprocess, "Popen", lambda command, **kwargs: no_ollama.append("child") or popen(
+        [sys.executable, "-c", "import os, signal; os.kill(os.getpid(), signal.SIGABRT)"], **kwargs))
+    with pytest.raises(ProcessingError, match="ran out of memory. Close other programs"):
+        SttPipeline(tmp_path).transcribe(tmp_path / "a.wav", {**CHILD_SETTINGS, "llm_model": "gemma4:e4b"},
+                                         lambda *progress: None, "medical")
+    assert no_ollama == ["unload", "child"]
+    monkeypatch.setattr("server.jobs.overlap_minutes", lambda: True)  # both fit: the child writes the minutes
+    no_ollama.clear()
+    with pytest.raises(ProcessingError):
+        SttPipeline(tmp_path).transcribe(tmp_path / "a.wav", {**CHILD_SETTINGS, "llm_model": "gemma4:e4b"},
+                                         lambda *progress: None, "medical")
+    assert no_ollama == ["child"]
+
+
 def _ended(read_end: int) -> bool:
     """True once every process holding the pipe's write end has ended: its read end sees EOF (even before init
     reaps an orphan)."""

@@ -102,6 +102,14 @@ class FakeMailer:
         self.sent.append(email)
 
 
+@pytest.fixture(autouse=True)
+def no_ollama(monkeypatch) -> list:
+    """The real transcription frees Ollama's memory first: never this machine's Ollama in the tests."""
+    calls = []
+    monkeypatch.setattr("server.jobs.unload_all", lambda: calls.append("unload") or [])
+    return calls
+
+
 @pytest.fixture
 def config(tmp_path) -> Config:
     return Config(data_dir=tmp_path / "data", allowed_hosts=TEST_HOSTS, web_dist=tmp_path / "no-web")

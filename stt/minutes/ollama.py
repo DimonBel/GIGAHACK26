@@ -29,6 +29,23 @@ def endpoint() -> str:
     return f"http://{name}:{url.port or 11434}/api/chat"
 
 
+def unload_all(timeout=10) -> list[str]:
+    """Frees the memory of every model Ollama holds (chat keeps one loaded for 30 minutes): Whisper on the GPU
+    crashes for lack of memory next to it on a 16 GB Mac. The models it unloaded; none if Ollama is not running."""
+    base = endpoint().removesuffix("/api/chat")
+    try:
+        with _local.open(base + "/api/ps", timeout=timeout) as resp:
+            names = [m["name"] for m in json.loads(resp.read()).get("models", [])]
+        for name in names:
+            body = json.dumps({"model": name, "messages": [], "keep_alive": 0}).encode()
+            request = urllib.request.Request(endpoint(), data=body, headers={"Content-Type": "application/json"})
+            with _local.open(request, timeout=timeout) as resp:
+                resp.read()
+    except (OSError, ValueError, KeyError):
+        return []  # not running, or an answer it can't give: nothing to free
+    return names
+
+
 def chat(model: str, system: str, user: str, schema: dict, num_ctx=4096, num_thread=10, num_predict=1000,
          retry=True, temperature=0.1, timeout=3600) -> tuple:
     """(JSON answer constrained to schema, timing stats). Retries once on invalid JSON."""
