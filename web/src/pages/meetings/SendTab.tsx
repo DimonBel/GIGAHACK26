@@ -14,17 +14,34 @@ import {
   Title,
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
-import { IconAlertTriangle, IconCircleCheck, IconInfoCircle, IconMail, IconPlus, IconSend } from '@tabler/icons-react';
+import {
+  IconAlertTriangle,
+  IconCircleCheck,
+  IconInfoCircle,
+  IconMail,
+  IconPlus,
+  IconSend,
+  IconUsers,
+} from '@tabler/icons-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-import { useDirectory, useLists, useMinutes, useRecipientDomains, useSendMinutes } from '../../api/queries';
+import {
+  useDirectory,
+  useEmailPreview,
+  useLists,
+  useMinutes,
+  useRecipientDomains,
+  useSendMinutes,
+} from '../../api/queries';
 import type { Meeting, Recipients } from '../../api/types';
-import { MinutesView } from '../../components/MinutesView';
+import { PdfButton } from '../../components/PdfButton';
 import { ErrorState, LoadingState } from '../../components/QueryState';
 import { domainList, inAllowedDomain, isEmail, normalizeEmail } from '../../lib/email';
 import { formatDateTime } from '../../lib/format';
 import { emailSubject, meetingTypeLabel } from '../../lib/meeting';
 import { buildRecipients, listsForType } from '../../lib/recipients';
+import { EmailNote } from './EmailPreview';
 
 function RecipientPills({
   label,
@@ -37,6 +54,7 @@ function RecipientPills({
   nameOf: (email: string) => string;
   onRemove?: (email: string) => void;
 }) {
+  const { t } = useTranslation('meetings');
   return (
     <Stack gap={6}>
       <Text size="sm" fw={600}>
@@ -44,7 +62,7 @@ function RecipientPills({
       </Text>
       {emails.length === 0 ? (
         <Text size="sm" c="dimmed">
-          Nobody yet.
+          {t('sendTab.recipients.nobodyYet')}
         </Text>
       ) : (
         <Group gap={6}>
@@ -54,7 +72,7 @@ function RecipientPills({
               size="md"
               withRemoveButton={Boolean(onRemove)}
               onRemove={() => onRemove?.(email)}
-              removeButtonProps={{ 'aria-label': `Remove ${email}` }}
+              removeButtonProps={{ 'aria-label': t('sendTab.recipients.removeAria', { email }) }}
               title={email}
             >
               {nameOf(email)}
@@ -78,10 +96,12 @@ function RecipientsForm({
   sending: boolean;
   onSend: (recipients: Recipients) => void;
 }) {
+  const { t } = useTranslation(['meetings', 'common']);
   const lists = useLists(active);
   const directory = useDirectory(active);
   const domains = useRecipientDomains(active);
   const minutes = useMinutes(meeting.id);
+  const preview = useEmailPreview(meeting.id);
   const [picked, setPicked] = useState<string[] | null>(null);
   const [extraTo, setExtraTo] = useState<string[]>([]);
   const [extraCc, setExtraCc] = useState<string[]>([]);
@@ -100,7 +120,27 @@ function RecipientsForm({
   const selectedIds =
     picked ?? available.filter((list) => list.meeting_type === meeting.meeting_type).map((list) => String(list.id));
   const selectedLists = available.filter((list) => selectedIds.includes(String(list.id)));
-  const recipients = buildRecipients({ lists: selectedLists, extraTo, extraCc, excluded });
+
+  // The people present at the meeting who have an account (an email in the directory) get the minutes: they are
+  // in To from the start, like the lists; the moderator can still remove each one.
+  const attendeeEmails = [
+    ...new Set(
+      (minutes.data?.attendees ?? [])
+        .map((attendee) =>
+          attendee.user_id !== null
+            ? directory.data.find((person) => person.id === attendee.user_id)?.email
+            : undefined,
+        )
+        .filter((email): email is string => Boolean(email))
+        .map(normalizeEmail),
+    ),
+  ];
+  const recipients = buildRecipients({
+    lists: selectedLists,
+    extraTo: [...attendeeEmails, ...extraTo],
+    extraCc,
+    excluded,
+  });
   const outside = [...recipients.to, ...recipients.cc].filter((email) => !inAllowedDomain(email, domains.data));
 
   const names = new Map<string, string>();
@@ -120,6 +160,10 @@ function RecipientsForm({
       label: person.position ? `${person.full_name} — ${person.position}` : person.full_name,
     }));
 
+  // Attendees the moderator removed, to bring back with one click.
+  const inRecipients = new Set([...recipients.to, ...recipients.cc]);
+  const newAttendeeEmails = attendeeEmails.filter((email) => !inRecipients.has(email));
+
   const include = (email: string) => setExcluded((current) => current.filter((item) => item !== email));
 
   const addTo = (email: string) => {
@@ -128,13 +172,15 @@ function RecipientsForm({
     setColleagueSearch('');
   };
 
+  const addAttendees = () => newAttendeeEmails.forEach((email) => addTo(email));
+
   const addCc = () => {
     if (!isEmail(ccInput)) {
-      setCcError('Enter a valid email address');
+      setCcError(t('sendTab.cc.invalidEmail'));
       return;
     }
     if (!inAllowedDomain(ccInput, domains.data)) {
-      setCcError(`Only addresses at ${domainList(domains.data)}`);
+      setCcError(t('sendTab.cc.outsideDomain', { domains: domainList(domains.data) }));
       return;
     }
     const email = normalizeEmail(ccInput);
@@ -152,15 +198,14 @@ function RecipientsForm({
 
   const confirmSend = () =>
     modals.openConfirmModal({
-      title: 'Send the minutes?',
+      title: t('sendTab.confirmSend.title'),
       centered: true,
       children: (
         <Text size="sm">
-          The approved minutes go to {recipients.to.length} recipient(s) in To and {recipients.cc.length} in CC, through
-          the hospital&apos;s own mail server.
+          {t('sendTab.confirmSend.body', { count: recipients.to.length, ccCount: recipients.cc.length })}
         </Text>
       ),
-      labels: { confirm: 'Send', cancel: 'Cancel' },
+      labels: { confirm: t('sendTab.confirmSend.confirm'), cancel: t('common:action.cancel') },
       confirmProps: { leftSection: <IconSend size={16} /> },
       onConfirm: () => onSend(recipients),
     });
@@ -172,14 +217,13 @@ function RecipientsForm({
           <Paper withBorder p="lg" h="100%">
             <Stack gap="lg">
               <Stack gap="xs">
-                <Title order={4}>Distribution lists</Title>
+                <Title order={4}>{t('sendTab.lists.title')}</Title>
                 {available.length === 0 ? (
                   <Text size="sm" c="dimmed">
-                    No distribution list for {meetingTypeLabel(meeting.meeting_type).toLowerCase()} meetings. An
-                    administrator can create one.
+                    {t('sendTab.lists.empty', { type: meetingTypeLabel(meeting.meeting_type).toLowerCase() })}
                   </Text>
                 ) : (
-                  <Checkbox.Group value={selectedIds} onChange={setPicked} aria-label="Distribution lists">
+                  <Checkbox.Group value={selectedIds} onChange={setPicked} aria-label={t('sendTab.lists.title')}>
                     <Stack gap="xs">
                       {available.map((list) => {
                         const to = list.members.filter((member) => member.kind === 'to').length;
@@ -188,7 +232,7 @@ function RecipientsForm({
                             key={list.id}
                             value={String(list.id)}
                             label={list.name}
-                            description={`${to} in To · ${list.members.length - to} in CC${list.meeting_type ? '' : ' · for any meeting type'}`}
+                            description={`${t('sendTab.lists.memberCounts', { to, cc: list.members.length - to })}${list.meeting_type ? '' : t('sendTab.lists.anyType')}`}
                           />
                         );
                       })}
@@ -196,9 +240,23 @@ function RecipientsForm({
                   </Checkbox.Group>
                 )}
               </Stack>
+              <Stack gap={4}>
+                <Button
+                  variant="default"
+                  size="xs"
+                  leftSection={<IconUsers size={14} />}
+                  onClick={addAttendees}
+                  disabled={newAttendeeEmails.length === 0}
+                >
+                  {t('sendTab.attendees.add')}
+                </Button>
+                <Text size="xs" c="dimmed">
+                  {t('sendTab.attendees.hint')}
+                </Text>
+              </Stack>
               <Select
-                label="Add a colleague (To)"
-                placeholder="Search by name or position"
+                label={t('sendTab.colleague.label')}
+                placeholder={t('sendTab.colleague.placeholder')}
                 data={colleagues}
                 value={null}
                 searchValue={colleagueSearch}
@@ -207,12 +265,12 @@ function RecipientsForm({
                 searchable
                 selectFirstOptionOnChange
                 selectFirstOptionOnDropdownOpen
-                nothingFoundMessage="Nobody found"
+                nothingFoundMessage={t('sendTab.colleague.nothingFound')}
               />
               <Stack gap={4}>
                 <Group gap="xs" align="flex-start" wrap="nowrap">
                   <TextInput
-                    label="Add another person (CC)"
+                    label={t('sendTab.cc.label')}
                     placeholder={`name@${domains.data[0] ?? 'medpark.md'}`}
                     type="email"
                     value={ccInput}
@@ -230,12 +288,12 @@ function RecipientsForm({
                     style={{ flex: 1 }}
                   />
                   <Button variant="default" mt={25} leftSection={<IconPlus size={16} />} onClick={addCc}>
-                    Add
+                    {t('common:action.add')}
                   </Button>
                 </Group>
                 {domains.data.length > 0 && (
                   <Text size="xs" c="dimmed">
-                    Minutes can only be sent to addresses at {domainList(domains.data)}.
+                    {t('sendTab.cc.hint', { domains: domainList(domains.data) })}
                   </Text>
                 )}
               </Stack>
@@ -245,18 +303,28 @@ function RecipientsForm({
         <Grid.Col span={{ base: 12, md: 6 }}>
           <Paper withBorder p="lg" h="100%">
             <Stack gap="md" h="100%">
-              <Title order={4}>Recipients</Title>
-              <RecipientPills label="To" emails={recipients.to} nameOf={nameOf} onRemove={remove} />
-              <RecipientPills label="CC" emails={recipients.cc} nameOf={nameOf} onRemove={remove} />
+              <Title order={4}>{t('sendTab.recipients.title')}</Title>
+              <RecipientPills
+                label={t('sendTab.recipients.to')}
+                emails={recipients.to}
+                nameOf={nameOf}
+                onRemove={remove}
+              />
+              <RecipientPills
+                label={t('sendTab.recipients.cc')}
+                emails={recipients.cc}
+                nameOf={nameOf}
+                onRemove={remove}
+              />
               {outside.length > 0 && (
-                <Alert color="orange" icon={<IconAlertTriangle />} title="Outside the allowed domains">
-                  Minutes can only go to {domainList(domains.data)}. Remove {outside.join(', ')} to send.
+                <Alert color="orange" icon={<IconAlertTriangle />} title={t('sendTab.outsideAlert.title')}>
+                  {t('sendTab.outsideAlert.body', { domains: domainList(domains.data), emails: outside.join(', ') })}
                 </Alert>
               )}
               <Divider />
               <Group justify="space-between" gap="sm">
                 <Text size="xs" c="dimmed" maw={300}>
-                  Delivered by the hospital&apos;s own mail server. Nothing leaves the network.
+                  {t('sendTab.footerNote')}
                 </Text>
                 <Button
                   leftSection={<IconSend size={16} />}
@@ -264,7 +332,7 @@ function RecipientsForm({
                   loading={sending}
                   onClick={confirmSend}
                 >
-                  Send minutes
+                  {t('sendTab.send')}
                 </Button>
               </Group>
             </Stack>
@@ -274,23 +342,29 @@ function RecipientsForm({
 
       <Paper withBorder p="lg">
         <Stack gap="md">
-          <Group gap="xs">
-            <IconMail size={18} />
-            <Title order={4}>Email preview</Title>
+          <Group justify="space-between" gap="sm">
+            <Group gap="xs">
+              <IconMail size={18} />
+              <Title order={4}>{t('sendTab.emailPreview.title')}</Title>
+            </Group>
+            <PdfButton meetingId={meeting.id} size="xs" />
           </Group>
           <Stack gap={2}>
             <Text size="sm">
-              <b>Subject:</b> {emailSubject(meeting, minutes.data?.title)}
+              <b>{t('sendTab.emailPreview.subject')}</b> {emailSubject(meeting, minutes.data?.title)}
             </Text>
             <Text size="sm">
-              <b>To:</b> {recipients.to.join(', ') || '—'}
+              <b>{t('sendTab.emailPreview.to')}</b> {recipients.to.join(', ') || '—'}
             </Text>
             <Text size="sm">
-              <b>CC:</b> {recipients.cc.join(', ') || '—'}
+              <b>{t('sendTab.emailPreview.cc')}</b> {recipients.cc.join(', ') || '—'}
+            </Text>
+            <Text size="sm">
+              <b>{t('sendTab.emailPreview.attachment')}</b> {preview.data?.attachment ?? '—'}
             </Text>
           </Stack>
           <Divider />
-          {minutes.data ? <MinutesView minutes={minutes.data} meetingType={meeting.meeting_type} /> : <LoadingState />}
+          {preview.data ? <EmailNote text={preview.data.text} /> : <LoadingState />}
         </Stack>
       </Paper>
     </Stack>
@@ -298,16 +372,17 @@ function RecipientsForm({
 }
 
 function SentSummary({ meeting, recipients }: { meeting: Meeting; recipients?: Recipients | null }) {
+  const { t } = useTranslation('meetings');
   return (
     <Stack gap="md">
-      <Alert color="green" icon={<IconCircleCheck />} title="Minutes sent">
-        Sent on {formatDateTime(meeting.sent_at)} through the hospital&apos;s own mail server.
+      <Alert color="green" icon={<IconCircleCheck />} title={t('sendTab.sent.title')}>
+        {t('sendTab.sent.body', { date: formatDateTime(meeting.sent_at) })}
       </Alert>
       {recipients && (
         <Paper withBorder p="lg">
           <Stack gap="md">
-            <RecipientPills label="To" emails={recipients.to} nameOf={(email) => email} />
-            <RecipientPills label="CC" emails={recipients.cc} nameOf={(email) => email} />
+            <RecipientPills label={t('sendTab.recipients.to')} emails={recipients.to} nameOf={(email) => email} />
+            <RecipientPills label={t('sendTab.recipients.cc')} emails={recipients.cc} nameOf={(email) => email} />
           </Stack>
         </Paper>
       )}
@@ -317,13 +392,14 @@ function SentSummary({ meeting, recipients }: { meeting: Meeting; recipients?: R
 
 /** Last step: recipients and sending, once the minutes are approved. */
 export function SendTab({ meeting, active }: { meeting: Meeting; active: boolean }) {
+  const { t } = useTranslation('meetings');
   const send = useSendMinutes(meeting.id);
   if (meeting.status === 'sent')
     return <SentSummary meeting={meeting} recipients={meeting.recipients ?? send.variables} />;
   if (meeting.status !== 'approved') {
     return (
-      <Alert color="blue" icon={<IconInfoCircle />} title="Approve the minutes first">
-        Review the draft on the Minutes tab and click “I agree”. Then choose the recipients here.
+      <Alert color="blue" icon={<IconInfoCircle />} title={t('sendTab.approveFirst.title')}>
+        {t('sendTab.approveFirst.body')}
       </Alert>
     );
   }

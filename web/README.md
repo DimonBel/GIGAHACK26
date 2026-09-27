@@ -1,8 +1,10 @@
 # Secure MOM web app
 
 React 19 + TypeScript + Vite + Mantine 9, React Router 8 and TanStack Query. It talks only to the backend under
-`/api` (contract: [docs/api.md](../docs/api.md)); everything is bundled, so it works without internet (system fonts,
-no CDN, no analytics).
+`/api` (contract: [docs/api.md](../docs/api.md)); everything is bundled, so it works without internet (Medpark's
+Montserrat font is in the build, no CDN, no analytics). Colors and type follow medpark.md. Texts are in
+`src/i18n/locales/{ro,ru,en}/` (i18next, one namespace per area; English is the reference and the types make
+Romanian and Russian complete).
 
 ```bash
 cd web
@@ -22,12 +24,12 @@ doesn't apply that policy, so check a change to styling or loading with the buil
 
 ## Pages
 
-| Role             | Pages                                                                                                                                                                                     |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| moderator, admin | Meetings, New meeting (upload or record), meeting page: live progress, then Minutes (edit, "I agree", reopen), Transcript (search, playback), Send (lists, colleagues, CC, email preview) |
-| admin            | Users, Distribution lists, Settings, Audit log                                                                                                                                            |
-| user             | My minutes (read-only, printable)                                                                                                                                                         |
-| everyone         | Change password (account menu); the only page while signing in with a password an admin chose                                                                                             |
+| Role             | Pages                                                                                                                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| moderator, admin | Meetings, New meeting (upload or record), meeting page: live progress, then Minutes (edit in place or next to a live email preview, email preview, "I agree", reopen), Transcript (search, playback), Send (lists, colleagues, CC, email preview) |
+| admin            | Users, Distribution lists, Templates, Settings, Audit log                                                                                                                                                                                         |
+| user             | My minutes (read-only, printable)                                                                                                                                                                                                                 |
+| everyone         | Dashboard; Profile (account menu) with Change password, the only page while signing in with a password an admin chose                                                                                                                             |
 
 ## Layout
 

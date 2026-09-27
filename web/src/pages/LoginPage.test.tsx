@@ -14,6 +14,8 @@ const moderator: User = {
   email: 'ion@medpark.md',
   full_name: 'Ion Rusu',
   position: 'Surgeon',
+  specialty: '',
+  job_title: '',
   role: 'moderator',
   active: true,
   must_change_password: false,
@@ -26,7 +28,7 @@ function renderLogin(auth: AuthContextValue, from?: string) {
       <MemoryRouter initialEntries={[{ pathname: '/login', state: from === undefined ? undefined : { from } }]}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/meetings" element={<p>Meetings page</p>} />
+          <Route path="/" element={<p>Dashboard</p>} />
           <Route path="/meetings/:id" element={<p>Meeting page</p>} />
         </Routes>
       </MemoryRouter>
@@ -47,6 +49,12 @@ describe('LoginPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Wrong email or password');
   });
 
+  it('shows the copyright under the form', () => {
+    renderLogin({ user: null, signedOut: false, login: vi.fn(), logout: vi.fn(), changePassword: vi.fn() });
+
+    expect(screen.getByText('© 2026 Gigahack. All rights reserved.')).toBeInTheDocument();
+  });
+
   it('checks the fields before calling the server', async () => {
     const login = vi.fn();
     renderLogin({ user: null, signedOut: false, login, logout: vi.fn(), changePassword: vi.fn() });
@@ -59,9 +67,9 @@ describe('LoginPage', () => {
     expect(login).not.toHaveBeenCalled();
   });
 
-  it('sends a signed-in user to their start page', () => {
+  it('sends a signed-in user to the dashboard', () => {
     renderLogin({ user: moderator, signedOut: false, login: vi.fn(), logout: vi.fn(), changePassword: vi.fn() });
-    expect(screen.getByText('Meetings page')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 
   it('returns a signed-in user to the page they asked for', () => {
@@ -74,6 +82,6 @@ describe('LoginPage', () => {
 
   it.each(['//evil.example/login', '/\\evil.example'])('never returns to another site (%s)', (from) => {
     renderLogin({ user: moderator, signedOut: false, login: vi.fn(), logout: vi.fn(), changePassword: vi.fn() }, from);
-    expect(screen.getByText('Meetings page')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 });

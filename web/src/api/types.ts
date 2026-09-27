@@ -6,7 +6,12 @@ export interface User {
   id: number;
   email: string;
   full_name: string;
+  /** e.g. "doctor". */
   position: string;
+  /** e.g. "neurologist". */
+  specialty: string;
+  /** The function, e.g. "vice president". */
+  job_title: string;
   role: Role;
   active: boolean;
   /** Someone else (an admin) chose the password: the user must change it before anything else. */
@@ -23,11 +28,15 @@ export interface UserCreate {
   email: string;
   full_name: string;
   position: string;
+  specialty: string;
+  job_title: string;
   role: Role;
   password: string;
 }
 
-export type UserUpdate = Partial<Pick<User, 'full_name' | 'position' | 'role' | 'active'>> & {
+export type UserUpdate = Partial<
+  Pick<User, 'full_name' | 'position' | 'specialty' | 'job_title' | 'role' | 'active'>
+> & {
   password?: string;
 };
 
@@ -35,10 +44,14 @@ export interface DirectoryEntry {
   id: number;
   full_name: string;
   position: string;
+  specialty: string;
+  job_title: string;
   email: string;
 }
 
 export type MeetingType = 'medical' | 'executive' | 'administrative';
+/** The language the minutes are written in. */
+export type MinutesLanguage = 'ro' | 'ru' | 'en';
 export type RecipientKind = 'to' | 'cc';
 
 export interface ListMember {
@@ -123,6 +136,9 @@ export interface Meeting {
   created_at: string;
   duration_s: number | null;
   language: string | null;
+  minutes_language: MinutesLanguage;
+  /** The recording is kept on the server and can be played. */
+  has_audio: boolean;
   error: string | null;
   approved_by: PersonRef | null;
   approved_at: string | null;
@@ -171,10 +187,21 @@ export type Priority = 'high' | 'medium' | 'low';
 export interface ActionItem {
   task: string;
   owner: string;
+  /** The owner when the moderator assigned it to one of the app's users. */
+  owner_user_id?: number | null;
   deadline: string;
   priority: Priority;
   time: string;
   patient: string;
+}
+
+/** Someone present at the meeting, also if they did not speak; user_id null: not a user of the app. */
+export interface Attendee {
+  user_id: number | null;
+  name: string;
+  job_title: string;
+  position: string;
+  specialty: string;
 }
 
 export interface Participant {
@@ -187,14 +214,61 @@ export interface Participant {
 export interface Minutes {
   title: string;
   summary: string;
-  suggestions: string[];
   key_moments: KeyMoment[];
   topics: Topic[];
   decisions: Decision[];
   action_items: ActionItem[];
   open_issues: string[];
   warnings: string[];
+  /** Everyone present; the moderator adds them (the recording only knows the voices). */
+  attendees: Attendee[];
   participants: Record<string, Participant>;
+}
+
+/** The email the minutes are sent as, rendered by the server from the minutes as they are now. */
+export interface EmailPreview {
+  subject: string;
+  language: MinutesLanguage;
+  html: string;
+  text: string;
+  /** File name of the minutes' PDF the email carries. */
+  attachment: string;
+}
+
+/** A part of the minutes (in the email, the preview and the print), in the order a template lists them. */
+export type TemplateSection =
+  | 'summary'
+  | 'key_moments'
+  | 'topics'
+  | 'other_decisions'
+  | 'action_items'
+  | 'open_issues'
+  | 'attendees'
+  | 'participants'
+  | 'warnings';
+
+/** How the minutes of one meeting type are written and shown; every save is a new version. Version 0 is the
+ *  built-in default (created_by and created_at null). */
+export interface MinutesTemplate {
+  meeting_type: MeetingType;
+  version: number;
+  /** Every section exactly once, in display order. */
+  sections: { key: TemplateSection; enabled: boolean }[];
+  /** What each topic shows. */
+  topic_fields: { status: boolean; findings: boolean; decisions: boolean };
+  /** Extra instructions for the local AI that writes the minutes (at most 1000 characters). */
+  instructions: string;
+  /** What changed in this version. */
+  note: string;
+  created_by: PersonRef | null;
+  created_at: string | null;
+}
+
+export interface TemplateInput {
+  sections: MinutesTemplate['sections'];
+  topic_fields: MinutesTemplate['topic_fields'];
+  instructions: string;
+  note: string;
 }
 
 export interface AuditEntry {

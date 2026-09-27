@@ -7,6 +7,7 @@ import { ApiError, setCsrfToken, setUnauthorizedHandler } from '../api/client';
 import { authApi } from '../api/endpoints';
 import { queryKeys } from '../api/queries';
 import type { User } from '../api/types';
+import i18n from '../i18n';
 import { AuthContext, type AuthContextValue } from './context';
 
 /** The current session's user, or null when nobody is signed in. */
@@ -48,8 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         notifications.show({
           id: 'session-expired',
           color: 'yellow',
-          title: 'Session expired',
-          message: 'Please sign in again.',
+          title: i18n.t('session.expired'),
+          message: i18n.t('session.signInAgain'),
         });
       }
     });
@@ -88,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (session.isPending) {
     return (
       <Center h="100vh">
-        <Loader aria-label="Loading" />
+        <Loader aria-label={i18n.t('state.loading')} />
       </Center>
     );
   }
@@ -96,10 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (
       <Center h="100vh" p="md">
         <Stack align="center" gap="sm" maw={420} ta="center">
-          <Title order={3}>Secure MOM is not available</Title>
+          <Title order={3}>{i18n.t('state.unavailable')}</Title>
           <Text c="dimmed">{session.error.message}</Text>
           <Button onClick={() => void session.refetch()} loading={session.isFetching}>
-            Try again
+            {i18n.t('action.retry')}
           </Button>
         </Stack>
       </Center>

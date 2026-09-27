@@ -17,28 +17,42 @@ import {
 import { useForm } from '@mantine/form';
 import { modals } from '@mantine/modals';
 import { IconAddressBook, IconEdit, IconPlus, IconTrash } from '@tabler/icons-react';
+import type { TFunction } from 'i18next';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useDeleteList, useDirectory, useLists, useRecipientDomains, useSaveList } from '../../api/queries';
 import type { DirectoryEntry, DistributionList, ListMember, MeetingType, RecipientKind } from '../../api/types';
 import { MeetingTypeBadge } from '../../components/Badges';
 import { PageHeader } from '../../components/PageHeader';
 import { ErrorState, LoadingState } from '../../components/QueryState';
+import { TablePagination } from '../../components/TablePagination';
+import { usePaged } from '../../hooks/usePaged';
 import { domainList, inAllowedDomain, isEmail, normalizeEmail } from '../../lib/email';
-import { MEETING_TYPES } from '../../lib/meeting';
+import { meetingTypeOptions } from '../../lib/meeting';
 import { notifySuccess } from '../../lib/notify';
 
 const ANY_TYPE = 'any';
-const KIND_OPTIONS: { value: RecipientKind; label: string }[] = [
-  { value: 'to', label: 'To' },
-  { value: 'cc', label: 'CC' },
+type Translate = TFunction<['admin', 'common']>;
+
+const kindOptions = (t: Translate): { value: RecipientKind; label: string }[] => [
+  { value: 'to', label: t('lists.kindTo', { ns: 'admin' }) },
+  { value: 'cc', label: t('lists.kindCc', { ns: 'admin' }) },
 ];
-const TYPE_OPTIONS = [...MEETING_TYPES, { value: ANY_TYPE, label: 'Any meeting type' }];
-const FILTER_OPTIONS = [
-  { value: 'all', label: 'All' },
-  ...TYPE_OPTIONS.map(({ value, label }) => ({
+
+const kindLabel = (t: Translate, kind: RecipientKind): string =>
+  kindOptions(t).find((option) => option.value === kind)?.label ?? kind;
+
+const typeOptions = (t: Translate) => [
+  ...meetingTypeOptions(),
+  { value: ANY_TYPE, label: t('lists.anyMeetingType', { ns: 'admin' }) },
+];
+
+const filterOptions = (t: Translate) => [
+  { value: 'all', label: t('lists.filterAll', { ns: 'admin' }) },
+  ...typeOptions(t).map(({ value, label }) => ({
     value,
-    label: value === ANY_TYPE ? 'Any type' : label,
+    label: value === ANY_TYPE ? t('lists.anyType', { ns: 'admin' }) : label,
   })),
 ];
 const PREVIEW_MEMBERS = 6;
@@ -49,12 +63,18 @@ interface ListFormValues {
   members: ListMember[];
 }
 
+/** "Vice president · Doctor · Neurologist": job title, position and specialty, skipping empty ones. */
+function personDetail(person: Pick<DirectoryEntry, 'job_title' | 'position' | 'specialty'>): string {
+  return [person.job_title, person.position, person.specialty].filter(Boolean).join(' · ');
+}
+
 function TypeBadge({ type }: { type: MeetingType | null }) {
+  const { t } = useTranslation(['admin', 'common']);
   return type ? (
     <MeetingTypeBadge type={type} />
   ) : (
     <Badge color="gray" variant="outline">
-      Any type
+      {t('lists.anyType', { ns: 'admin' })}
     </Badge>
   );
 }
@@ -72,6 +92,7 @@ function ListForm({
   domains: string[];
   onDone: () => void;
 }) {
+  const { t } = useTranslation(['admin', 'common']);
   const save = useSaveList();
   const [personSearch, setPersonSearch] = useState('');
   const [personKind, setPersonKind] = useState<RecipientKind>('to');
@@ -85,16 +106,16 @@ function ListForm({
       meetingType: list?.meeting_type ?? ANY_TYPE,
       members: list?.members ?? [],
     },
-    validate: { name: (value) => (value.trim() ? null : 'Enter a name') },
+    validate: { name: (value) => (value.trim() ? null : t('lists.form.nameRequired', { ns: 'admin' })) },
   });
   const members = form.values.members;
   const listed = new Set(members.map((member) => normalizeEmail(member.email)));
   const people = directory
     .filter((entry) => !listed.has(normalizeEmail(entry.email)))
-    .map((entry) => ({
-      value: String(entry.id),
-      label: `${entry.full_name}${entry.position ? ` — ${entry.position}` : ''}`,
-    }));
+    .map((entry) => {
+      const detail = personDetail(entry);
+      return { value: String(entry.id), label: detail ? `${entry.full_name} — ${detail}` : entry.full_name };
+    });
 
   const addPerson = (id: string | null) => {
     const entry = directory.find((candidate) => String(candidate.id) === id);
@@ -106,15 +127,15 @@ function ListForm({
   const addExternal = () => {
     const email = normalizeEmail(external);
     if (!isEmail(email)) {
-      setExternalError('Enter a valid email address');
+      setExternalError(t('validation.email', { ns: 'admin' }));
       return;
     }
     if (!inAllowedDomain(email, domains)) {
-      setExternalError(`Only addresses at ${domainList(domains)}`);
+      setExternalError(t('lists.form.onlyDomains', { ns: 'admin', domains: domainList(domains) }));
       return;
     }
     if (listed.has(email)) {
-      setExternalError('Already on the list');
+      setExternalError(t('lists.form.alreadyListed', { ns: 'admin' }));
       return;
     }
     form.insertListItem('members', { user_id: null, email, name: '', kind: externalKind });
@@ -136,7 +157,7 @@ function ListForm({
       { id: list?.id, input },
       {
         onSuccess: () => {
-          notifySuccess(list ? 'List saved.' : 'List created.');
+          notifySuccess(list ? t('lists.notify.saved', { ns: 'admin' }) : t('lists.notify.created', { ns: 'admin' }));
           onDone();
         },
       },
@@ -145,28 +166,33 @@ function ListForm({
 
   return (
     <Stack>
-      <TextInput label="Name" placeholder="e.g. Medical board" required {...form.getInputProps('name')} />
+      <TextInput
+        label={t('lists.form.name', { ns: 'admin' })}
+        placeholder={t('lists.form.namePlaceholder', { ns: 'admin' })}
+        required
+        {...form.getInputProps('name')}
+      />
       <Select
-        label="Meeting type"
-        description="The list is offered when sending minutes of this type."
-        data={TYPE_OPTIONS}
+        label={t('lists.meetingTypeFilterAria', { ns: 'admin' })}
+        description={t('lists.form.meetingTypeDescription', { ns: 'admin' })}
+        data={typeOptions(t)}
         allowDeselect={false}
         {...form.getInputProps('meetingType')}
       />
 
       <Stack gap={6}>
         <Text size="sm" fw={500}>
-          Add a colleague
+          {t('lists.form.addColleague', { ns: 'admin' })}
         </Text>
         <Group gap="xs" wrap="nowrap" align="flex-start">
           <SegmentedControl
-            data={KIND_OPTIONS}
+            data={kindOptions(t)}
             value={personKind}
             onChange={setPersonKind}
-            aria-label="Colleague receives as"
+            aria-label={t('lists.form.colleagueKindAria', { ns: 'admin' })}
           />
           <Select
-            placeholder="Search the directory"
+            placeholder={t('lists.form.searchDirectory', { ns: 'admin' })}
             data={people}
             value={null}
             onChange={addPerson}
@@ -175,8 +201,8 @@ function ListForm({
             searchable
             selectFirstOptionOnChange
             selectFirstOptionOnDropdownOpen
-            nothingFoundMessage="Nobody found"
-            aria-label="Colleague"
+            nothingFoundMessage={t('lists.form.nobodyFound', { ns: 'admin' })}
+            aria-label={t('lists.form.colleagueAria', { ns: 'admin' })}
             style={{ flex: 1 }}
           />
         </Group>
@@ -185,18 +211,20 @@ function ListForm({
       <Stack gap={6}>
         <div>
           <Text size="sm" fw={500}>
-            Add another address
+            {t('lists.form.addAnother', { ns: 'admin' })}
           </Text>
           <Text size="xs" c="dimmed">
-            {domains.length > 0 ? `At ${domainList(domains)} (the allowed recipient domains).` : 'Any domain.'}
+            {domains.length > 0
+              ? t('lists.form.domainsHint', { ns: 'admin', domains: domainList(domains) })
+              : t('lists.form.anyDomain', { ns: 'admin' })}
           </Text>
         </div>
         <Group gap="xs" wrap="nowrap" align="flex-start">
           <SegmentedControl
-            data={KIND_OPTIONS}
+            data={kindOptions(t)}
             value={externalKind}
             onChange={setExternalKind}
-            aria-label="Address receives as"
+            aria-label={t('lists.form.addressKindAria', { ns: 'admin' })}
           />
           <TextInput
             placeholder={`quality@${domains[0] ?? 'medpark.md'}`}
@@ -210,10 +238,15 @@ function ListForm({
             onKeyDown={(event) => {
               if (event.key === 'Enter') addExternal();
             }}
-            aria-label="Email address"
+            aria-label={t('lists.form.emailAria', { ns: 'admin' })}
             style={{ flex: 1 }}
           />
-          <ActionIcon size={36} variant="default" aria-label="Add the address" onClick={addExternal}>
+          <ActionIcon
+            size={36}
+            variant="default"
+            aria-label={t('lists.form.addAddress', { ns: 'admin' })}
+            onClick={addExternal}
+          >
             <IconPlus size={18} />
           </ActionIcon>
         </Group>
@@ -221,15 +254,15 @@ function ListForm({
 
       {members.length === 0 ? (
         <Text size="sm" c="dimmed">
-          No members yet.
+          {t('lists.form.noMembers', { ns: 'admin' })}
         </Text>
       ) : (
         <Table.ScrollContainer minWidth={420}>
           <Table verticalSpacing={6}>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Member</Table.Th>
-                <Table.Th w={110}>Receives as</Table.Th>
+                <Table.Th>{t('lists.form.memberHeader', { ns: 'admin' })}</Table.Th>
+                <Table.Th w={110}>{t('lists.form.receivesAsHeader', { ns: 'admin' })}</Table.Th>
                 <Table.Th w={40} />
               </Table.Tr>
             </Table.Thead>
@@ -247,17 +280,17 @@ function ListForm({
                   <Table.Td>
                     <SegmentedControl
                       size="xs"
-                      data={KIND_OPTIONS}
+                      data={kindOptions(t)}
                       value={member.kind}
                       onChange={(value) => form.setFieldValue(`members.${index}.kind`, value)}
-                      aria-label={`${member.email} receives as`}
+                      aria-label={t('lists.form.receivesAsAria', { ns: 'admin', email: member.email })}
                     />
                   </Table.Td>
                   <Table.Td>
                     <ActionIcon
                       variant="subtle"
                       color="gray"
-                      aria-label={`Remove ${member.email}`}
+                      aria-label={t('lists.form.removeMemberAria', { ns: 'admin', email: member.email })}
                       onClick={() => form.removeListItem('members', index)}
                     >
                       <IconTrash size={16} />
@@ -272,10 +305,10 @@ function ListForm({
 
       <Group justify="flex-end" mt="sm">
         <Button variant="default" onClick={onDone}>
-          Cancel
+          {t('common:action.cancel')}
         </Button>
         <Button onClick={() => submit()} loading={save.isPending}>
-          {list ? 'Save' : 'Create list'}
+          {list ? t('common:action.save') : t('lists.createList', { ns: 'admin' })}
         </Button>
       </Group>
     </Stack>
@@ -283,6 +316,7 @@ function ListForm({
 }
 
 function ListCard({ list, onEdit, onDelete }: { list: DistributionList; onEdit: () => void; onDelete: () => void }) {
+  const { t } = useTranslation(['admin', 'common']);
   const to = list.members.filter((member) => member.kind === 'to');
   const cc = list.members.filter((member) => member.kind === 'cc');
   const preview = list.members.slice(0, PREVIEW_MEMBERS);
@@ -294,13 +328,13 @@ function ListCard({ list, onEdit, onDelete }: { list: DistributionList; onEdit: 
           <TypeBadge type={list.meeting_type} />
         </Group>
         <Text size="sm" c="dimmed">
-          {to.length} in To · {cc.length} in CC
+          {t('lists.card.counts', { ns: 'admin', to: to.length, cc: cc.length })}
         </Text>
         <Stack gap={2} style={{ flex: 1 }}>
           {preview.map((member) => (
             <Group key={member.email} gap={6} wrap="nowrap">
               <Badge size="xs" variant="light" color={member.kind === 'to' ? 'teal' : 'gray'} w={32}>
-                {member.kind}
+                {kindLabel(t, member.kind)}
               </Badge>
               <Text size="sm" truncate>
                 {member.name || member.email}
@@ -309,16 +343,16 @@ function ListCard({ list, onEdit, onDelete }: { list: DistributionList; onEdit: 
           ))}
           {list.members.length > PREVIEW_MEMBERS && (
             <Text size="xs" c="dimmed">
-              and {list.members.length - PREVIEW_MEMBERS} more
+              {t('lists.card.moreMembers', { ns: 'admin', count: list.members.length - PREVIEW_MEMBERS })}
             </Text>
           )}
         </Stack>
         <Group gap="xs" justify="flex-end">
           <Button variant="default" size="xs" leftSection={<IconEdit size={14} />} onClick={onEdit}>
-            Edit
+            {t('common:action.edit')}
           </Button>
           <Button variant="subtle" color="red" size="xs" leftSection={<IconTrash size={14} />} onClick={onDelete}>
-            Delete
+            {t('common:action.delete')}
           </Button>
         </Group>
       </Stack>
@@ -327,6 +361,7 @@ function ListCard({ list, onEdit, onDelete }: { list: DistributionList; onEdit: 
 }
 
 export function ListsPage() {
+  const { t } = useTranslation(['admin', 'common']);
   const lists = useLists();
   const directory = useDirectory();
   const domains = useRecipientDomains();
@@ -337,25 +372,29 @@ export function ListsPage() {
 
   const confirmDelete = (list: DistributionList) =>
     modals.openConfirmModal({
-      title: `Delete “${list.name}”?`,
+      title: t('lists.deleteConfirm.title', { ns: 'admin', name: list.name }),
       centered: true,
-      children: <Text size="sm">Moderators will no longer be offered this list. Sent minutes are not affected.</Text>,
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      children: <Text size="sm">{t('lists.deleteConfirm.body', { ns: 'admin' })}</Text>,
+      labels: { confirm: t('common:action.delete'), cancel: t('common:action.cancel') },
       confirmProps: { color: 'red' },
-      onConfirm: () => remove.mutate(list.id, { onSuccess: () => notifySuccess('List deleted.') }),
+      onConfirm: () =>
+        remove.mutate(list.id, { onSuccess: () => notifySuccess(t('lists.notify.deleted', { ns: 'admin' })) }),
     });
 
   const header = (
     <PageHeader
-      title="Distribution lists"
-      description="Who receives the minutes of each meeting type. Moderators can add more people when sending."
+      title={t('common:nav.lists')}
+      description={t('lists.description', { ns: 'admin' })}
       actions={
         <Button leftSection={<IconPlus size={18} />} onClick={() => setEditing('new')}>
-          New list
+          {t('lists.newList', { ns: 'admin' })}
         </Button>
       }
     />
   );
+
+  const shown = (lists.data ?? []).filter((list) => filter === 'all' || (list.meeting_type ?? ANY_TYPE) === filter);
+  const paged = usePaged(shown);
 
   if (lists.isPending || directory.isPending || domains.isPending)
     return (
@@ -388,34 +427,46 @@ export function ListsPage() {
     );
   }
 
-  const shown = lists.data.filter((list) => filter === 'all' || (list.meeting_type ?? ANY_TYPE) === filter);
-
   return (
     <>
       {header}
-      <SegmentedControl mb="md" data={FILTER_OPTIONS} value={filter} onChange={setFilter} aria-label="Meeting type" />
+      <SegmentedControl
+        mb="md"
+        data={filterOptions(t)}
+        value={filter}
+        onChange={setFilter}
+        aria-label={t('lists.meetingTypeFilterAria', { ns: 'admin' })}
+      />
       {shown.length === 0 ? (
         <EmptyState
           mt="xl"
           icon={<IconAddressBook />}
-          title="No distribution lists"
-          description="Create a list per meeting type, e.g. the medical board for medical meetings."
+          title={t('lists.emptyTitle', { ns: 'admin' })}
+          description={t('lists.emptyDescription', { ns: 'admin' })}
         />
       ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-          {shown.map((list) => (
-            <ListCard key={list.id} list={list} onEdit={() => setEditing(list)} onDelete={() => confirmDelete(list)} />
-          ))}
-        </SimpleGrid>
+        <>
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+            {paged.items.map((list) => (
+              <ListCard
+                key={list.id}
+                list={list}
+                onEdit={() => setEditing(list)}
+                onDelete={() => confirmDelete(list)}
+              />
+            ))}
+          </SimpleGrid>
+          <TablePagination paged={paged} />
+        </>
       )}
       <Modal
         opened={editing !== null}
         onClose={close}
-        title={editing === 'new' ? 'New distribution list' : 'Edit distribution list'}
+        title={editing === 'new' ? t('lists.newListTitle', { ns: 'admin' }) : t('lists.editListTitle', { ns: 'admin' })}
         size="lg"
         centered
       >
-        {editing !== null && (
+        {editing !== null && directory.data && domains.data && (
           <ListForm
             list={editing === 'new' ? undefined : editing}
             directory={directory.data}

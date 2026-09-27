@@ -3,14 +3,18 @@ import { apiUrl, request, upload, type UploadOptions } from './client';
 import type {
   AuditEntry,
   DirectoryEntry,
+  EmailPreview,
   DistributionList,
   DistributionListInput,
   Meeting,
   MeetingType,
   Minutes,
+  MinutesLanguage,
+  MinutesTemplate,
   Recipients,
   Session,
   Settings,
+  TemplateInput,
   Transcript,
   User,
   UserCreate,
@@ -20,6 +24,7 @@ import type {
 export interface NewMeeting {
   file: File;
   meetingType: MeetingType;
+  minutesLanguage: MinutesLanguage;
   title: string;
 }
 
@@ -30,13 +35,13 @@ function completeMinutes(minutes: Partial<Minutes>): Minutes {
   return {
     title: minutes.title ?? '',
     summary: minutes.summary ?? '',
-    suggestions: minutes.suggestions ?? [],
     key_moments: minutes.key_moments ?? [],
     topics: minutes.topics ?? [],
     decisions: minutes.decisions ?? [],
     action_items: minutes.action_items ?? [],
     open_issues: minutes.open_issues ?? [],
     warnings: minutes.warnings ?? [],
+    attendees: minutes.attendees ?? [],
     participants: minutes.participants ?? {},
   };
 }
@@ -75,10 +80,11 @@ export const settingsApi = {
 export const meetingsApi = {
   list: () => request<Meeting[]>('/meetings'),
   get: (id: string) => request<Meeting>(meetingPath(id)),
-  create: ({ file, meetingType, title }: NewMeeting, options?: UploadOptions) => {
+  create: ({ file, meetingType, minutesLanguage, title }: NewMeeting, options?: UploadOptions) => {
     const form = new FormData();
     form.append('file', file, file.name);
     form.append('meeting_type', meetingType);
+    form.append('minutes_language', minutesLanguage);
     if (title.trim()) form.append('title', title.trim());
     return upload<Meeting>('/meetings', form, options);
   },
@@ -92,8 +98,20 @@ export const meetingsApi = {
     request<Meeting>(meetingPath(id, '/send'), { method: 'POST', body: recipients }),
   remove: (id: string) => request<void>(meetingPath(id), { method: 'DELETE' }),
   audioUrl: (id: string) => apiUrl(meetingPath(id, '/audio')),
+  /** The minutes as the PDF that is emailed (opened in the browser's own viewer). */
+  pdfUrl: (id: string) => apiUrl(meetingPath(id, '/minutes.pdf')),
+  emailPreview: (id: string) => request<EmailPreview>(meetingPath(id, '/email-preview')),
 };
 
 export const auditApi = {
   list: (meetingId?: string) => request<AuditEntry[]>('/audit', { query: { meeting_id: meetingId } }),
+};
+
+export const templatesApi = {
+  list: () => request<MinutesTemplate[]>('/templates'),
+  versions: (type: MeetingType) => request<MinutesTemplate[]>(`/templates/${type}/versions`),
+  create: (type: MeetingType, input: TemplateInput) =>
+    request<MinutesTemplate>(`/templates/${type}`, { method: 'POST', body: input }),
+  restore: (type: MeetingType, version: number) =>
+    request<MinutesTemplate>(`/templates/${type}/versions/${version}/restore`, { method: 'POST' }),
 };

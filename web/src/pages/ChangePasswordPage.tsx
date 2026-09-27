@@ -2,6 +2,7 @@ import { Alert, Button, Paper, PasswordInput, Stack } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconAlertTriangle, IconKey } from '@tabler/icons-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import { useAuth, useUser } from '../auth/context';
@@ -19,6 +20,7 @@ function capitalize(text: string): string {
 
 /** The signed-in user's own password: the only page while they sign in with one an admin chose. */
 export function ChangePasswordPage() {
+  const { t } = useTranslation('auth');
   const user = useUser();
   const { changePassword } = useAuth();
   const navigate = useNavigate();
@@ -27,23 +29,23 @@ export function ChangePasswordPage() {
     mode: 'uncontrolled',
     initialValues: { current: '', next: '', repeat: '' },
     validate: {
-      current: (value) => (value ? null : 'Enter your current password'),
+      current: (value) => (value ? null : t('password.enterCurrent')),
       next: (value, values) => {
-        if (value.length < MIN_PASSWORD_LENGTH) return `At least ${MIN_PASSWORD_LENGTH} characters`;
-        return value === values.current ? 'Choose a new password' : null;
+        if (value.length < MIN_PASSWORD_LENGTH) return t('password.tooShort', { min: MIN_PASSWORD_LENGTH });
+        return value === values.current ? t('password.same') : null;
       },
-      repeat: (value, values) => (value === values.next ? null : 'The passwords differ'),
+      repeat: (value, values) => (value === values.next ? null : t('password.differ')),
     },
   });
 
   const submit = form.onSubmit(async ({ current, next }) => {
     setError(null);
     try {
-      const updated = await changePassword(current, next);
-      notifySuccess('Password changed. Your other sessions were signed out.');
-      void navigate(homePath(updated.role), { replace: true });
+      await changePassword(current, next);
+      notifySuccess(t('password.changed'));
+      void navigate(homePath(), { replace: true });
     } catch (changeError) {
-      const message = changeError instanceof Error ? changeError.message : 'The password could not be changed.';
+      const message = changeError instanceof Error ? changeError.message : t('password.failed');
       const [name, problem] = message.split(/: (.*)/s);
       if (SERVER_FIELDS[name] && problem) form.setFieldError(SERVER_FIELDS[name], capitalize(problem));
       else setError(message);
@@ -53,33 +55,29 @@ export function ChangePasswordPage() {
   return (
     <>
       <PageHeader
-        title="Change password"
-        description={
-          user.must_change_password
-            ? 'An administrator set your password. Choose your own to continue.'
-            : 'Your other sessions are signed out when you change it.'
-        }
+        title={t('password.title')}
+        description={user.must_change_password ? t('password.mustChange') : t('password.otherSessions')}
       />
       <Paper withBorder p="lg" maw={440}>
         <form onSubmit={submit} noValidate>
           <Stack>
             <PasswordInput
-              label="Current password"
+              label={t('password.current')}
               autoComplete="current-password"
               required
               key={form.key('current')}
               {...form.getInputProps('current')}
             />
             <PasswordInput
-              label="New password"
-              description={`At least ${MIN_PASSWORD_LENGTH} characters.`}
+              label={t('password.new')}
+              description={t('password.newHint', { min: MIN_PASSWORD_LENGTH })}
               autoComplete="new-password"
               required
               key={form.key('next')}
               {...form.getInputProps('next')}
             />
             <PasswordInput
-              label="Repeat the new password"
+              label={t('password.repeat')}
               autoComplete="new-password"
               required
               key={form.key('repeat')}
@@ -91,7 +89,7 @@ export function ChangePasswordPage() {
               </Alert>
             )}
             <Button type="submit" loading={form.submitting} leftSection={<IconKey size={16} />}>
-              Change password
+              {t('password.submit')}
             </Button>
           </Stack>
         </form>

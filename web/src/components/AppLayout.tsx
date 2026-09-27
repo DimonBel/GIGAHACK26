@@ -1,4 +1,17 @@
-import { AppShell, Avatar, Badge, Burger, Group, Menu, NavLink, Stack, Text, UnstyledButton } from '@mantine/core';
+import {
+  AppShell,
+  Avatar,
+  Burger,
+  Container,
+  Drawer,
+  Group,
+  Menu,
+  NavLink,
+  Paper,
+  Stack,
+  Text,
+  UnstyledButton,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
   IconAddressBook,
@@ -6,63 +19,62 @@ import {
   IconClipboardList,
   IconFileText,
   IconHistory,
-  IconKey,
-  IconLock,
+  IconLayoutDashboard,
   IconLogout,
   IconMicrophone,
   IconSettings,
   IconShieldLock,
+  IconTemplate,
+  IconUserCircle,
   IconUsers,
   type Icon,
 } from '@tabler/icons-react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { Link, Outlet, useLocation } from 'react-router';
 
 import type { Role, User } from '../api/types';
 import { useAuth, useUser } from '../auth/context';
-import { HEADER_HEIGHT } from '../lib/layout';
-import { CHANGE_PASSWORD_PATH, roleLabel } from '../lib/roles';
+import { initials } from '../lib/format';
+import { HEADER_HEIGHT, PAGE_WIDTH } from '../lib/layout';
+import { roleLabel } from '../lib/roles';
+import { CANVAS } from '../theme';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface NavItem {
   to: string;
-  label: string;
+  label: ParseKeys<'common'>;
   icon: Icon;
   roles: Role[];
   admin?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/meetings', label: 'Meetings', icon: IconClipboardList, roles: ['admin', 'moderator'] },
-  { to: '/meetings/new', label: 'New meeting', icon: IconMicrophone, roles: ['admin', 'moderator'] },
-  { to: '/my-minutes', label: 'My minutes', icon: IconFileText, roles: ['user'] },
-  { to: '/admin/users', label: 'Users', icon: IconUsers, roles: ['admin'], admin: true },
-  { to: '/admin/lists', label: 'Distribution lists', icon: IconAddressBook, roles: ['admin'], admin: true },
-  { to: '/admin/settings', label: 'Settings', icon: IconSettings, roles: ['admin'], admin: true },
-  { to: '/admin/audit', label: 'Audit log', icon: IconHistory, roles: ['admin'], admin: true },
+  { to: '/', label: 'nav.dashboard', icon: IconLayoutDashboard, roles: ['admin', 'moderator', 'user'] },
+  { to: '/meetings', label: 'nav.meetings', icon: IconClipboardList, roles: ['admin', 'moderator'] },
+  { to: '/meetings/new', label: 'nav.newMeeting', icon: IconMicrophone, roles: ['admin', 'moderator'] },
+  { to: '/my-minutes', label: 'nav.myMinutes', icon: IconFileText, roles: ['user'] },
+  { to: '/admin/users', label: 'nav.users', icon: IconUsers, roles: ['admin'], admin: true },
+  { to: '/admin/lists', label: 'nav.lists', icon: IconAddressBook, roles: ['admin'], admin: true },
+  { to: '/admin/templates', label: 'nav.templates', icon: IconTemplate, roles: ['admin'], admin: true },
+  { to: '/admin/settings', label: 'nav.settings', icon: IconSettings, roles: ['admin'], admin: true },
+  { to: '/admin/audit', label: 'nav.audit', icon: IconHistory, roles: ['admin'], admin: true },
 ];
 
-const NAVBAR_WIDTH = 250;
-
-/** The item for a path: the longest link that is the path or one of its parents. */
+/** The item for a path: the longest link that is the path or one of its parents ("/" only for itself). */
 function activeItem(items: NavItem[], pathname: string): NavItem | undefined {
   return items
-    .filter((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))
+    .filter((item) => pathname === item.to || (item.to !== '/' && pathname.startsWith(`${item.to}/`)))
     .sort((a, b) => b.to.length - a.to.length)[0];
 }
 
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0].toUpperCase())
-    .join('');
-}
-
 function UserMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
+  const { t } = useTranslation();
+  const detail = user.job_title || user.position || roleLabel(user.role);
   return (
-    <Menu position="bottom-end" width={240} withinPortal>
+    <Menu position="bottom-end" width={260} withinPortal>
       <Menu.Target>
-        <UnstyledButton aria-label="Account menu">
+        <UnstyledButton aria-label={t('account.menu')}>
           <Group gap="xs" wrap="nowrap">
             <Avatar color="teal" radius="xl" size="md">
               {initials(user.full_name || user.email)}
@@ -72,7 +84,7 @@ function UserMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
                 {user.full_name || user.email}
               </Text>
               <Text size="xs" c="dimmed" lh={1.2}>
-                {user.position || roleLabel(user.role)}
+                {detail}
               </Text>
             </Stack>
             <IconChevronDown size={14} />
@@ -80,22 +92,54 @@ function UserMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
         </UnstyledButton>
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Label>
-          {user.email} · {roleLabel(user.role)}
-        </Menu.Label>
-        <Menu.Item component={Link} to={CHANGE_PASSWORD_PATH} leftSection={<IconKey size={16} />}>
-          Change password
+        <Menu.Label>{roleLabel(user.role)}</Menu.Label>
+        <Menu.Item component={Link} to="/profile" leftSection={<IconUserCircle size={16} />}>
+          {t('account.profile')}
         </Menu.Item>
-        <Menu.Item leftSection={<IconLogout size={16} />} onClick={onLogout}>
-          Sign out
+        <Menu.Divider />
+        <Menu.Item leftSection={<IconLogout size={16} />} onClick={onLogout} color="red">
+          {t('account.signOut')}
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>
   );
 }
 
-/** Header, role-based navigation and the current page. */
+/** The menu: the pages of the user's role, then the administration pages. */
+function NavList({ items, active, onNavigate }: { items: NavItem[]; active?: NavItem; onNavigate: () => void }) {
+  const { t } = useTranslation();
+  const link = (item: NavItem) => (
+    <NavLink
+      key={item.to}
+      component={Link}
+      to={item.to}
+      label={t(item.label)}
+      leftSection={<item.icon size={18} stroke={1.6} />}
+      active={item === active}
+      aria-current={item === active ? 'page' : undefined}
+      onClick={onNavigate}
+    />
+  );
+  const admin = items.filter((item) => item.admin);
+  return (
+    <nav aria-label={t('nav.main')}>
+      {items.filter((item) => !item.admin).map(link)}
+      {admin.length > 0 && (
+        <>
+          <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="md" mb={4} px="sm">
+            {t('nav.administration')}
+          </Text>
+          {admin.map(link)}
+        </>
+      )}
+    </nav>
+  );
+}
+
+/** Header, side menu and the current page, all in one centred column with room on both sides (medpark.md's
+ *  layout); on smaller screens the menu opens from the side. */
 export function AppLayout() {
+  const { t } = useTranslation();
   const [opened, { toggle, close }] = useDisclosure();
   const { logout } = useAuth();
   const user = useUser();
@@ -104,67 +148,52 @@ export function AppLayout() {
   const items = user.must_change_password ? [] : NAV_ITEMS.filter((item) => item.roles.includes(user.role));
   const active = activeItem(items, pathname);
 
-  const renderItem = (item: NavItem) => (
-    <NavLink
-      key={item.to}
-      component={Link}
-      to={item.to}
-      label={item.label}
-      leftSection={<item.icon size={18} stroke={1.6} />}
-      active={item === active}
-      onClick={close}
-    />
-  );
-
   return (
-    <AppShell
-      header={{ height: HEADER_HEIGHT }}
-      navbar={{ width: NAVBAR_WIDTH, breakpoint: 'sm', collapsed: { mobile: !opened } }}
-      padding="md"
-    >
+    <AppShell header={{ height: HEADER_HEIGHT }} padding={0}>
       <AppShell.Header className="no-print">
-        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap">
-            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Toggle navigation" />
-            <IconShieldLock size={28} color="var(--mantine-color-teal-6)" aria-hidden />
-            <Stack gap={0}>
-              <Text fw={700} lh={1.1}>
-                Secure MOM
-              </Text>
-              <Text size="xs" c="dimmed" lh={1.1}>
-                Medpark · Minutes of Meeting
-              </Text>
-            </Stack>
+        <Container size={PAGE_WIDTH} h="100%" px={{ base: 'md', sm: 'lg' }}>
+          <Group h="100%" justify="space-between" wrap="nowrap" gap="md">
+            <Group gap="md" wrap="nowrap">
+              <Burger opened={opened} onClick={toggle} hiddenFrom="lg" size="sm" aria-label={t('nav.toggle')} />
+              <UnstyledButton component={Link} to="/" aria-label={t('nav.home')} onClick={close}>
+                <Group gap="sm" wrap="nowrap">
+                  <IconShieldLock size={30} color="var(--mantine-color-teal-6)" aria-hidden />
+                  <Stack gap={0} style={{ whiteSpace: 'nowrap' }}>
+                    <Text fw={700} lh={1.15}>
+                      {t('app.name')}
+                    </Text>
+                    <Text size="xs" c="dimmed" lh={1.15} visibleFrom="xs">
+                      {t('app.tagline')}
+                    </Text>
+                  </Stack>
+                </Group>
+              </UnstyledButton>
+            </Group>
+            <Group gap="sm" wrap="nowrap">
+              <LanguageSwitcher />
+              <UserMenu user={user} onLogout={() => void logout()} />
+            </Group>
           </Group>
-          <Group gap="md" wrap="nowrap">
-            <Badge
-              visibleFrom="md"
-              variant="light"
-              color="teal"
-              leftSection={<IconLock size={12} />}
-              title="Audio, transcripts and minutes are processed on this server only"
-            >
-              On-premises · offline
-            </Badge>
-            <UserMenu user={user} onLogout={() => void logout()} />
-          </Group>
-        </Group>
+        </Container>
       </AppShell.Header>
 
-      <AppShell.Navbar p="sm" className="no-print" aria-label="Main navigation">
-        {items.filter((item) => !item.admin).map(renderItem)}
-        {items.some((item) => item.admin) && (
-          <>
-            <Text size="xs" fw={600} c="dimmed" tt="uppercase" mt="md" mb={4} px="sm">
-              Administration
-            </Text>
-            {items.filter((item) => item.admin).map(renderItem)}
-          </>
-        )}
-      </AppShell.Navbar>
+      <Drawer opened={opened} onClose={close} size={280} hiddenFrom="lg" title={t('app.name')} className="no-print">
+        <NavList items={items} active={active} onNavigate={close} />
+      </Drawer>
 
-      <AppShell.Main>
-        <Outlet />
+      <AppShell.Main bg={CANVAS}>
+        <Container size={PAGE_WIDTH} px={{ base: 'md', sm: 'lg' }} py={{ base: 'md', sm: 'xl' }}>
+          <div className="app-columns">
+            {items.length > 0 && (
+              <Paper withBorder p="xs" visibleFrom="lg" className="app-sidebar no-print">
+                <NavList items={items} active={active} onNavigate={close} />
+              </Paper>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <Outlet />
+            </div>
+          </div>
+        </Container>
       </AppShell.Main>
     </AppShell>
   );

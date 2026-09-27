@@ -15,15 +15,17 @@ import {
 import { Dropzone, type FileRejection } from '@mantine/dropzone';
 import { IconFileMusic, IconUpload, IconX } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
 
 import { useCreateMeeting } from '../../api/queries';
-import type { MeetingType } from '../../api/types';
+import type { MeetingType, MinutesLanguage } from '../../api/types';
 import { PageHeader } from '../../components/PageHeader';
 import { Recorder } from '../../components/Recorder';
 import { useLeaveGuard } from '../../hooks/useLeaveGuard';
 import { formatBytes } from '../../lib/format';
-import { MEETING_TYPES } from '../../lib/meeting';
+import { MINUTES_LANGUAGES } from '../../lib/languages';
+import { meetingTypeOptions } from '../../lib/meeting';
 import { notifyError, notifySuccess } from '../../lib/notify';
 
 type Source = 'upload' | 'record';
@@ -46,19 +48,18 @@ interface Selection {
 }
 
 export function NewMeetingPage() {
+  const { t } = useTranslation(['meetings', 'common']);
   const navigate = useNavigate();
   const create = useCreateMeeting();
   const [source, setSource] = useState<Source>('upload');
   const [selection, setSelection] = useState<Selection | null>(null);
   const [recording, setRecording] = useState(false);
   const [meetingType, setMeetingType] = useState<MeetingType>('medical');
+  const [minutesLanguage, setMinutesLanguage] = useState<MinutesLanguage>('ro');
   const [title, setTitle] = useState('');
   const [uploaded, setUploaded] = useState(0);
   const upload = useRef<AbortController | null>(null);
-  const guard = useLeaveGuard(
-    recording || selection !== null,
-    'The recording has not been uploaded yet and will be lost.',
-  );
+  const guard = useLeaveGuard(recording || selection !== null, t('newMeetingPage.leaveGuard'));
 
   useEffect(() => {
     if (!selection) return;
@@ -68,7 +69,9 @@ export function NewMeetingPage() {
   const choose = (file: File) => setSelection({ file, url: URL.createObjectURL(file) });
 
   const reject = (rejections: FileRejection[]) =>
-    notifyError(new Error(`${rejections[0]?.file.name ?? 'This file'} is not an audio or video file.`));
+    notifyError(
+      new Error(t('newMeetingPage.invalidFile', { name: rejections[0]?.file.name ?? t('newMeetingPage.unnamedFile') })),
+    );
 
   const submit = () => {
     if (!selection) return;
@@ -77,13 +80,13 @@ export function NewMeetingPage() {
     setUploaded(0);
     create.mutate(
       {
-        input: { file: selection.file, meetingType, title },
+        input: { file: selection.file, meetingType, minutesLanguage, title },
         options: { onProgress: setUploaded, signal: controller.signal },
       },
       {
         onSuccess: (meeting) => {
           guard.release();
-          notifySuccess('Uploaded. The transcription has started.');
+          notifySuccess(t('newMeetingPage.uploaded'));
           void navigate(`/meetings/${meeting.id}`);
         },
       },
@@ -95,24 +98,24 @@ export function NewMeetingPage() {
   return (
     <>
       <PageHeader
-        title="New meeting"
-        description="Upload a recording or record the meeting here. Everything is processed on this server."
-        back={{ to: '/meetings', label: 'Meetings' }}
+        title={t('common:nav.newMeeting')}
+        description={t('newMeetingPage.description')}
+        back={{ to: '/meetings', label: t('common:nav.meetings') }}
       />
       <Grid gap="lg">
         <Grid.Col span={{ base: 12, lg: 7 }}>
           <Paper withBorder p="lg">
             <Stack>
-              <Title order={4}>1. Recording</Title>
+              <Title order={4}>{t('newMeetingPage.recordingStep')}</Title>
               <SegmentedControl
                 value={source}
                 onChange={(value) => setSource(value)}
                 disabled={recording || uploading}
                 data={[
-                  { value: 'upload', label: 'Upload a file' },
-                  { value: 'record', label: 'Record now' },
+                  { value: 'upload', label: t('newMeetingPage.source.upload') },
+                  { value: 'record', label: t('newMeetingPage.source.record') },
                 ]}
-                aria-label="Recording source"
+                aria-label={t('newMeetingPage.source.aria')}
               />
               {source === 'upload' ? (
                 <Dropzone
@@ -121,7 +124,7 @@ export function NewMeetingPage() {
                   accept={ACCEPTED_FILES}
                   multiple={false}
                   disabled={uploading}
-                  aria-label="Recording file"
+                  aria-label={t('newMeetingPage.dropzone.aria')}
                 >
                   <Stack
                     align="center"
@@ -140,9 +143,9 @@ export function NewMeetingPage() {
                     <Dropzone.Idle>
                       <IconFileMusic size={44} color="var(--mantine-color-dimmed)" />
                     </Dropzone.Idle>
-                    <Text size="lg">Drop the recording here or click to choose it</Text>
+                    <Text size="lg">{t('newMeetingPage.dropzone.title')}</Text>
                     <Text size="sm" c="dimmed">
-                      Audio or video: m4a, mp3, wav, ogg, webm, mp4, mov…
+                      {t('newMeetingPage.dropzone.hint')}
                     </Text>
                   </Stack>
                 </Dropzone>
@@ -164,7 +167,7 @@ export function NewMeetingPage() {
                       </Stack>
                     </Group>
                     <CloseButton
-                      aria-label="Remove the recording"
+                      aria-label={t('newMeetingPage.removeRecording')}
                       disabled={uploading}
                       onClick={() => setSelection(null)}
                     />
@@ -178,21 +181,38 @@ export function NewMeetingPage() {
         <Grid.Col span={{ base: 12, lg: 5 }}>
           <Paper withBorder p="lg">
             <Stack>
-              <Title order={4}>2. Meeting</Title>
+              <Title order={4}>{t('newMeetingPage.meetingStep')}</Title>
               <Select
-                label="Meeting type"
-                description="Chooses how the minutes are written and who receives them."
-                data={MEETING_TYPES}
+                label={t('newMeetingPage.meetingType.label')}
+                description={t('newMeetingPage.meetingType.description')}
+                data={meetingTypeOptions()}
                 value={meetingType}
                 onChange={(value) => value && setMeetingType(value)}
                 allowDeselect={false}
                 disabled={uploading}
                 required
               />
+              <Stack gap={4}>
+                <Text size="sm" fw={500} id="minutes-language-label">
+                  {t('newMeetingPage.minutesLanguage.label')}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {t('newMeetingPage.minutesLanguage.description')}
+                </Text>
+                <SegmentedControl
+                  value={minutesLanguage}
+                  onChange={(value) => setMinutesLanguage(value)}
+                  data={MINUTES_LANGUAGES}
+                  disabled={uploading}
+                  color="teal"
+                  fullWidth
+                  aria-labelledby="minutes-language-label"
+                />
+              </Stack>
               <TextInput
-                label="Title"
-                description="Optional."
-                placeholder="e.g. Medical board 26.09"
+                label={t('newMeetingPage.titleField.label')}
+                description={t('newMeetingPage.titleField.description')}
+                placeholder={t('newMeetingPage.titleField.placeholder')}
                 value={title}
                 onChange={(event) => setTitle(event.currentTarget.value)}
                 disabled={uploading}
@@ -201,11 +221,13 @@ export function NewMeetingPage() {
               {uploading ? (
                 <Stack gap="xs">
                   <Text size="sm">
-                    {uploaded < 1 ? `Uploading… ${Math.round(uploaded * 100)} %` : 'Checking the file…'}
+                    {uploaded < 1
+                      ? t('newMeetingPage.uploading', { percent: Math.round(uploaded * 100) })
+                      : t('newMeetingPage.checkingFile')}
                   </Text>
                   <Progress value={uploaded * 100} animated={uploaded >= 1} striped={uploaded >= 1} />
                   <Button variant="default" onClick={() => upload.current?.abort()}>
-                    Cancel upload
+                    {t('newMeetingPage.cancelUpload')}
                   </Button>
                 </Stack>
               ) : (
@@ -215,11 +237,11 @@ export function NewMeetingPage() {
                   disabled={!selection || recording}
                   onClick={submit}
                 >
-                  Upload and process
+                  {t('newMeetingPage.submit')}
                 </Button>
               )}
               <Text size="xs" c="dimmed">
-                The recording is transcribed and summarised on this server. A one-hour meeting takes a few minutes.
+                {t('newMeetingPage.footer')}
               </Text>
             </Stack>
           </Paper>

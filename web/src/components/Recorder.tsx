@@ -1,6 +1,7 @@
 import { Alert, Badge, Box, Button, Group, Progress, Stack, Text } from '@mantine/core';
 import { IconMicrophone, IconPlayerPause, IconPlayerPlay, IconPlayerStop } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useAudioLevel } from '../hooks/useAudioLevel';
 import { formatClock } from '../lib/format';
@@ -34,12 +35,15 @@ function recordingName(type: string, date: Date): string {
   return `recording-${day}-${pad(date.getHours())}${pad(date.getMinutes())}.${extension}`;
 }
 
-function microphoneError(error: unknown): string {
+type MicrophoneErrorKey =
+  'recorder.error.denied' | 'recorder.error.notFound' | 'recorder.error.notReadable' | 'recorder.error.generic';
+
+function microphoneErrorKey(error: unknown): MicrophoneErrorKey {
   const name = error instanceof DOMException ? error.name : '';
-  if (name === 'NotAllowedError') return 'Microphone access was denied. Allow it in the browser to record.';
-  if (name === 'NotFoundError') return 'No microphone was found.';
-  if (name === 'NotReadableError') return 'The microphone is being used by another application.';
-  return 'The microphone could not be started.';
+  if (name === 'NotAllowedError') return 'recorder.error.denied';
+  if (name === 'NotFoundError') return 'recorder.error.notFound';
+  if (name === 'NotReadableError') return 'recorder.error.notReadable';
+  return 'recorder.error.generic';
 }
 
 function canRecord(): boolean {
@@ -53,6 +57,7 @@ interface RecorderProps {
 
 /** Records the microphone with MediaRecorder: Rec, pause / resume, stop; hands over the file at stop. */
 export function Recorder({ onRecorded, onRecordingChange }: RecorderProps) {
+  const { t } = useTranslation('meetings');
   const [status, setStatus] = useState<RecorderStatus>('idle');
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -105,7 +110,7 @@ export function Recorder({ onRecorded, onRecordingChange }: RecorderProps) {
     } catch (startError) {
       media?.getTracks().forEach((track) => track.stop());
       setStatus('idle');
-      setError(microphoneError(startError));
+      setError(t(microphoneErrorKey(startError)));
     }
   }
 
@@ -128,9 +133,8 @@ export function Recorder({ onRecorded, onRecordingChange }: RecorderProps) {
 
   if (!canRecord()) {
     return (
-      <Alert color="yellow" title="Recording is not available">
-        This browser cannot record here. Recording needs a current browser and a secure address (https, or this
-        computer). You can upload a file instead.
+      <Alert color="yellow" title={t('recorder.notAvailable.title')}>
+        {t('recorder.notAvailable.body')}
       </Alert>
     );
   }
@@ -146,7 +150,7 @@ export function Recorder({ onRecorded, onRecordingChange }: RecorderProps) {
             <Text fw={700} ff="monospace" fz={32} lh={1}>
               {formatClock(elapsedMs / 1000)}
             </Text>
-            {status === 'paused' && <Badge color="gray">Paused</Badge>}
+            {status === 'paused' && <Badge color="gray">{t('recorder.paused')}</Badge>}
           </Group>
           <Progress
             value={level * 100}
@@ -155,16 +159,16 @@ export function Recorder({ onRecorded, onRecordingChange }: RecorderProps) {
             size="sm"
             color={level > 0.9 ? 'red' : 'teal'}
             transitionDuration={0}
-            aria-label="Microphone level"
+            aria-label={t('recorder.levelAria')}
           />
           <Group>
             {status === 'recording' ? (
               <Button variant="default" leftSection={<IconPlayerPause size={18} />} onClick={pause}>
-                Pause
+                {t('recorder.pause')}
               </Button>
             ) : (
               <Button variant="default" leftSection={<IconPlayerPlay size={18} />} onClick={resume}>
-                Resume
+                {t('recorder.resume')}
               </Button>
             )}
             <Button
@@ -172,7 +176,7 @@ export function Recorder({ onRecorded, onRecordingChange }: RecorderProps) {
               leftSection={<IconPlayerStop size={18} />}
               onClick={() => session.current?.recorder.stop()}
             >
-              Stop
+              {t('recorder.stop')}
             </Button>
           </Group>
         </>
@@ -186,10 +190,10 @@ export function Recorder({ onRecorded, onRecordingChange }: RecorderProps) {
             loading={status === 'starting'}
             onClick={() => void start()}
           >
-            Rec
+            {t('recorder.start')}
           </Button>
           <Text size="sm" c="dimmed" ta="center">
-            Records the meeting with this computer&apos;s microphone. You can listen to it before uploading.
+            {t('recorder.hint')}
           </Text>
         </>
       )}

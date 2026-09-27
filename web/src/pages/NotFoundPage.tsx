@@ -1,17 +1,14 @@
 import { Button, EmptyState } from '@mantine/core';
 import { IconMapOff } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 
 export function NotFoundPage() {
+  const { t } = useTranslation();
   return (
-    <EmptyState
-      mt="xl"
-      icon={<IconMapOff />}
-      title="Page not found"
-      description="The address does not exist, or you do not have access to it."
-    >
+    <EmptyState mt="xl" icon={<IconMapOff />} title={t('notFound.title')} description={t('notFound.description')}>
       <Button component={Link} to="/" variant="light">
-        Go to the start page
+        {t('notFound.home')}
       </Button>
     </EmptyState>
   );

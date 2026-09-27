@@ -16,9 +16,10 @@ import { CHANGE_PASSWORD_PATH } from './lib/roles';
 import { AuditPage } from './pages/admin/AuditPage';
 import { ListsPage } from './pages/admin/ListsPage';
 import { SettingsPage } from './pages/admin/SettingsPage';
+import { TemplatesPage } from './pages/admin/TemplatesPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
-import { HomeRedirect } from './pages/HomeRedirect';
+import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { MeetingPage } from './pages/meetings/MeetingPage';
 import { MeetingsPage } from './pages/meetings/MeetingsPage';
@@ -26,6 +27,7 @@ import { NewMeetingPage } from './pages/meetings/NewMeetingPage';
 import { MyMinutesPage } from './pages/my/MyMinutesPage';
 import { ReceivedMinutesPage } from './pages/my/ReceivedMinutesPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { RouteErrorPage } from './pages/RouteErrorPage';
 import { theme } from './theme';
 
@@ -42,8 +44,9 @@ const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { index: true, element: <HomeRedirect /> },
+          { index: true, element: <DashboardPage /> },
           { path: CHANGE_PASSWORD_PATH, element: <ChangePasswordPage /> },
+          { path: 'profile', element: <ProfilePage /> },
           {
             element: <RequireRole roles={STAFF} />,
             children: [
@@ -64,6 +67,7 @@ const router = createBrowserRouter([
             children: [
               { path: 'admin/users', element: <UsersPage /> },
               { path: 'admin/lists', element: <ListsPage /> },
+              { path: 'admin/templates', element: <TemplatesPage /> },
               { path: 'admin/settings', element: <SettingsPage /> },
               { path: 'admin/audit', element: <AuditPage /> },
             ],

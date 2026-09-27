@@ -12,6 +12,8 @@ function userWith(role: Role, mustChangePassword = false): User {
     email: `${role}@medpark.md`,
     full_name: 'Test',
     position: '',
+    specialty: '',
+    job_title: '',
     role,
     active: true,
     must_change_password: mustChangePassword,
@@ -30,8 +32,7 @@ function renderAt(path: string, user: User | null, signedOut = false) {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/login" element={<LoginProbe />} />
-          <Route path="/meetings" element={<p>Meetings page</p>} />
-          <Route path="/my-minutes" element={<p>My minutes page</p>} />
+          <Route path="/" element={<p>Dashboard</p>} />
           <Route element={<RequireRole />}>
             <Route path="/change-password" element={<p>Change password page</p>} />
           </Route>
@@ -69,11 +70,8 @@ describe('RequireRole', () => {
     expect(screen.getByText('Change password page')).toBeInTheDocument();
   });
 
-  it('sends other roles to their own start page', () => {
+  it('sends other roles to the dashboard', () => {
     renderAt('/admin/users', userWith('moderator'));
-    expect(screen.getByText('Meetings page')).toBeInTheDocument();
-
-    renderAt('/admin/users', userWith('user'));
-    expect(screen.getByText('My minutes page')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard')).toBeInTheDocument();
   });
 });

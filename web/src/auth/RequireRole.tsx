@@ -17,6 +17,6 @@ export function RequireRole({ roles }: { roles?: Role[] }) {
   if (user.must_change_password && location.pathname !== CHANGE_PASSWORD_PATH) {
     return <Navigate to={CHANGE_PASSWORD_PATH} replace />;
   }
-  if (roles && !roles.includes(user.role)) return <Navigate to={homePath(user.role)} replace />;
+  if (roles && !roles.includes(user.role)) return <Navigate to={homePath()} replace />;
   return <Outlet />;
 }

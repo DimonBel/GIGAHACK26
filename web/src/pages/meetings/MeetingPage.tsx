@@ -9,6 +9,7 @@ import {
   IconSend,
   IconTrash,
 } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { useDeleteMeeting, useMeeting } from '../../api/queries';
@@ -19,7 +20,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { ErrorState, LoadingState } from '../../components/QueryState';
 import { ReceivedMinutes } from '../../components/ReceivedMinutes';
 import { formatDateTime, formatDuration } from '../../lib/format';
-import { languageLabel } from '../../lib/languages';
+import { isMinutesLanguage, languageLabel } from '../../lib/languages';
 import { hasMinutes, isProcessing } from '../../lib/meeting';
 import { notifySuccess } from '../../lib/notify';
 import { MinutesTab } from './MinutesTab';
@@ -30,12 +31,18 @@ import { TranscriptTab } from './TranscriptTab';
 type TabName = 'minutes' | 'transcript' | 'send';
 
 function MeetingFacts({ meeting }: { meeting: Meeting }) {
+  const { t } = useTranslation('meetings');
   const facts = [
-    `By ${meeting.created_by.full_name}`,
+    t('meetingPage.facts.by', { name: meeting.created_by.full_name }),
     formatDateTime(meeting.created_at),
-    meeting.duration_s !== null && `Length ${formatDuration(meeting.duration_s)}`,
-    meeting.language && `Language ${languageLabel(meeting.language)}`,
-    meeting.timings?.total_s && `Processed in ${formatDuration(meeting.timings.total_s)}`,
+    meeting.duration_s !== null && t('meetingPage.facts.length', { duration: formatDuration(meeting.duration_s) }),
+    meeting.language &&
+      (isMinutesLanguage(meeting.language)
+        ? t(`meetingPage.facts.spoken.${meeting.language}`)
+        : t('meetingPage.facts.language', { language: languageLabel(meeting.language) })),
+    meeting.minutes_language && t(`meetingPage.facts.minutesIn.${meeting.minutes_language}`),
+    meeting.timings?.total_s &&
+      t('meetingPage.facts.processedIn', { duration: formatDuration(meeting.timings.total_s) }),
   ].filter(Boolean);
   return (
     <Stack gap={6}>
@@ -51,25 +58,22 @@ function MeetingFacts({ meeting }: { meeting: Meeting }) {
 }
 
 function MeetingMenu({ meeting }: { meeting: Meeting }) {
+  const { t } = useTranslation(['meetings', 'common']);
   const user = useUser();
   const navigate = useNavigate();
   const remove = useDeleteMeeting(meeting.id);
 
   const confirmDelete = () =>
     modals.openConfirmModal({
-      title: 'Delete this meeting?',
+      title: t('meetingPage.deleteConfirm.title'),
       centered: true,
-      children: (
-        <Text size="sm">
-          The recording, the transcript and the minutes are deleted from the server. This cannot be undone.
-        </Text>
-      ),
-      labels: { confirm: 'Delete', cancel: 'Cancel' },
+      children: <Text size="sm">{t('meetingPage.deleteConfirm.body')}</Text>,
+      labels: { confirm: t('common:action.delete'), cancel: t('common:action.cancel') },
       confirmProps: { color: 'red' },
       onConfirm: () =>
         remove.mutate(undefined, {
           onSuccess: () => {
-            notifySuccess('Meeting deleted.');
+            notifySuccess(t('meetingPage.deleted'));
             void navigate('/meetings');
           },
         }),
@@ -78,7 +82,7 @@ function MeetingMenu({ meeting }: { meeting: Meeting }) {
   return (
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
-        <ActionIcon variant="default" size="lg" aria-label="Meeting actions" loading={remove.isPending}>
+        <ActionIcon variant="default" size="lg" aria-label={t('meetingPage.menu.aria')} loading={remove.isPending}>
           <IconDotsVertical size={18} />
         </ActionIcon>
       </Menu.Target>
@@ -89,7 +93,7 @@ function MeetingMenu({ meeting }: { meeting: Meeting }) {
             to={`/admin/audit?meeting_id=${encodeURIComponent(meeting.id)}`}
             leftSection={<IconHistory size={16} />}
           >
-            Audit trail
+            {t('common:nav.audit')}
           </Menu.Item>
         )}
         <Menu.Item
@@ -98,7 +102,7 @@ function MeetingMenu({ meeting }: { meeting: Meeting }) {
           onClick={confirmDelete}
           disabled={meeting.status === 'processing'}
         >
-          {meeting.status === 'processing' ? 'Delete (after processing)' : 'Delete meeting'}
+          {meeting.status === 'processing' ? t('meetingPage.menu.deleteProcessing') : t('meetingPage.menu.delete')}
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>
@@ -106,6 +110,7 @@ function MeetingMenu({ meeting }: { meeting: Meeting }) {
 }
 
 function MeetingTabs({ meeting }: { meeting: Meeting }) {
+  const { t } = useTranslation('meetings');
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab');
   const canSend = meeting.status !== 'ready';
@@ -116,22 +121,22 @@ function MeetingTabs({ meeting }: { meeting: Meeting }) {
 
   return (
     <Tabs value={tab} onChange={select} keepMountedMode="display-none">
-      <Tabs.List mb="md">
+      <Tabs.List mb="md" className="no-print">
         <Tabs.Tab value="minutes" leftSection={<IconFileText size={16} />}>
-          Minutes
+          {t('meetingPage.tabs.minutes')}
         </Tabs.Tab>
         <Tabs.Tab value="transcript" leftSection={<IconMessages size={16} />}>
-          Transcript
+          {t('meetingPage.tabs.transcript')}
         </Tabs.Tab>
         <Tabs.Tab value="send" leftSection={<IconSend size={16} />} disabled={!canSend}>
-          Send
+          {t('meetingPage.tabs.send')}
         </Tabs.Tab>
       </Tabs.List>
       <Tabs.Panel value="minutes">
-        <MinutesTab meeting={meeting} onApproved={() => select('send')} />
+        <MinutesTab meeting={meeting} active={tab === 'minutes'} onApproved={() => select('send')} />
       </Tabs.Panel>
       <Tabs.Panel value="transcript">
-        <TranscriptTab meetingId={meeting.id} active={tab === 'transcript'} />
+        <TranscriptTab meetingId={meeting.id} active={tab === 'transcript'} hasAudio={meeting.has_audio} />
       </Tabs.Panel>
       <Tabs.Panel value="send">
         <SendTab meeting={meeting} active={tab === 'send'} />
@@ -142,16 +147,17 @@ function MeetingTabs({ meeting }: { meeting: Meeting }) {
 
 /** One meeting: live progress while processing, then minutes, transcript and sending. */
 export function MeetingPage() {
+  const { t } = useTranslation(['meetings', 'common']);
   const { id = '' } = useParams();
   const user = useUser();
   const meeting = useMeeting(id);
-  const back = { to: '/meetings', label: 'Meetings' };
+  const back = { to: '/meetings', label: t('common:nav.meetings') };
 
   if (meeting.isPending) return <LoadingState />;
   if (meeting.isError) {
     return (
       <>
-        <PageHeader title="Meeting" back={back} />
+        <PageHeader title={t('meetingPage.title')} back={back} />
         <ErrorState error={meeting.error} onRetry={() => void meeting.refetch()} />
       </>
     );
@@ -164,7 +170,7 @@ export function MeetingPage() {
   return (
     <>
       <PageHeader
-        title={data.title || 'Untitled meeting'}
+        title={data.title || t('untitled')}
         description={<MeetingFacts meeting={data} />}
         actions={<MeetingMenu meeting={data} />}
         back={back}
@@ -172,8 +178,8 @@ export function MeetingPage() {
       <Stack gap="lg">
         {isProcessing(data.status) && <ProcessingCard meeting={data} />}
         {data.status === 'failed' && (
-          <Alert color="red" icon={<IconAlertTriangle />} title="Processing failed">
-            {data.error ?? 'The recording could not be processed.'} Check the file and upload it again.
+          <Alert color="red" icon={<IconAlertTriangle />} title={t('processingFailed')}>
+            {data.error ?? t('meetingPage.failedAlert.fallback')} {t('meetingPage.failedAlert.suffix')}
           </Alert>
         )}
         {hasMinutes(data.status) && <MeetingTabs meeting={data} />}

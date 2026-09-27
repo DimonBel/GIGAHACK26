@@ -14,6 +14,8 @@ const reader: User = {
   email: 'ana@medpark.md',
   full_name: 'Ana Popescu',
   position: 'Nurse',
+  specialty: '',
+  job_title: '',
   role: 'user',
   active: true,
   must_change_password: true,
@@ -26,7 +28,7 @@ function renderPage(changePassword: AuthContextValue['changePassword']) {
       <MemoryRouter initialEntries={['/change-password']}>
         <Routes>
           <Route path="/change-password" element={<ChangePasswordPage />} />
-          <Route path="/my-minutes" element={<p>My minutes page</p>} />
+          <Route path="/" element={<p>Dashboard</p>} />
         </Routes>
       </MemoryRouter>
     </AuthContext>,
@@ -41,7 +43,7 @@ async function fill(current: string, next: string, repeat = next) {
 }
 
 describe('ChangePasswordPage', () => {
-  it('asks for a password of their own and then opens the start page', async () => {
+  it('asks for a password of their own and then opens the dashboard', async () => {
     const changePassword = vi.fn().mockResolvedValue({ ...reader, must_change_password: false });
     renderPage(changePassword);
     expect(screen.getByText(/An administrator set your password/)).toBeInTheDocument();
@@ -49,7 +51,7 @@ describe('ChangePasswordPage', () => {
     await fill('the admin gave me this', 'my very own passphrase');
 
     expect(changePassword).toHaveBeenCalledWith('the admin gave me this', 'my very own passphrase');
-    expect(await screen.findByText('My minutes page')).toBeInTheDocument();
+    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
   });
 
   it('checks the new password before calling the server', async () => {

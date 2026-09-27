@@ -7,3 +7,141 @@
     padding: 0 !important;
   }
 }
+
+/* Minutes document: a sidebar of sections next to the open one. */
+.minutes-document {
+  display: grid;
+  gap: var(--mantine-spacing-lg);
+  align-items: start;
+}
+
+@media (min-width: 62em) {
+  .minutes-document {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+
+  .minutes-document-compact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* "04:12" in the minutes: opens the transcript at that line. */
+.time-link {
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-teal-7);
+  white-space: nowrap;
+}
+
+.time-link:not(.time-link-plain):not(:disabled):hover {
+  background: var(--mantine-color-teal-0);
+}
+
+.time-link-plain,
+.time-link:disabled {
+  color: var(--mantine-color-dimmed);
+}
+
+.stat:hover {
+  background: var(--mantine-color-gray-0) !important;
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+
+  .screen-only {
+    display: none !important;
+  }
+}
+
+/* A meeting in a dashboard list. */
+.dashboard-row {
+  display: block;
+  border-radius: var(--mantine-radius-md);
+}
+
+.dashboard-row:hover {
+  background: var(--mantine-color-gray-0);
+}
+
+/* The side menu next to the page, inside the centred column. */
+.app-columns {
+  display: grid;
+  gap: var(--mantine-spacing-xl);
+  align-items: start;
+}
+
+@media (min-width: 75em) {
+  .app-columns {
+    grid-template-columns: 232px minmax(0, 1fr);
+  }
+}
+
+.app-sidebar {
+  position: sticky;
+  top: calc(68px + var(--mantine-spacing-xl));
+}
+
+/* The minutes as the email shows them: a card on screen, the plain page when printed. */
+@media print {
+  .minutes-page {
+    border: none !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}
+
+/* Edit with live preview: the editor and the email side by side, each scrolling on its own. */
+.split-editor {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+.split-editor-header {
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-sm);
+  border-bottom: 1px solid var(--mantine-color-gray-3);
+}
+
+.split-editor-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 !important;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-y: auto;
+}
+
+.split-editor-pane {
+  padding: var(--mantine-spacing-lg);
+  background: var(--mantine-color-gray-0);
+}
+
+.split-editor-preview {
+  background: #f3f5f7;
+}
+
+@media (min-width: 62em) {
+  .split-editor-body {
+    grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+    overflow: hidden;
+  }
+
+  .split-editor-pane {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .split-editor-preview {
+    border-left: 1px solid var(--mantine-color-gray-3);
+  }
+}

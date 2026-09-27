@@ -1,5 +1,6 @@
 import { Button, Group, Modal, Text } from '@mantine/core';
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useBlocker } from 'react-router';
 
 /**
@@ -7,6 +8,7 @@ import { useBlocker } from 'react-router';
  * Returns the question's modal to render, and release() to let the page's own next navigation through.
  */
 export function useLeaveGuard(when: boolean, message: string) {
+  const { t } = useTranslation();
   const released = useRef(false);
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
@@ -25,14 +27,14 @@ export function useLeaveGuard(when: boolean, message: string) {
   }, []);
 
   const modal = (
-    <Modal opened={blocker.state === 'blocked'} onClose={() => blocker.reset?.()} title="Leave this page?" centered>
+    <Modal opened={blocker.state === 'blocked'} onClose={() => blocker.reset?.()} title={t('leave.title')} centered>
       <Text size="sm">{message}</Text>
       <Group justify="flex-end" mt="lg">
         <Button variant="default" onClick={() => blocker.reset?.()}>
-          Stay
+          {t('leave.stay')}
         </Button>
         <Button color="red" onClick={() => blocker.proceed?.()}>
-          Leave
+          {t('leave.leave')}
         </Button>
       </Group>
     </Modal>

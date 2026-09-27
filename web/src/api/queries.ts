@@ -3,8 +3,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { isProcessing, POLL_INTERVAL_MS } from '../lib/meeting';
 import type { UploadOptions } from './client';
-import { auditApi, listsApi, meetingsApi, settingsApi, usersApi, type NewMeeting } from './endpoints';
-import type { DistributionListInput, Meeting, Minutes, Recipients, Settings, UserCreate, UserUpdate } from './types';
+import { auditApi, listsApi, meetingsApi, settingsApi, templatesApi, usersApi, type NewMeeting } from './endpoints';
+import type {
+  DistributionListInput,
+  Meeting,
+  MeetingType,
+  Minutes,
+  MinutesTemplate,
+  Recipients,
+  Settings,
+  TemplateInput,
+  UserCreate,
+  UserUpdate,
+} from './types';
 
 export const queryKeys = {
   session: ['session'] as const,
@@ -12,12 +23,15 @@ export const queryKeys = {
   meeting: (id: string) => ['meetings', id] as const,
   transcript: (id: string) => ['meetings', id, 'transcript'] as const,
   minutes: (id: string) => ['meetings', id, 'minutes'] as const,
+  emailPreview: (id: string) => ['meetings', id, 'email-preview'] as const,
   users: ['users'] as const,
   directory: ['directory'] as const,
   recipientDomains: ['recipient-domains'] as const,
   lists: ['lists'] as const,
   settings: ['settings'] as const,
   audit: (meetingId: string) => ['audit', meetingId] as const,
+  templates: ['templates'] as const,
+  templateVersions: (type: MeetingType) => ['templates', type, 'versions'] as const,
 };
 
 export function useMeetings() {
@@ -50,6 +64,12 @@ export function useTranscript(id: string, enabled: boolean) {
 
 export function useMinutes(id: string, enabled = true) {
   return useQuery({ queryKey: queryKeys.minutes(id), queryFn: () => meetingsApi.minutes(id), enabled });
+}
+
+/** The email the minutes are sent as (the note; the minutes are its PDF), as the server renders it now: never
+ *  cached, it follows the minutes and who looks. */
+export function useEmailPreview(id: string) {
+  return useQuery({ queryKey: queryKeys.emailPreview(id), queryFn: () => meetingsApi.emailPreview(id), gcTime: 0 });
 }
 
 /** Minutes that were sent never change, and every read by a recipient is audited: fetched once. */
@@ -193,4 +213,41 @@ export function useSaveSettings() {
 
 export function useAudit(meetingId: string) {
   return useQuery({ queryKey: queryKeys.audit(meetingId), queryFn: () => auditApi.list(meetingId || undefined) });
+}
+
+/** The active template of each meeting type; any signed-in user (drives MinutesView). */
+export function useTemplates() {
+  return useQuery({ queryKey: queryKeys.templates, queryFn: templatesApi.list });
+}
+
+/** Every version of a meeting type's template, newest first, version 0 last (admin). */
+export function useTemplateVersions(type: MeetingType) {
+  return useQuery({ queryKey: queryKeys.templateVersions(type), queryFn: () => templatesApi.versions(type) });
+}
+
+/** Prepends a newly created version to the cached history, and refreshes the active templates list. */
+function useStoreTemplateVersion(type: MeetingType) {
+  const queryClient = useQueryClient();
+  return (created: MinutesTemplate) => {
+    queryClient.setQueryData(queryKeys.templateVersions(type), (existing?: MinutesTemplate[]) =>
+      existing ? [created, ...existing] : [created],
+    );
+    void queryClient.invalidateQueries({ queryKey: queryKeys.templates, exact: true });
+  };
+}
+
+export function useCreateTemplateVersion(type: MeetingType) {
+  const storeVersion = useStoreTemplateVersion(type);
+  return useMutation({
+    mutationFn: (input: TemplateInput) => templatesApi.create(type, input),
+    onSuccess: storeVersion,
+  });
+}
+
+export function useRestoreTemplateVersion(type: MeetingType) {
+  const storeVersion = useStoreTemplateVersion(type);
+  return useMutation({
+    mutationFn: (version: number) => templatesApi.restore(type, version),
+    onSuccess: storeVersion,
+  });
 }

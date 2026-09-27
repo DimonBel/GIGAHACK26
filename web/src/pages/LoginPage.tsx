@@ -1,10 +1,12 @@
-import { Alert, Box, Button, Center, Group, Paper, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Alert, Box, Button, Center, Paper, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconAlertTriangle, IconLock, IconShieldLock } from '@tabler/icons-react';
+import { IconAlertTriangle, IconShieldLock } from '@tabler/icons-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation } from 'react-router';
 
 import { useAuth } from '../auth/context';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { isEmail } from '../lib/email';
 import { homePath } from '../lib/roles';
 
@@ -20,6 +22,7 @@ function returnPath(state: unknown): string | null {
 }
 
 export function LoginPage() {
+  const { t } = useTranslation(['auth', 'common']);
   const { user, login } = useAuth();
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
@@ -27,37 +30,40 @@ export function LoginPage() {
     mode: 'uncontrolled',
     initialValues: { email: '', password: '' },
     validate: {
-      email: (value) => (isEmail(value) ? null : 'Enter your email address'),
-      password: (value) => (value ? null : 'Enter your password'),
+      email: (value) => (isEmail(value) ? null : t('login.enterEmail')),
+      password: (value) => (value ? null : t('login.enterPassword')),
     },
   });
 
-  if (user) return <Navigate to={returnPath(location.state) ?? homePath(user.role)} replace />;
+  if (user) return <Navigate to={returnPath(location.state) ?? homePath()} replace />;
 
   const submit = form.onSubmit(async ({ email, password }) => {
     setError(null);
     try {
       await login(email.trim(), password);
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : 'Sign-in failed.');
+      setError(loginError instanceof Error ? loginError.message : t('login.failed'));
     }
   });
 
   return (
-    <Center mih="100vh" p="md" bg="gray.0">
+    <Center mih="100vh" p="md" bg="gray.0" pos="relative">
+      <Box pos="absolute" top={16} right={16}>
+        <LanguageSwitcher />
+      </Box>
       <Box w="100%" maw={400}>
         <Stack align="center" gap={4} mb="lg">
           <IconShieldLock size={44} color="var(--mantine-color-teal-6)" aria-hidden />
-          <Title order={2}>Secure MOM</Title>
+          <Title order={2}>{t('common:app.name')}</Title>
           <Text c="dimmed" size="sm">
-            Medpark · Minutes of Meeting
+            {t('common:app.tagline')}
           </Text>
         </Stack>
         <Paper withBorder shadow="sm" p="xl">
           <form onSubmit={submit} noValidate>
             <Stack>
               <TextInput
-                label="Email"
+                label={t('login.email')}
                 type="email"
                 autoComplete="username"
                 required
@@ -65,7 +71,7 @@ export function LoginPage() {
                 {...form.getInputProps('email')}
               />
               <PasswordInput
-                label="Password"
+                label={t('login.password')}
                 autoComplete="current-password"
                 required
                 key={form.key('password')}
@@ -77,17 +83,14 @@ export function LoginPage() {
                 </Alert>
               )}
               <Button type="submit" loading={form.submitting} fullWidth>
-                Sign in
+                {t('login.submit')}
               </Button>
             </Stack>
           </form>
         </Paper>
-        <Group justify="center" gap={6} mt="md">
-          <IconLock size={14} color="var(--mantine-color-dimmed)" aria-hidden />
-          <Text size="xs" c="dimmed">
-            Runs on the hospital&apos;s own server. No data leaves the network.
-          </Text>
-        </Group>
+        <Text size="xs" c="dimmed" ta="center" mt="md">
+          {t('login.copyright')}
+        </Text>
       </Box>
     </Center>
   );

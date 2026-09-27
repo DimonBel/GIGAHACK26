@@ -1,7 +1,7 @@
 import { Badge, Box, Group, Highlight, Paper, Select, Stack, Text, TextInput, UnstyledButton } from '@mantine/core';
-import type { MantineColor } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { meetingsApi } from '../../api/endpoints';
 import { useMinutes, useTranscript } from '../../api/queries';
@@ -10,15 +10,8 @@ import { LanguageBadges } from '../../components/Badges';
 import { ErrorState, LoadingState } from '../../components/QueryState';
 import { formatClock } from '../../lib/format';
 import { languageLabel } from '../../lib/languages';
+import { speakerColor } from '../../lib/minutesDoc';
 import { matchesQuery } from '../../lib/search';
-
-const SPEAKER_COLORS: MantineColor[] = ['blue', 'grape', 'orange', 'teal', 'pink', 'lime', 'indigo', 'cyan', 'red'];
-
-/** A stable color per speaker label ("SPEAKER 3" is always the same color). */
-function speakerColor(speaker: string): MantineColor {
-  const number = Number(/\d+/.exec(speaker)?.[0] ?? 0);
-  return SPEAKER_COLORS[Math.max(0, number - 1) % SPEAKER_COLORS.length];
-}
 
 /** "Romanian 81% · Russian 15% · English 4%": share of utterances in which each language is spoken. */
 function languageShares(utterances: Utterance[]): string {
@@ -38,13 +31,21 @@ function utteranceAt(utterances: Utterance[], seconds: number): number {
   return utterances.findLastIndex((utterance) => utterance.start <= seconds && seconds < utterance.end);
 }
 
+interface TranscriptTabProps {
+  meetingId: string;
+  active: boolean;
+  /** The recording is kept on the server: it can be played from any line. */
+  hasAudio: boolean;
+}
+
 /** Who said what, with language tags, search, and playback when the recording is kept. */
-export function TranscriptTab({ meetingId, active }: { meetingId: string; active: boolean }) {
+export function TranscriptTab({ meetingId, active, hasAudio }: TranscriptTabProps) {
+  const { t } = useTranslation(['meetings', 'common']);
   const transcript = useTranscript(meetingId, active);
   const participants = useMinutes(meetingId).data?.participants;
   const [query, setQuery] = useState('');
   const [speaker, setSpeaker] = useState<string | null>(null);
-  const [audioMissing, setAudioMissing] = useState(false);
+  const [audioFailed, setAudioFailed] = useState(false);
   const [playing, setPlaying] = useState(-1);
   const audio = useRef<HTMLAudioElement>(null);
 
@@ -52,6 +53,7 @@ export function TranscriptTab({ meetingId, active }: { meetingId: string; active
   if (transcript.isError) return <ErrorState error={transcript.error} onRetry={() => void transcript.refetch()} />;
 
   const { utterances } = transcript.data;
+  const playable = hasAudio && !audioFailed;
   const speakers = [...new Set(utterances.map((utterance) => utterance.speaker))].sort((a, b) =>
     a.localeCompare(b, undefined, { numeric: true }),
   );
@@ -74,26 +76,22 @@ export function TranscriptTab({ meetingId, active }: { meetingId: string; active
     <Stack gap="md">
       <Paper withBorder p="md">
         <Stack gap="sm">
-          {audioMissing ? (
-            <Text size="sm" c="dimmed">
-              The recording is not kept on the server (privacy setting), so it cannot be played back.
-            </Text>
-          ) : (
+          {playable && (
             <audio
               ref={audio}
               controls
               preload="metadata"
               src={meetingsApi.audioUrl(meetingId)}
-              onError={() => setAudioMissing(true)}
+              onError={() => setAudioFailed(true)}
               onTimeUpdate={(event) => setPlaying(utteranceAt(utterances, event.currentTarget.currentTime))}
               style={{ width: '100%' }}
-              aria-label="Meeting recording"
+              aria-label={t('transcriptTab.recordingAria')}
             />
           )}
           <Group gap="sm" align="flex-end">
             <TextInput
-              label="Search"
-              placeholder="Words in the transcript"
+              label={t('common:action.search')}
+              placeholder={t('transcriptTab.searchPlaceholder')}
               leftSection={<IconSearch size={16} />}
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
@@ -101,8 +99,8 @@ export function TranscriptTab({ meetingId, active }: { meetingId: string; active
               miw={200}
             />
             <Select
-              label="Speaker"
-              placeholder="All speakers"
+              label={t('transcriptTab.speaker')}
+              placeholder={t('transcriptTab.allSpeakers')}
               data={speakers.map((label) => ({ value: label, label: describe(label) }))}
               value={speaker}
               onChange={setSpeaker}
@@ -111,7 +109,10 @@ export function TranscriptTab({ meetingId, active }: { meetingId: string; active
             />
           </Group>
           <Text size="xs" c="dimmed">
-            {shown.length} of {utterances.length} utterances · {languageShares(utterances)}
+            {shown.length === utterances.length
+              ? t('transcriptTab.lines', { count: utterances.length })
+              : t('transcriptTab.summary', { shown: shown.length, count: utterances.length })}{' '}
+            · {languageShares(utterances)}
           </Text>
         </Stack>
       </Paper>
@@ -119,7 +120,7 @@ export function TranscriptTab({ meetingId, active }: { meetingId: string; active
       <Paper withBorder>
         {shown.length === 0 && (
           <Text c="dimmed" ta="center" py="lg" size="sm">
-            Nothing matches.
+            {t('transcriptTab.noMatches')}
           </Text>
         )}
         {shown.map(({ utterance, index }) => {
@@ -136,15 +137,20 @@ export function TranscriptTab({ meetingId, active }: { meetingId: string; active
               bg={index === playing ? 'teal.0' : undefined}
               style={{ borderBottom: '1px solid var(--mantine-color-gray-2)' }}
             >
-              <UnstyledButton
-                onClick={() => seek(utterance.start)}
-                disabled={audioMissing}
-                aria-label={`Play from ${formatClock(utterance.start)}`}
-              >
-                <Text size="sm" ff="monospace" c={audioMissing ? 'dimmed' : 'teal.7'}>
+              {playable ? (
+                <UnstyledButton
+                  onClick={() => seek(utterance.start)}
+                  aria-label={t('transcriptTab.playFrom', { time: formatClock(utterance.start) })}
+                >
+                  <Text size="sm" ff="monospace" c="teal.7">
+                    {formatClock(utterance.start)}
+                  </Text>
+                </UnstyledButton>
+              ) : (
+                <Text size="sm" ff="monospace" c="dimmed">
                   {formatClock(utterance.start)}
                 </Text>
-              </UnstyledButton>
+              )}
               <Box style={{ flex: 1, minWidth: 0 }}>
                 <Group gap={8} mb={4}>
                   <Badge variant="light" color={speakerColor(utterance.speaker)}>
@@ -158,7 +164,7 @@ export function TranscriptTab({ meetingId, active }: { meetingId: string; active
                   <LanguageBadges languages={utterance.languages} />
                   {utterance.accent && (
                     <Text size="xs" c="dimmed">
-                      {utterance.accent} accent
+                      {t('transcriptTab.accent', { accent: utterance.accent })}
                     </Text>
                   )}
                 </Group>

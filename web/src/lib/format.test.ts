@@ -1,8 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { formatBytes, formatClock, formatDuration } from './format';
+import i18n from '../i18n';
+import { formatBytes, formatClock, formatDay, formatDuration } from './format';
+
+afterEach(() => void i18n.changeLanguage('en'));
 
 describe('format', () => {
+  it('writes the day of a greeting with a capital letter in every language', async () => {
+    const sunday = new Date(2026, 8, 27, 10);
+    expect(formatDay(sunday)).toBe('Sunday 27 September');
+    await i18n.changeLanguage('ro');
+    expect(formatDay(sunday)).toBe('Duminică, 27 septembrie');
+    await i18n.changeLanguage('ru');
+    expect(formatDay(sunday)).toBe('Воскресенье, 27 сентября');
+  });
+
   it('writes recording positions as a clock', () => {
     expect(formatClock(3.1)).toBe('00:03');
     expect(formatClock(252)).toBe('04:12');
