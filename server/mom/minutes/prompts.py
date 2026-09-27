@@ -6,17 +6,23 @@ MEETING_TYPES = ("medical", "executive", "administrative")
 # Every fact is filed under its patient / agenda item, so nothing is written twice (the old schema had a plan
 # per topic plus global decision / action lists that repeated it) and code knows whose each item is.
 # No "time" fields: code finds each item's transcript line (locate), and every generated token costs time.
-CHUNK_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "topics": objs(max_items=3, min_items=1, name=text(40), status=text(300),
-                        findings=strs(7, max_len=160), decisions=strs(6, max_len=160),
-                        tasks=objs(max_items=4, task=text(160), owner=text(60), deadline=text(40),
-                                    priority={"type": "string", "enum": ["high", "medium", "low"]}),
-                        open=strs(2, max_len=160)),
-    },
-    "required": ["topics"],
-}
+def chunk_schema(topics: int = 3, scale: float = 1.0) -> dict:
+    """Answer of one chunk: up to `topics` patients; per patient the item limits grow with the chunk (`scale`)."""
+    n = lambda k: max(k, round(k * scale))  # noqa: E731
+    return {
+        "type": "object",
+        "properties": {
+            "topics": objs(max_items=topics, min_items=1, name=text(40), status=text(n(300)),
+                           findings=strs(n(7), max_len=160), decisions=strs(n(6), max_len=160),
+                           tasks=objs(max_items=n(4), task=text(160), owner=text(60), deadline=text(40),
+                                      priority={"type": "string", "enum": ["high", "medium", "low"]}),
+                           open=strs(n(2), max_len=160)),
+        },
+        "required": ["topics"],
+    }
+
+
+CHUNK_SCHEMA = chunk_schema()
 
 FINAL_SCHEMA = {
     "type": "object",

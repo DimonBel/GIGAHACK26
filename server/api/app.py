@@ -4,7 +4,7 @@ from fastapi import APIRouter, FastAPI
 from .db import Store
 from .jobs import JobRunner
 from .mailer import Mailer
-from .routes import auth, meetings, minutes, users
+from .routes import auth, codes, meetings, minutes, users
 from .settings import Settings
 
 
@@ -31,7 +31,7 @@ def create_app(settings: Settings = None, pipeline=None, smtp=None) -> FastAPI:
     def health():
         return {"ok": True}
 
-    for module in (auth, users, meetings, minutes):
+    for module in (auth, users, codes, meetings, minutes):
         api.include_router(module.router)
     app.include_router(api)
     return app

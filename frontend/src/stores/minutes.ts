@@ -20,14 +20,12 @@ import type {
   User,
 } from "@/api/types";
 import { listUsers } from "@/api/users";
-import { CATALOG } from "@/shared/config/catalog";
-import type { CatalogCode, MinutesSection } from "@/shared/types/domain";
+import type { MinutesSection } from "@/shared/types/domain";
 
 const AUTOSAVE_MS = 800;
 
 /** Fallback for selectors (`s.doc?.topics ?? NONE`): one shared empty array, so it never looks like a change. */
 export const NONE: never[] = [];
-const CATALOG_RESULTS = 5;
 
 export type SaveState = "saved" | "dirty" | "saving" | "error" | "conflict";
 export type Item = ListItem | TaskItem | CodeItem;
@@ -104,16 +102,6 @@ export function topicLines(lines: Line[], topics: Topic[], topicId: string): Lin
 
 export function itemCount(topic: Topic) {
   return topic.blocks.reduce((n, b) => n + (b.kind === "text" ? (b.text.trim() ? 1 : 0) : b.items.length), 0);
-}
-
-/** Catalog codes matching the query (code, label or RO/RU terms) that the block does not have yet. */
-export function searchCatalog(query: string, have: CodeItem[]): CatalogCode[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  const taken = new Set(have.map((c) => c.code));
-  return CATALOG.filter(
-    (c) => !taken.has(c.code) && [c.system, c.code, c.label, c.terms].join(" ").toLowerCase().includes(q),
-  ).slice(0, CATALOG_RESULTS);
 }
 
 function editTopic(doc: MinutesDoc, topicId: string, fn: (t: Topic) => Topic): MinutesDoc {

@@ -1,0 +1,48 @@
+{
+  "utterances": 100,
+  "audio_seconds": 1013,
+  "stock": {
+    "wer": 11.26,
+    "seconds": 445,
+    "examples": [
+      {
+        "ref": "Compoziția acestor cristale se potrivește cu a celor întâlnite în urina animalelor de companie afectate, atunci când sunt comparate printr-o spectroscopie în infraroșu (spectroscopie în IR).",
+        "hyp": " Compoziția acestor cristale se potrivește cu acelor întâlnite în urina animalelor de companie afectate atunci când sunt comparate printr-o spectroscopie în infraroșu, spectroscopie în IR."
+      },
+      {
+        "ref": "Celelalte nominalizări includ cel mai bun film, regizor, imagine, design de costume, montaj de film, coloană sonoră, design de producție, regie de sunet, mixaj sonor și scenariu original.",
+        "hyp": " Cele alte numele analizări inclui cel mai bun film, regizor, imagini, design de costume, montaj de film, coloană sonoră, design de producție, regie de sunet, mixașonor și scenariul original."
+      },
+      {
+        "ref": "Cuomo, în vârstă de 53 de ani, și-a început guvernarea la începutul acestui an și a semnat luna trecută un proiect de lege, prin care se legalizează căsătoria între persoane de același sex.",
+        "hyp": " Cuomo, în vârstă de 53 de ani, a început guvernarea la începutul acestui an și a semanat în întrebat un proiect de lege prin care se legalizează căsătoria între persoane de același sex."
+      },
+      {
+        "ref": "Perioada celor Trei Regate a fost una dintre epocile cele mai sângeroase din istoria Chinei antice, mii de oameni murind luptându-se să ocupe tronul din mărețul palat de la Xi’an.",
+        "hyp": " Perioada celor trei regate a fost una dintre epocile cele mai sângeroase din istoria Chinei antice, mii de oameni murind luptându-se să ocupe tronul din Mărețul Palat de la Xi'an."
+      }
+    ]
+  },
+  "finetuned": {
+    "wer": 10.16,
+    "seconds": 566,
+    "examples": [
+      {
+        "ref": "Compoziția acestor cristale se potrivește cu a celor întâlnite în urina animalelor de companie afectate, atunci când sunt comparate printr-o spectroscopie în infraroșu (spectroscopie în IR).",
+        "hyp": "Compoziția acestor cristale se potrivește cu acelor întâlnite în urina animalelor de companie afectate atunci când sunt comparate printr-o spectroscopie în infraroșu, spectroscopie în IR."
+      },
+      {
+        "ref": "Celelalte nominalizări includ cel mai bun film, regizor, imagine, design de costume, montaj de film, coloană sonoră, design de producție, regie de sunet, mixaj sonor și scenariu original.",
+        "hyp": "Cele alte numele analizări inclui cel mai bun film, regizor, imagini, design de costume, montaj de film, coloană sonoră, design de producție, regie de sunet, mixașonor și scenariul original."
+      },
+      {
+        "ref": "Cuomo, în vârstă de 53 de ani, și-a început guvernarea la începutul acestui an și a semnat luna trecută un proiect de lege, prin care se legalizează căsătoria între persoane de același sex.",
+        "hyp": "Cu omul în vârstă de 53 de ani și a început guvernarea la începutul acestui an și a se înaltă în întreput un proiect de lege prin care se legalizează căsătoria între persoane de același sex."
+      },
+      {
+        "ref": "Perioada celor Trei Regate a fost una dintre epocile cele mai sângeroase din istoria Chinei antice, mii de oameni murind luptându-se să ocupe tronul din mărețul palat de la Xi’an.",
+        "hyp": "Perioada celor trei regate a fost una dintre epocile cele mai sângeroase din istoria Chinei antice. Mii de oameni murind, luptându-se să ocupe tronul din Mărețul Palat de la Xian."
+      }
+    ]
+  }
+}

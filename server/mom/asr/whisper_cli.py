@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ..audio.convert import to_wav16k
 from ..config import DEFAULT_WHISPER_MODEL as DEFAULT_MODEL
-from ..config import VAD_MODEL
+from ..config import VAD_MODEL, WHISPER_CLI
 from .types import Segment, Transcript, Word
 
 # whisper-cli live output line: "[00:00:01.230 --> 00:00:04.560]   text"
@@ -25,31 +25,37 @@ def transcribe(audio: Path, model: Path = DEFAULT_MODEL, language: str = "auto",
 
 
 def transcribe_wav(wav: Path, model: Path = DEFAULT_MODEL, language: str = "auto",
-                   translate: bool = False, threads: int = 8, beam_size: int = 1, on_segment=None) -> Transcript:
+                   translate: bool = False, threads: int = 8, beam_size: int = 1, on_segment=None,
+                   prompt: str = None) -> Transcript:
     """Transcribe an already-converted 16 kHz mono WAV, with word-level timestamps.
 
     beam_size=1 is greedy decoding (~30% faster); 5 is whisper-cli's own default, slightly more careful.
 
     on_segment(start_sec, end_sec, text) is called live for every recognized segment;
     by default segments are printed to stderr as progress.
+
+    prompt: vocabulary to bias the spelling of domain words (prepended to every 30 s window). whisper.cpp drops
+    the prompt with no text context (-mc 0), so a prompt brings a small context of 64 tokens with it.
     """
-    if shutil.which("whisper-cli") is None:
-        raise RuntimeError("whisper-cli not found. Install it with: brew install whisper-cpp")
+    if shutil.which(WHISPER_CLI) is None:
+        raise RuntimeError(f"{WHISPER_CLI} not found. Install it with: brew install whisper-cpp")
     if not model.exists():
         raise FileNotFoundError(f"Model not found: {model}")
 
     with tempfile.TemporaryDirectory() as tmp:
         out_base = Path(tmp) / "result"
         # -ojf: full JSON including per-token timestamps (used for speaker alignment).
-        cmd = ["whisper-cli", "-m", str(model), "-f", str(wav), "-l", language,
+        cmd = [WHISPER_CLI, "-m", str(model), "-f", str(wav), "-l", language,
                "-t", str(threads), "-ojf", "-of", str(out_base), "-np",
                # Anti-hallucination: don't condition on previous text (stops repeat loops)
                # and suppress non-speech tokens.
-               "-mc", "0", "-sns",
+               "-mc", "64" if prompt else "0", "-sns",
                "-bs", str(beam_size)] + (["-bo", "1"] if beam_size <= 1 else [])
         if VAD_MODEL.exists():
             # Skip silence/noise, where Whisper tends to hallucinate.
             cmd += ["--vad", "-vm", str(VAD_MODEL)]
+        if prompt:
+            cmd += ["--prompt", prompt, "--carry-initial-prompt"]
         if translate:
             cmd.append("-tr")
         if on_segment is None:

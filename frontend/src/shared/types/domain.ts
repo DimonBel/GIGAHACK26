@@ -21,15 +21,7 @@ export interface DirectoryUser {
 
 export type MeetingStatusTone = "warn" | "info" | "ok" | "danger";
 
-export type CodeSystem = "ICD-10" | "ACHI";
-
-/** A catalog entry: a code plus search terms in RO / RU. */
-export interface CatalogCode {
-  system: CodeSystem;
-  code: string;
-  label: string;
-  terms: string;
-}
+export type CodeSystem = "ICD-10" | "ACHI" | "DRG";
 
 /** Minutes navigation: the overview, a topic, or one of the general sections. */
 export type MinutesSection =

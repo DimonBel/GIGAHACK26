@@ -45,19 +45,19 @@ def run_dialog(audio: Path, args):
         # Minutes are extracted chunk by chunk while the speech is still being transcribed.
         from ..minutes import LiveMinutes, MinutesBuilder
         minutes = LiveMinutes(MinutesBuilder(args.minutes, args.minutes_model))
-    on_utterance = minutes.feed if minutes else None
     stages = {}
     speakers = {k: v for k, v in dict(num_speakers=args.speakers, min_speakers=args.min_speakers,
                                       max_speakers=args.max_speakers).items() if v}
     if args.engine == "whisper-file":
+        # The minutes get Whisper's text at once, without waiting for the speakers (see transcribe_dialog_file).
         utterances = transcribe_dialog_file(audio, model=whisper_model(args.model), language=args.lang,
                                             translate=args.translate, beam_size=args.beam_size, live=live,
-                                            on_utterance=on_utterance, speakers=speakers,
+                                            on_text=minutes.feed if minutes else None, speakers=speakers,
                                             audio_filters=CLEAN_FILTERS[args.clean_audio], timings=stages)
     else:
         utterances = transcribe_dialog(audio, engine=args.engine, language=args.lang,
-                                       translate=args.translate, live=live, on_utterance=on_utterance,
-                                       speakers=speakers)
+                                       translate=args.translate, live=live,
+                                       on_utterance=minutes.feed if minutes else None, speakers=speakers)
     roles = None
     if args.roles or minutes:
         # One short LLM call; runs while the minutes are being finished (Ollama serves both at once).

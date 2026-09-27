@@ -2,11 +2,12 @@
 
 Every engine is a context manager with transcribe(wav_bytes) -> str:
   whisper        Whisper Large V3 (whisper.cpp server) - most accurate, slowest
-  whisper-turbo  Whisper Large V3 Turbo - same encoder, 4 instead of 32 decoder layers (default, fast)
+  whisper-turbo  Whisper Large V3 Turbo - same encoder, 4 instead of 32 decoder layers (default, fast); the version
+                 fine-tuned on Moldovan / Romanian speech when it is built (models/ggml-turbo-md-q8_0.bin)
   gemma          Gemma 4 E4B via local Ollama - audio-capable LLM
   gemma-fast     Gemma 4 E2B via local Ollama - smaller and faster, less accurate
 """
-from ..config import GEMMA_FAST_ASR_MODEL, WHISPER_LARGE_V3, WHISPER_TURBO, WHISPER_TURBO_Q8
+from ..config import GEMMA_FAST_ASR_MODEL, WHISPER_LARGE_V3, WHISPER_TURBO, WHISPER_TURBO_MD_Q8, WHISPER_TURBO_Q8
 from .gemma import GemmaEngine
 from .whisper_server import WhisperServer
 
@@ -17,6 +18,9 @@ def make_engine(name: str, language: str = "auto", translate: bool = False):
     if name == "whisper":
         return WhisperServer(WHISPER_LARGE_V3, language, translate)
     if name == "whisper-turbo":
+        # Fine-tuned on Moldovan / Romanian (same size and speed, far fewer Romanian errors; English and Russian kept).
+        if WHISPER_TURBO_MD_Q8.exists():
+            return WhisperServer(WHISPER_TURBO_MD_Q8, language, translate)
         # 8-bit version: ~20% faster on Apple M4, same words as the f16 model on the Medpark recording.
         if not WHISPER_TURBO_Q8.exists():
             raise FileNotFoundError(

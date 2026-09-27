@@ -31,6 +31,8 @@ models/
 
 # --- Web app storage: uploaded recordings, transcripts, minutes, accounts (patient data) ---
 /server/storage/
+# Model build intermediates (scripts/build_turbo_md.sh): merged HF model, converter sources, f16 ggml
+/server/build/
 
 # --- Transcription outputs ---
 *_transcript.txt

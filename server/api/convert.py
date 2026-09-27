@@ -31,6 +31,19 @@ def _issues_by_topic(issues: list, names: list) -> dict:
     return out
 
 
+def codes_block(codes: dict) -> dict:
+    """ICD-10 principal + secondary diagnoses and the DRG family, as suggested by mom.medical.coding."""
+    from mom.medical.dictionary import label
+
+    items = [{"id": new_id("c"), "system": "ICD-10", "code": c, "label": label(c, "en") or label(c, "ro")}
+             for c in [codes["principal"], *codes.get("secondary", [])]]
+    drg = codes.get("drg")
+    if drg:
+        items.append({"id": new_id("c"), "system": "DRG", "code": drg["family"],
+                      "label": f"{drg['name']} ({' / '.join(drg['variants'])}, estimate)"})
+    return {"id": new_id("b"), "kind": "codes", "label": "Diagnosis codes (suggested)", "items": items}
+
+
 def minutes_doc(minutes: dict, meeting_type: str) -> dict:
     """A MinutesDoc (as a dict) from the output of MinutesBuilder.finalize() plus its "participants"."""
     names = [t["name"] for t in minutes.get("topics", [])]
@@ -61,6 +74,9 @@ def minutes_doc(minutes: dict, meeting_type: str) -> dict:
         if issues.get(name):
             blocks.append({"id": new_id("b"), "kind": "list", "label": "Open issues",
                            "items": [list_item(i) for i in issues[name]]})
+        codes = (minutes.get("coding") or {}).get(name)
+        if codes:
+            blocks.append(codes_block(codes))
         topics.append({"id": new_id("t"), "title": name, "time": t.get("time"), "blocks": blocks})
 
     participants = [{"speaker": speaker, "name": r.get("name", ""), "role": r.get("role", ""),

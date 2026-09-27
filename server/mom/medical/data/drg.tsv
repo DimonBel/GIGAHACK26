@@ -1,0 +1,660 @@
+ar_drg	ro_drg	mdc	type	name	relative_value
+A01Z	A1010	0	C	Transplant de ficat	0.0000
+A03Z	A1020	0	C	Transplant de plaman/inima sau plaman	0.0000
+A05Z	A1030	0	C	Transplant de inima	0.0000
+A06Z	A1040	0	C	Traheostomie sau ventilatie >95 ore	14.2331
+A07Z	A1050	0	C	Transplant alogenic de maduva osoasa	0.0000
+A08A	A1061	0	C	Transplant autolog de maduva osoasa cu CC catastrofale	0.0000
+A08B	A1062	0	C	Transplant autolog de maduva osoasa fara CC catastrofale	0.0000
+A09A	A1071	0	C	Transplant renal cu transplant de pancreas sau CC catastrofale	0.0000
+A09B	A1072	0	C	Transplant renal fara transplant de pancreas fara CC catastrofale	0.0000
+A40Z	A2010	0	A	Oxigenoterapie extracorporal fara chirurgie cardiaca	28.5797
+A41A	A2021	0	A	Intubatie varsta< 16 cu CC	4.1332
+A41B	A2022	0	A	Intubatie varsta< 16 fara CC	1.6508
+B01Z	B1010	1	C	Revizia shuntului ventricular	1.7579
+B02A	B1021	1	C	Craniotomie cu CC catastrofale	5.8344
+B02B	B1022	1	C	Craniotomie cu CC severe sau moderate	3.4275
+B02C	B1023	1	C	Craniotomie fara CC	2.5833
+B03A	B1031	1	C	Proceduri la nivelul coloanei vertebrale cu CC catastrofale sau severe	4.2466
+B03B	B1032	1	C	Proceduri la nivelul coloanei vertebrale fara CC catastrofale sau severe	2.0414
+B04A	B1041	1	C	Proceduri vasculare extracraniene cu CC catastrofale sau severe	2.2682
+B04B	B1042	1	C	Proceduri vasculare extracraniene fara CC catastrofale sau severe	1.4176
+B05Z	B1050	1	C	Eliberarea tunelului carpian	0.3276
+B06A	B1061	1	C	Proceduri pentru paralizie cerebrala, distrofie musculara, neuropatie cu CC catastrofale sau severe	4.3915
+B06B	B1062	1	C	Proceduri pentru paralizie cerebrala, distrofie musculara, neuropatie fara CC catastrofale sau severe	0.7561
+B07A	B1071	1	C	Proceduri la nivelul nervilor cranieni si periferici si alte proceduri ale sistemului nervos cu CC	2.0099
+B07B	B1072	1	C	Proceduri la nivelul nervilor cranieni si periferici si alte proceduri ale sistemului nervos fara CC	0.7120
+B40Z	B2010	1	A	Plasmafereza cu boli neurologice	0.8002
+B41Z	B2020	1	A	Monitorizare telemetrica EEG	0.8317
+B60A	B3011	1	M	Paraplegie/tetraplegie stabilita cu sau fara proceduri in sala de operatii cu CC catastrofale	5.0342
+B60B	B3012	1	M	Paraplegie/tetraplegie stabilita cu sau fara proceduri in sala de operatii fara CC catastrofale	1.5122
+B61A	B3021	1	M	Afectiuni ale maduvei spinarii cu sau fara proceduri in sala de operatii cu CC catastrofale sau severe	4.8704
+B61B	B3022	1	M	Afectiuni ale maduvei spinarii cu sau fara proceduri in sala de operatii fara CC catastrofale sau severe	1.2601
+B62Z	B3030	1	M	Internare pentru afereza	0.1827
+B63Z	B3040	1	M	Dementa si alte tulburari cronice ale functiei cerebrale	1.7957
+B64A	B3051	1	M	Delir cu CC catastrofale	1.7579
+B64B	B3052	1	M	Delir fara CC catastrofale	0.8884
+B65Z	B3060	1	M	Paralizie cerebrala	0.3339
+B66A	B3071	1	M	Tumori ale sistemului nervos cu CC catastrofale sau severe	1.6445
+B66B	B3072	1	M	Tumori ale sistemului nervos fara CC catastrofale sau severe	0.7624
+B67A	B3081	1	M	Tulburari degenerative ale sistemului nervos cu CC catastrofale sau severe	2.1233
+B67B	B3082	1	M	Tulburari degenerative ale sistemului nervos varsta >59 fara CC catastrofale sau severe	0.8821
+B67C	B3083	1	M	Tulburari degenerative ale sistemului nervos varsta <60 fara CC catastrofale sau severe	0.4032
+B68A	B3091	1	M	Scleroza multipla si ataxia de origine cerebeloasa cu CC	1.8776
+B68B	B3092	1	M	Scleroza multipla si ataxia de origine cerebeloasa fara CC	0.3591
+B69A	B3101	1	M	AIT si ocluzie precerebrala cu CC catastrofale sau severe	0.9766
+B69B	B3102	1	M	AIT si ocluzie precerebrala fara CC catastrofale sau severe	0.4284
+B70A	B3111	1	M	Accident vascular cerebral cu CC catastrofale	2.9991
+B70B	B3112	1	M	Accident vascular cerebral cu CC severe	1.6319
+B70C	B3113	1	M	Accident vascular cerebral fara CC catastrofale sau severe	1.0585
+B70D	B3114	1	M	Accident vascular cerebral, decedat sau transferat < 5 zile	0.3969
+B71A	B3121	1	M	Tulburari ale nervilor cranieni si periferici cu CC	1.2223
+B71B	B3122	1	M	Tulburari ale nervilor cranieni si periferici fara CC	0.2520
+B72A	B3131	1	M	Infectii ale sistemului nervos cu exceptia meningitei virale cu CC catastrofale sau severe	2.7786
+B72B	B3132	1	M	Infectii ale sistemului nervos cu exceptia meningitei virale fara CC catastrofale sau severe	1.1467
+B73Z	B3140	1	M	Menigita virala	0.6175
+B74Z	B3150	1	M	Stupoare si coma non-traumatica	0.5482
+B75Z	B3160	1	M	Convulsii febrile	0.2835
+B76A	B3171	1	M	Atacuri cu CC catastrofale sau severe	1.1089
+B76B	B3172	1	M	Atacuri fara CC catastrofale sau severe	0.3717
+B77Z	B3180	1	M	Cefalee	0.2709
+B78A	B3191	1	M	Leziune intracraniana cu CC catastrofale sau severe	1.9973
+B78B	B3192	1	M	Leziune intracraniana fara CC catastrofale sau severe	0.8191
+B79Z	B3200	1	M	Fracturi craniene	0.6616
+B80Z	B3210	1	M	Alta leziune a capului	0.2394
+B81A	B3221	1	M	Alte tulburari ale sistemului nervos cu CC catastrofale sau severe	1.5059
+B81B	B3222	1	M	Alte tulburari ale sistemului nervos fara CC catastrofale sau severe	0.5545
+C01Z	C1010	2	C	Proceduri pentru leziuni penetrante ale ochiului	1.2853
+C02Z	C1020	2	C	Enucleeri si proceduri ale orbitei	1.1278
+C03Z	C1030	2	C	Proceduri la nivelul retinei	0.6616
+C04Z	C1040	2	C	Proceduri majore asupra corneei, sclerei si conjunctivei	0.8884
+C05Z	C1050	2	C	Dacriocistorinostomie	0.6112
+C10Z	C1060	2	C	Proceduri pentru strabism	0.4284
+C11Z	C1070	2	C	Proceduri ale pleoapei	0.4599
+C12Z	C1080	2	C	Alte proceduri asupra corneei, sclerei si conjunctivei	0.4158
+C13Z	C1090	2	C	Proceduri privind caile lacrimare	0.2835
+C14Z	C1100	2	C	Alte proceduri la nivelul ochiului	0.3150
+C15A	C1111	2	C	Glaucom si proceduri complexe ale cataractei	0.8191
+C15B	C1112	2	C	Glaucom si proceduri complexe ale cataractei, de zi	0.4284
+C16A	C1121	2	C	Proceduri asupra cristalinului	0.6049
+C16B	C1122	2	C	Proceduri asupra cristalinului, de zi	0.4095
+C60A	C3011	2	M	Infectii oculare acute si majore varsta >54 SAU cu (CC catastrofale sau severe )	1.1404
+C60B	C3012	2	M	Infectii oculare acute si majore varsta <55 fara CC catastrofale sau severe	0.7057
+C61Z	C3020	2	M	Tulburari neurologice si vasculare ale ochiului	0.4347
+C62Z	C3030	2	M	Hifema si traume oculare tratate medical	0.2898
+C63A	C3041	2	M	Alte tulburari ale ochiului cu CC	0.7498
+C63B	C3042	2	M	Alte tulburari ale ochiului fara CC	0.2961
+D01Z	D1010	3	C	Implant cohlear	4.6436
+D02A	D1021	3	C	Proceduri ale capului si gatului cu CC catastrofale sau severe	4.2655
+D02B	D1022	3	C	Proceduri ale capului si gatului cu stare maligna SAU CC moderate	1.8335
+D02C	D1023	3	C	Proceduri ale capului si gatului fara stare maligna fara CC	1.1152
+D03Z	D1030	3	C	Cura chirugicala a cheiloschisisului sau diagnostic privind palatul	1.1026
+D04A	D1041	3	C	Chirurgie maxialo-faciala cu CC	1.6193
+D04B	D1042	3	C	Chirurgie maxialo-faciala fara CC	0.9325
+D05Z	D1050	3	C	Proceduri la nivelul glandei parotide	1.4239
+D06Z	D1060	3	C	Proceduri la nivelul sinusului, mastoidei si urechii medii	0.8947
+D09Z	D1070	3	C	Proceduri diverse ale urechii, nasului, gurii si gatului	0.5671
+D10Z	D1080	3	C	Proceduri nasale	0.5293
+D11Z	D1090	3	C	Amigdalectomie si/sau adenoidectomie	0.4284
+D12Z	D1100	3	C	Alte proceduri ale urechii, nasului, gurii si gatului	0.6427
+D13Z	D1110	3	C	Miringotomie cu insertie de tub	0.2457
+D14Z	D1120	3	C	Proceduri asupra gurii si glandei salivare	0.4978
+D40Z	D2010	3	A	Extractii dentare si restaurare	0.3402
+D60A	D3011	3	M	Stare maligna a urechii, nasului, gurii si gatului cu CC catastrofale sau severe	1.8146
+D60B	D3012	3	M	Stare maligna a urechii, nasului, gurii si gatului fara CC catastrofale sau severe	0.5608
+D61Z	D3020	3	M	Dezechilibru	0.3213
+D62Z	D3030	3	M	Epistaxis	0.2961
+D63A	D3041	3	M	Otita medie si infectie a cailor respiratorii superioare cu CC	0.5293
+D63B	D3042	3	M	Otita medie si infectie a cailor respiratorii superioare fara CC	0.3024
+D64Z	D3050	3	M	Laringotraheita si epiglotita	0.2394
+D65Z	D3060	3	M	Traumatism si diformitate nazale	0.2583
+D66A	D3071	3	M	Alte diagnostice privind urechea, nasul, gura si gatului cu CC	0.6490
+D66B	D3072	3	M	Alte diagnostice privind urechea, nasul, gura si gatului fara CC	0.2457
+D67A	D3081	3	M	Tulburari orale si dentare cu exceptia extractiilor si reconstituirilor	0.5293
+D67B	D3082	3	M	Tulburari orale si dentare cu exceptia extractiilor si reconstituirilor de zi	0.1449
+E01A	E1011	4	C	Proceduri majore la nivelul toracelui cu CC catastrofale	4.1017
+E01B	E1012	4	C	Proceduri majore la nivelul toracelui fara CC catastrofale	2.1989
+E02A	E1021	4	C	Alte proceduri in sala de operatii ale sistemului respirator cu CC catastrofale	3.6859
+E02B	E1022	4	C	Alte proceduri in sala de operatii ale sistemului respirator cu CC severe	1.5311
+E02C	E1023	4	C	Alte proceduri in sala de operatii ale sistemului respirator fara CC catastrofale sau severe	0.6112
+E40Z	E2010	4	A	Diagnostic asupra sistemului respirator cu suport ventilator	3.6985
+E41Z	E2020	4	A	Diagnostic asupra sistemului respirator cu ventilatie neinvaziva	2.6337
+E60A	E3011	4	M	Fibroza cistica cu CC catastrofale sau severe	2.6652
+E60B	E3012	4	M	Fibroza cistica fara CC catastrofale sau severe	2.0036
+E61A	E3021	4	M	Embolism pulmonar cu CC catastrofale sau severe	1.5374
+E61B	E3022	4	M	Embolism pulmonar fara CC catastrofale sau severe	0.7876
+E62A	E3031	4	M	Infectii respiratorii/inflamatii cu CC catastrofale	1.6697
+E62B	E3032	4	M	Infectii respiratorii/inflamatii cu CC severe sau moderate	0.9703
+E62C	E3033	4	M	Infectii respiratorii/inflamatii fara CC	0.5608
+E63Z	E3040	4	M	Apnee de somn	0.2835
+E64Z	E3050	4	M	Edem pulmonar si insuficienta respiratorie	0.8758
+E65A	E3061	4	M	Boala cronica obstructiva a cailor respiratorii cu CC catastrofale sau severe	1.1467
+E65B	E3062	4	M	Boala cronica obstructiva a cailor respiratorii fara CC catastrofale sau severe	0.6805
+E66A	E3071	4	M	Traumatism major la nivelul toracelui varsta >69 cu CC	1.4302
+E66B	E3072	4	M	Traumatism major la nivelul toracelui varsta >69 sau cu CC	0.7435
+E66C	E3073	4	M	Traumatism major la nivelul toracelui varsta <70 fara CC	0.4032
+E67A	E3081	4	M	Semne si simptome respiratorii cu CC catastrofale sau severe	0.6679
+E67B	E3082	4	M	Semne si simptome respiratorii fara CC catastrofale sau severe	0.3087
+E68Z	E3090	4	M	Pneumotorax	0.7309
+E69A	E3101	4	M	Bronsita si astm varsta >49 cu CC	0.7624
+E69B	E3102	4	M	Bronsita si astm varsta >49 sau cu CC	0.5041
+E69C	E3103	4	M	Bronsita si astm varsta <50 fara CC	0.3339
+E70A	E3111	4	M	Tuse convulsiva si bronsiolita acuta cu CC	1.0396
+E70B	E3112	4	M	Tuse convulsiva si bronsiolita acuta fara CC	0.5608
+E71A	E3121	4	M	Tumori respiratorii cu CC catastrofale	1.6508
+E71B	E3122	4	M	Tumori respiratorii cu CC severe sau moderate	0.8758
+E71C	E3123	4	M	Tumori respiratorii fara CC	0.4725
+E72Z	E3130	4	M	Probleme respiratorii aparute in perioada neonatala	0.9829
+E73A	E3141	4	M	Revarsat pleural cu CC catastrofale	1.6634
+E73B	E3142	4	M	Revarsat pleural cu CC severe	1.0396
+E73C	E3143	4	M	Revarsat pleural fara CC catastrofale sau severe	0.6049
+E74A	E3151	4	M	Boala interstitiala pulmonara cu CC catastrofale	1.6760
+E74B	E3152	4	M	Boala interstitiala pulmonara cu CC severe	1.1530
+E74C	E3153	4	M	Boala interstitiala pulmonara fara CC catastrofale sau severe	0.6616
+E75A	E3161	4	M	Alt diagnostic al sistemului respirator varsta >64 cu CC	0.9388
+E75B	E3162	4	M	Alt diagnostic al sistemului respirator varsta >64 sau cu CC	0.6364
+E75C	E3163	4	M	Alt diagnostic al sistemului respirator varsta <65 fara CC	0.3843
+F01A	F1011	5	C	Implant sau inlocuire de defibrilator cardiac implantabil automat, sistem total cu CC catastrofale sau severe	7.3276
+F01B	F1012	5	C	Implant sau inlocuire de defibrilator cardiac implantabil automat, sistem total fara CC catastrofale sau severe	6.3195
+F02Z	F1020	5	C	Implant/Inlocuire componenta AICD	6.3447
+F03Z	F1030	5	C	Procedura de valva cardiaca cu pompa CPB cu investigatie cardiaca invaziva	8.8524
+F04A	F1041	5	C	Procedura de valva cardiaca cu pompa CPB fara investigatie cardiaca invaziva cu CC catastrofale	6.1557
+F04B	F1042	5	C	Procedura de valva cardiaca cu pompa CPB fara investigatie cardiaca invaziva fara CC catastrofale	4.3663
+F05A	F1051	5	C	Bypass coronarian cu investigatii cardiace invazive cu CC catastrofale	6.5779
+F05B	F1052	5	C	Bypass coronarian cu investigatii cardiace invazive fara CC catastrofale	4.9397
+F06A	F1061	5	C	Bypass coronarian fara investigatii cardiace invazive cu CC catastrofale sau severe	4.0513
+F06B	F1062	5	C	Bypass coronarian fara investigatii cardiace invazive fara CC catastrofale sau severe	3.0999
+F07A	F1071	5	C	Alte proceduri cardiotoracice/vasculare cu pompa CPB cu CC catastrofale	7.5230
+F07B	F1072	5	C	Alte proceduri cardiotoracice/vascula re cu pompa CPB fara CC catastrofale	4.5365
+F08A	F1081	5	C	Proceduri majore de reconstructie vasculara fara pompa CPB cu CC catastrofale	5.2232
+F08B	F1082	5	C	Proceduri majore de reconstructie vasculara fara pompa CPB fara CC catastrofale	2.5266
+F09A	F1091	5	C	Alte proceduri cardiotoracice fara pompa CPB cu CC catastrofale	4.1143
+F09B	F1092	5	C	Alte proceduri cardiotoracice fara pompa CPB fara CC catastrofale	2.6715
+F10Z	F1100	5	C	Interventie coronara percutanata cu IMA	1.8461
+F11A	F1111	5	C	Amputatie pentru sistemul circulator cu exceptia membrului superior si a degetului de la picior cu CC catastrofale	5.9037
+F11B	F1112	5	C	Amputatie pentru sistemul circulator cu exceptia membrului superior si a degetului de la picior fara CC catastrofale	2.9487
+F12Z	F1120	5	C	Implantare pacemaker cardiac	1.9343
+F13Z	F1130	5	C	Amputatie a membrului superior si a degetului pentru tulburari ale sistemului circulator	2.3375
+F14A	F1141	5	C	Proceduri vasculare exceptand reconstructia majora fara pompa CPB cu CC catastrofale	3.1881
+F14B	F1142	5	C	Proceduri vasculare exceptand reconstructia majora fara pompa CPB cu CC severe	1.3420
+F14C	F1143	5	C	Proceduri vasculare exceptand reconstructia majora fara pompa CPB fara CC catastrofale sau severe	0.9388
+F15Z	F1150	5	C	Interventie coronara percutanata fara IMA cu implantare de stent	1.2853
+F16Z	F1160	5	C	Interventie coronara percutanata fara IMA fara implantare de stent	1.2538
+F17Z	F1170	5	C	Inlocuire de pacemaker cardiac	1.2538
+F18Z	F1180	5	C	Revizie de pacemaker cardiac exceptand inlocuirea dispozitivului	1.2160
+F19Z	F1190	5	C	Alta interventie percutanata cardiaca transvasculara	1.5689
+F20Z	F1200	5	C	Ligatura venelor si stripping	0.6616
+F21A	F1211	5	C	Alte proceduri in sala de operatii privind sistemul circulator cu CC catastrofale	3.2385
+F21B	F1212	5	C	Alte proceduri in sala de operatii privind sistemul circulator fara CC catastrofale	1.2601
+F40Z	F2010	5	A	Diagnostic al sistemului circulator cu suport ventilator	3.4401
+F41A	F2021	5	A	Tulburari circulatorii cu IMA cu proceduri de investigatie cardiaca invaziva cu CC catastrofale sau severe	1.7327
+F41B	F2022	5	A	Tulburari circulatorii cu IMA cu proceduri de investigatie cardiaca invaziva fara CC catastrofale sau severe	1.0648
+F42A	F2031	5	A	Tulburari circulatorii fara IMA cu proceduri de investigatie cardiaca invaziva cu diagnostic principal complex	1.0396
+F42B	F2032	5	A	Tulburari circulatorii fara IMA cu proceduri de investigatie cardiaca invaziva fara diagnostic principal complex	0.5608
+F60A	F3011	5	M	Tulburari circulatorii cu IMA fara proceduri de investigatie cardiaca invaziva cu CC catastrofale sau severe	1.3609
+F60B	F3012	5	M	Tulburari circulatorii cu IMA fara proceduri de investigatie cardiaca invaziva fara CC catastrofale sau severe	0.6553
+F60C	F3013	5	M	Tulburari circulatorii cu IMA fara proceduri de investigatie cardiaca invaziva, decedat	0.7561
+F61Z	F3020	5	M	Endocardita infectioasa	2.7471
+F62A	F3031	5	M	Insuficienta cardiaca si soc cu CC catastrofale	1.6886
+F62B	F3032	5	M	Insuficienta cardiaca si soc fara CC catastrofale	0.7561
+F63A	F3041	5	M	Tromboza venoasa cu CC catastrofale sau severe	1.2538
+F63B	F3042	5	M	Tromboza venoasa fara CC catastrofale sau severe	0.5734
+F64Z	F3050	5	M	Ulceratie a pielii pentru tulburari circulatorii	1.5689
+F65A	F3061	5	M	Tulburari vasculare periferice cu CC catastrofale sau severe	1.2853
+F65B	F3062	5	M	Tulburari vasculare periferice fara CC catastrofale sau severe	0.4284
+F66A	F3071	5	M	Ateroscleroza coronariana cu CC	0.5482
+F66B	F3072	5	M	Ateroscleroza coronariana fara CC	0.2646
+F67A	F3081	5	M	Hipertensiune cu CC	0.7246
+F67B	F3082	5	M	Hipertensiune fara CC	0.3528
+F68Z	F3090	5	M	Boala congenitala de inima	0.3780
+F69A	F3101	5	M	Tulburari valvulare cu CC catastrofale sau severe	1.2034
+F69B	F3102	5	M	Tulburari valvulare fara CC catastrofale sau severe	0.2520
+F70A	F3111	5	M	Aritmie majora si stop cardiac cu CC catastrofale sau severe	0.9829
+F70B	F3112	5	M	Aritmie majora si stop cardiac fara CC catastrofale sau severe	0.4473
+F71A	F3121	5	M	Aritmie non-majora si tulburari de conducere cu CC catastrofale sau severe	0.9514
+F71B	F3122	5	M	Aritmie non-majora si tulburari de conducere fara CC catastrofale sau severe	0.3654
+F72A	F3131	5	M	Angina instabila cu CC catastrofale sau severe	0.8317
+F72B	F3132	5	M	Angina instabila fara CC catastrofale sau severe	0.4221
+F73A	F3141	5	M	Sincopa si colaps cu CC catastrofale sau severe	0.7876
+F73B	F3142	5	M	Sincopa si colaps fara CC catastrofale sau severe	0.2961
+F74Z	F3150	5	M	Durere toracica	0.2646
+F75A	F3161	5	M	Alte diagnostice ale sistemului circulator cu CC catastrofale	2.0414
+F75B	F3162	5	M	Alte diagnostice ale sistemului circulator cu CC severe	0.9892
+F75C	F3163	5	M	Alte diagnostice ale sistemului circulator fara CC catastrofale sau severe	0.5230
+G01A	G1011	6	C	Rezectie rectala cu CC catastrofale	4.6940
+G01B	G1012	6	C	Rezectie rectala fara CC catastrofale	2.6841
+G02A	G1021	6	C	Proceduri majore pe intestinul subtire si gros cu CC catastrofale	4.4356
+G02B	G1022	6	C	Proceduri majore pe intestinul subtire si gros fara CC catastrofale	2.1359
+G03A	G1031	6	C	Proceduri la nivelul stomacului, esofagului si duodenului cu stare maligna	5.0909
+G03B	G1032	6	C	Proceduri la nivelul stomacului, esofagului si duodenului fara stare malignam cu CC catastrofale sau severe	3.8182
+G03C	G1033	6	C	Proceduri la nivelul stomacului, esofagului si duodenului fara stare maligna fara CC catastrofale sau severe	1.3672
+G04A	G1041	6	C	Aderente peritoneale varsta >49 SI cu CC	2.8920
+G04B	G1042	6	C	Aderente peritoneale varsta >49 SAU cu CC	1.7579
+G04C	G1043	6	C	Aderente peritoneale varsta <50 fara CC	1.0459
+G05A	G1051	6	C	Proceduri minore pe intenstinul subtire si gros cu CC	1.9532
+G05B	G1052	6	C	Proceduri minore pe intenstinul subtire si gros fara CC	1.0963
+G06Z	G1060	6	C	Piloromiotomie	1.0648
+G07A	G1071	6	C	Apendicectomie cu CC catastrofale sau severe	1.6886
+G07B	G1072	6	C	Apendicectomie fara CC catastrofale sau severe	0.8443
+G08A	G1081	6	C	Proceduri pentru hernie abdominala si alte hernii varsta >59 SAU cu (CC catastrofale sau severe)	1.0018
+G08B	G1082	6	C	Proceduri pentru hernie abdominala si alte hernii varsta 1 la 59 fara CC catastrofale sau severe	0.5923
+G09Z	G1090	6	C	Proceduri pentru hernia inghinala si femurala varsta >0	0.5797
+G10Z	G1100	6	C	Proceduri pentru hernie varsta < 1	0.5293
+G11A	G1111	6	C	Proceduri anale si la nivelul stomei cu CC catastrofale sau severe	1.2097
+G11B	G1112	6	C	Proceduri anale si la nivelul stomei fara CC catastrofale sau severe	0.4221
+G12A	G1121	6	C	Alte proceduri in sala de operatii la nivelul sistemului digestiv cu CC catastrofale sau severe	2.8479
+G12B	G1122	6	C	Alte proceduri in sala de operatii la nivelul sistemului digestiv fara CC catastrofale sau severe	0.8317
+G42A	G2011	6	A	Alte gastroscopii pentru boli digestive majore	0.9577
+G42B	G2012	6	A	Alte gastroscopii pentru boli digestive majore, de zi	0.1764
+G43Z	G2020	6	A	Colonoscopie complexa	0.4032
+G44A	G2031	6	A	Alte colonoscopii cu CC catastrofale sau severe	1.5437
+G44B	G2032	6	A	Alte colonoscopii fara CC catastrofale sau severe	0.6364
+G44C	G2033	6	A	Alte colonoscopii, de zi	0.2079
+G45A	G2041	6	A	Alte gastroscopii pentru boli digestive care nu sunt majore	0.7687
+G45B	G2042	6	A	Alte gastroscopii pentru boli digestive care nu sunt majore, de zi	0.1701
+G46A	G2051	6	A	Gastroscopie complexa cu CC catastrofale sau severe	1.8335
+G46B	G2052	6	A	Gastroscopie complexa fara CC catastrofale sau severe	0.8380
+G46C	G2053	6	A	Gastroscopie complexa, de zi	0.2394
+G60A	G3011	6	M	Stare maligna digestiva cu CC catastrofale sau severe	0.9766
+G60B	G3012	6	M	Stare maligna digestiva fara CC catastrofale sau severe	0.5041
+G61A	G3021	6	M	Hemoragie gastrointestinala varsta >64 SAU cu (CC catastrofale sau severe )	0.4978
+G61B	G3022	6	M	Hemoragie gastrointestinala varsta <65 fara CC catastrofale sau severe	0.2583
+G62Z	G3030	6	M	Ulcer peptic complicat	0.9199
+G63Z	G3040	6	M	Ulcer peptic necomplicat	0.2205
+G64Z	G3050	6	M	Boala inflamatorie a intestinului	0.5356
+G65A	G3061	6	M	Ocluzie intestinala cu CC	0.9703
+G65B	G3062	6	M	Ocluzie intestinala fara CC	0.4473
+G66A	G3071	6	M	Durere abdominala sau adenita mezenterica cu CC	0.4725
+G66B	G3072	6	M	Durere abdominala sau adenita mezenterica fara CC	0.2331
+G67A	G3081	6	M	Esofagita, gastroenterita si diverse tulburari ale sistemului digestiv varsta >9 ani cu CC catastrofale/severe	0.8065
+G67B	G3082	6	M	Esofagita, gastroenterita si diverse tulburari ale sistemului digestiv varsta >9 ani fara CC catastrofale/severe	0.2709
+G68A	G3091	6	M	Gastroenterita varsta <10 ani cu CC	0.7498
+G68B	G3092	6	M	Gastroenterita varsta <10 ani fara CC	0.3402
+G69Z	G3100	6	M	Esofagita si diverse tulburari ale sistemului digestiv varsta <10 ani	0.3717
+G70A	G3111	6	M	Alte diagnostice ale sistemului digestiv cu CC	0.7813
+G70B	G3112	6	M	Alte diagnostice ale sistemului digestiv fara CC	0.2394
+H01A	H1011	7	C	Proceduri la nivel de pancreas, ficat si shunt cu CC catastrofale	5.5572
+H01B	H1012	7	C	Proceduri la nivel de pancreas, ficat si shunt fara CC catastrofale	2.4825
+H02A	H1021	7	C	Proceduri majore ale tractului biliar cu stare maligna sau CC catastrofale	4.2340
+H02B	H1022	7	C	Proceduri majore ale tractului biliar fara stare maligna cu CC moderate sau severe	2.3753
+H02C	H1023	7	C	Proceduri majore ale tractului biliar fara stare maligna fara CC	1.3294
+H05A	H1031	7	C	Proceduri de diagnostic hepatobiliar cu CC catastrofale sau severe	2.4320
+H05B	H1032	7	C	Proceduri de diagnostic hepatobiliar fara CC catastrofale sau severe	1.0648
+H06Z	H1040	7	C	Alte proceduri in sala de operatii hepatobiliare si pancreatice	2.4825
+H07A	H1051	7	C	Colecistectomie deschisa cu explorarea inchisa a CBP sau cu CC catastrofale	3.4780
+H07B	H1052	7	C	Colecistectomie deschisa fara explorarea inchisa a CBP fara CC catastrofale	1.5563
+H08A	H1061	7	C	Colecistectomie laparoscopica cu explorarea inchisa a CBP sau cu (CC catastrofale sau severe)	1.7075
+H08B	H1062	7	C	Colecistectomie laparoscopica fara explorarea inchisa a CBP fara CC catastrofale sau severe	0.8443
+H40Z	H2010	7	A	Proceduri endoscopice pentru varice esofagiene sangerande	1.9469
+H41A	H2021	7	A	Procedura terapeutica complexa pentru colangiopancreatografie retrograda endoscopica cu CC catastrofale sau severe	2.0099
+H41B	H2022	7	A	retrograda endoscopica fara CC catastrofale sau severe	0.8380
+H42A	H2031	7	A	Alte proceduri terapeutice pentru colangiopancreatografie retrograda	1.8083
+H42B	H2032	7	A	Alte proceduri terapeutice pentru colangiopancreatografie retrograda endoscopica cu CC moderate	1.0144
+H42C	H2033	7	A	Alte proceduri terapeutice pentru colangiopancreatografie retrograda endoscopica fara CC	0.5860
+H60A	H3011	7	M	Ciroza si hepatita alcoolica cu CC catastrofale	1.9406
+H60B	H3012	7	M	Ciroza si hepatita alcoolica cu CC severe	0.9136
+H60C	H3013	7	M	Ciroza si hepatita alcoolica fara CC catastrofale sau severe	0.4347
+H61A	H3021	7	M	Stare maligna a sistemului hepatobiliar si pancreasului (varsta>69 cu CC catastrofale sau severe ) SAU cu CC catastrofale	1.3987
+H61B	H3022	7	M	Stare maligna a sistemului hepatobiliar si pancreasului (varsta>69 fara CC catastrofale sau severe ) SAU fara CC catastrofale	0.6301
+H62A	H3031	7	M	Tulburari ale pancreasului, cu exceptia starii maligne cu CC catastrofale sau severe	1.4428
+H62B	H3032	7	M	Tulburari ale pancreasului, cu exceptia starii maligne fara CC catastrofale sau severe	0.5797
+H63A	H3041	7	M	Tulburari ale ficatului, cu exceptia starii maligne, cirozei, hepatitei alcoolice cu CC catastrofale sau severe	1.4996
+H63B	H3042	7	M	Tulburari ale ficatului, cu exceptia starii maligne, cirozei, hepatitei alcoolice fara CC catastrofale sau severe	0.4095
+H64A	H3051	7	M	Tulburari ale tractului biliar cu CC	0.8569
+H64B	H3052	7	M	Tulburari ale tractului biliar fara CC	0.3465
+I01Z	I1010	8	C	Proceduri majore bilaterale sau multiple ale extremitatilor inferioare	5.7966
+I02A	I1021	8	C	Transfer de tesut micorvascular sau (grefa de piele cu CC catastrofale sau severe), cu exceptia mainii	6.9181
+I02B	I1022	8	C	Grefe pe piele fara CC catastrofale sau severe, cu exceptia mainii	2.7534
+I03A	I1031	8	C	Revizie a artroplastiei totale de sold cu CC catastrofale sau severe	6.1935
+I03B	I1032	8	C	Inlocuire sold cu CC catastrofale sau severe sau revizie a artroplastiei totale de sold fara CC catastrofale sau severe	3.3834
+I03C	I1033	8	C	Inlocuire sold fara CC catastrofale sau severe	2.7597
+I04Z	I1040	8	C	Inlocuire si reatasare de genunchi	2.8920
+I05Z	I1050	8	C	Alte proceduri majore de inlocuire a articulatiilor si reatasare a unui membru	2.6652
+I06Z	I1060	8	C	Artrodeza vertebrala cu diformitate	6.1683
+I07Z	I1070	8	C	Amputatie	4.8767
+I08A	I1081	8	C	Alte proceduri la nivelul soldului si al femurului cu CC catastrofale sau severe	3.1188
+I08B	I1082	8	C	Alte proceduri la nivelul soldului si al femurului fara CC catastrofale sau severe	1.9280
+I09A	I1091	8	C	Artrodeza vertebrala cu CC catastrofale sau severe	5.6517
+I09B	I1092	8	C	Artrodeza vertebrala fara CC catastrofale sau severe	3.0432
+I10A	I1101	8	C	Alte proceduri la nivelul spatelui si gatului cu CC catastrofale sau severe	2.6967
+I10B	I1102	8	C	Alte proceduri la nivelul spatelui si gatului fara CC catastrofale sau severe	1.3546
+I11Z	I1110	8	C	Proceduri de alungire a membrelor	2.0603
+I12A	I1121	8	C	Infectii/inflamatii ale oaselor si articulatiilor cu diverse proceduri ale sistemului muscular si tesutului conjunctiv cu CC catastrofale	4.9334
+I12B	I1122	8	C	Infectii/inflamatii ale oaselor si articulatiilor cu diverse proceduri ale sistemului muscular si tesutului conjunctiv cu CC severe	2.6274
+I12C	I1123	8	C	sistemului muscular si tesutului conjunctiv fara CC catastrofale sau	1.3546
+I13A	I1131	8	C	Proceduri ale humeruslui, tibiei, fibulei si gleznei cu CC catastrofale sau severe	2.9298
+I13B	I1132	8	C	Proceduri ale humeruslui, tibiei, fibulei si gleznei varsta >59 fara CC catastrofale sau severe	1.6004
+I13C	I1133	8	C	Proceduri ale humeruslui, tibiei, fibulei si gleznei varsta <60 fara CC catastrofale sau severe	1.2034
+I14Z	I1140	8	C	Revizie a bontului de amputatie	1.4870
+I15Z	I1150	8	C	Chirurgie craniofacial	1.9343
+I16Z	I1160	8	C	Alte proceduri la nivelul umarului	0.8695
+I17Z	I1170	8	C	Chirurgie maxilo-faciala	1.4113
+I18Z	I1180	8	C	Alte proceduri la nivelul genunchiului	0.5167
+I19Z	I1190	8	C	Alte proceduri la nivelul cotului si antebratului	0.9829
+I20Z	I1200	8	C	Alte proceduri la nivelul labei piciorului	0.7939
+I21Z	I1210	8	C	Excizie locala si indepartare a dispozitivelor interne de fixare a soldului si femurului	0.8506
+I23Z	I1220	8	C	Excizie locala si indepartare a dispozitivelor interne de fixare exclusiv sold si femur	0.4221
+I24Z	I1230	8	C	Artroscopie	0.4536
+I25Z	I1240	8	C	Proceduri diagnostic ale oaselor si a incheieturilor, incluzand biopsia	1.8146
+I27A	I1251	8	C	Proceduri la nivelul tesuturilor moi cu CC catastrofale sau severe	2.1422
+I27B	I1252	8	C	Proceduri la nivelul tesuturilor moi fara CC catastrofale sau severe	0.6868
+I28A	I1261	8	C	Alte proceduri la nivelul tesutului conjunctiv cu CC	2.4699
+I28B	I1262	8	C	Alte proceduri la nivelul tesutului conjunctiv fara CC	0.7435
+I29Z	I1270	8	C	Reconstructie sau revizie a genunchiului	1.0711
+I30Z	I1280	8	C	Proceduri la nivelul mainii	0.5545
+I60Z	I3010	8	M	Fracturi ale diafizei femurale	1.7579
+I61Z	I3020	8	M	Fracturi ale extremitatii distale femurale	1.3483
+I63Z	I3030	8	M	Entorse, luxatii si dislocari ale soldului, pelvisului si coapsei	0.5356
+I64A	I3041	8	M	Osteomielita cu CC	2.0162
+I64B	I3042	8	M	Osteomielita fara CC	0.7120
+I65A	I3051	8	M	Stare maligna a tesutului conjunctiv, incluzand fractura patologica cu CC catastrofale sau severe	1.3609
+I65B	I3052	8	M	Stare maligna a tesutului conjunctiv, incluzand fractura patologica tologica fara CC catastrofale sau severe	0.5671
+I66A	I3061	8	M	Tulburari inflamatorii musculoscheletale cu CC catastrofale sau severe	2.2178
+I66B	I3062	8	M	Tulburari inflamatorii musculoscheletale fara CC catastrofale sau severe	0.4221
+I67A	I3071	8	M	Artrita septica cu CC catastrofale sau severe	2.3564
+I67B	I3072	8	M	Artrita septica fara CC catastrofale sau severe	0.7939
+I68A	I3081	8	M	Tulburari nechirurgicale ale coloanei cu CC	1.3294
+I68B	I3082	8	M	Tulburari nechirurgicale ale coloanei fara CC	0.6049
+I68C	I3083	8	M	Tulburari nechirurgicale ale coloanei, de zi	0.1890
+I69A	I3091	8	M	Boli ale oaselor si atropatii specifice varsta >74 SI cu CC catastrofale sau severe	1.5626
+I69B	I3092	8	M	Boli ale oaselor si atropatii specifice varsta >74 SAU cu (CC catastrofale sau severe )	0.5923
+I69C	I3093	8	M	Boli ale oaselor si atropatii specifice varsta <75 fara CC catastrofale sau severe	0.2898
+I70Z	I3100	8	M	Artropatii nespecifice	0.5482
+I71A	I3111	8	M	Alte tulburari musculotendinoase varsta >69 SI cu CC	0.8695
+I71B	I3112	8	M	Alte tulburari musculotendinoase varsta >69 SAU cu CC	0.4032
+I71C	I3113	8	M	Alte tulburari musculotendinoase varsta <70 fara CC	0.2646
+I72A	I3121	8	M	Tulburari musculotendinoase specifice varsta >79 sau cu (CC catastrofale sau severe)	1.2034
+I72B	I3122	8	M	Tulburari musculotendinoase specifice varsta <80 fara CC catastrofale sau severe	0.3339
+I73A	I3131	8	M	Ingrijiri postprocedurale ale implanturilor/prostezel or musculoscheletale varsta >59 SI cu CC catastrofale sau severe	1.7768
+I73B	I3132	8	M	Ingrijiri postprocedurale ale implanturilor/prostezel or musculoscheletale varsta >59 SAU cu (CC catastrofale sau severe)	0.6427
+I73C	I3133	8	M	Ingrijiri postprocedurale ale implanturilor/prostezel or musculoscheletale varsta <60 fara CC catastrofale sau severe	0.3465
+I74A	I3141	8	M	Leziuni ale antebratului, pumnului, mainii sau piciorului varsta >74 SI cu CC	1.1026
+I74B	I3142	8	M	Leziuni ale antebratului, pumnului, mainii sau piciorului varsta >74 SAU cu CC	0.4284
+I74C	I3143	8	M	Leziuni ale antebratului, pumnului, mainii sau piciorului varsta <75 fara CC	0.2835
+I75A	I3151	8	M	Leziuni ale umarului, bratului, cotului, genunchiului, gambei sau gleznei, varsta >64 SI cu CC	1.3861
+I75B	I3152	8	M	Leziuni ale umarului, bratului, cotului, genunchiului, gambei sau gleznei varsta >64 SAU cu CC	0.5860
+I75C	I3153	8	M	Leziuni ale umarului, bratului, cotului, genunchiului, gambei sau gleznei, varsta <65 fara CC	0.2961
+I76A	I3161	8	M	Alte tulburari musculoscheletale varsta >69 SI cu CC	1.1467
+I76B	I3162	8	M	Alte tulburari musculoscheletale varsta >69 SAU cu CC	0.4788
+I76C	I3163	8	M	Alte tulburari musculoscheletale varsta <70 fara CC	0.2583
+I77A	I3171	8	M	Fracturi ale pelvisului cu CC catastrofale sau severe	2.0477
+I77B	I3172	8	M	Fracturi ale pelvisului fara CC catastrofale sau severe	0.9262
+I78A	I3181	8	M	Fracturi ale colului femural cu CC catastrofale sau severe	1.2979
+I78B	I3182	8	M	Fracturi ale colului femural fara CC catastrofale sau severe	0.4284
+J01Z	J1010	9	C	Transfer de tesut microvasular pentru piele, tesut subcutanat si tulburari ale sanului	4.8137
+J06A	J1021	9	C	Proceduri majore pentru afectiuni maligne ale sanului	1.2097
+J06B	J1022	9	C	Proceduri majore pentru afectiuni nemaligne ale sanului	0.9829
+J07A	J1031	9	C	Proceduri minore pentru afectiuni maligne ale sanului	0.5482
+J07B	J1032	9	C	Proceduri minore pentru afectiuni nemaligne ale sanului	0.3780
+J08A	J1041	9	C	Alta grefa a pielii si/sau proceduri de debridare cu CC catastrofale sau severe	2.0918
+J08B	J1042	9	C	Alta grefa a pielii si/sau proceduri de debridare fara CC catastrofale sau severe	0.6112
+J09Z	J1050	9	C	Proceduri perianale si pilonidale	0.4978
+J10Z	J1060	9	C	Proceduri in sala de operatii ale pielii, tesutului subcutanat si chirugie plastica la nivelul sanului	0.4473
+J11Z	J1070	9	C	Alte proceduri ale pielii, tesutului subcutanat si sanului	0.2709
+J12A	J1081	9	C	Proceduri ale membrelor inferioare cu ulcer/celulita cu CC catastrofale	4.7444
+J12B	J1082	9	C	Proceduri ale membrelor inferioare cu ulcer/celulita fara CC catastrofale SI cu grefa de piele/lambou de reparare	2.6148
+J12C	J1083	9	C	Proceduri ale membrelor inferioare cu ulcer/celulita fara CC catastrofale FARA grefa de piele/lambou de reparare	1.7768
+J13A	J1091	9	C	Proceduri ale membrelor inferioare fara ulcer/celulita cu grefa de piele (CC catastrofale sau severe)	2.4194
+J13B	J1092	9	C	Proceduri ale membrelor inferioare fara ulcer/celulita fara (grefa de piele si (CC catastrofale sau severe)	0.8947
+J14Z	J1100	9	C	Reaconstructii majore ale sanului	3.5347
+J60A	J3011	9	M	Ulceratii ale pielii	1.4491
+J60B	J3012	9	M	Ulceratie ale pielii, de zi	0.1260
+J62A	J3021	9	M	Tulburari maligne ale sanului (varsta >69 SI cu CC) SAU cu (CC catastrofale sau severe)	0.6742
+J62B	J3022	9	M	Tulburari maligne ale sanului (varsta >69 fara CC) sau fara (CC catastrofale sau severe)	0.2394
+J63Z	J3030	9	M	Tulburari nemaligne ale sanului	0.2772
+J64A	J3041	9	M	Celulita varsta >59 cu CC catastrofale sau severe	1.3420
+J64B	J3042	9	M	Celulita (varsta >59 fara CC catastrofale sau severe ) sau varsta <60	0.5608
+J65A	J3051	9	M	Trauma a pielii, tesutului subcutanat si sanului varsta >69	0.5545
+J65B	J3052	9	M	Trauma a pielii, tesutului subcutanat si sanului varsta <70	0.2709
+J67A	J3061	9	M	Tulburari minore ale pielii	0.5923
+J67B	J3062	9	M	Tulburari minore ale pielii, de zi	0.1575
+J68A	J3071	9	M	Tulburari majore ale pielii	0.9199
+J68B	J3072	9	M	Tulburari majore ale pielii, de zi	0.0882
+K01Z	K1010	10	C	Proceduri ale piciorului diabetic	3.7867
+K02Z	K1020	10	C	Proceduri la nivel de hipofiza	2.7849
+K03Z	K1030	10	C	Proceduri la nivelul suprarenalelor	2.6085
+K04Z	K1040	10	C	Proceduri majore pentru obezitate	1.5689
+K05Z	K1050	10	C	Proceduri la nivelul paratiroidelor	1.2664
+K06Z	K1060	10	C	Proceduri la nivelul tiroidei	1.1152
+K07Z	K1070	10	C	Proceduri privind obezitatea	1.3357
+K08Z	K1080	10	C	Proceduri privind tiroglosul	0.6616
+K09Z	K1090	10	C	Alte proceduri in sala de operatii la nivel endocrin, nutritional si metabolic	2.7849
+K40Z	K2010	10	A	Proceduri endoscopice sau investigative pentru tulburari metabolice fara CC	0.3843
+K60A	K3011	10	M	Diabet cu CC catastrofale sau severe	1.2790
+K60B	K3012	10	M	Diabet fara CC catastrofale sau severe	0.5734
+K61Z	K3020	10	M	Perturbare nutritionala severa	2.3060
+K62A	K3031	10	M	Diverse tulburari metabolice cu CC catastrofale	1.5185
+K62B	K3032	10	M	Diverse tulburari metabolice varsta >74 SAU cu CC severe	0.7246
+K62C	K3033	10	M	Diverse tulburari metabolice varsta <75 fara CC catastrofale sau severe	0.3843
+K63Z	K3040	10	M	Erori innascute de metabolism	0.4158
+K64A	K3051	10	M	Tulburari endocrine cu CC catastrofale sau severe	1.4239
+K64B	K3052	10	M	Tulburari endocrine fara CC catastrofale sau severe	0.4851
+L02A	L1011	11	C	Insertie operatorie a cateterului peritoneal pentru dializa cu CC catastrofale sau severe	4.0576
+L02B	L1012	11	C	Insertie operatorie a cateterului peritoneal pentru dializa fara CC catastrofale sau severe	1.1971
+L03A	L1021	11	C	Proceduri majore ale rinichiului, ureterului, si vezicii urinare pentru tumori cu CC catastrofale sau severe	4.1332
+L03B	L1022	11	C	Proceduri majore ale rinichiului, ureterului, si vezicii urinare pentru tumori fara CC catastrofale sau severe	2.7345
+L04A	L1031	11	C	Proceduri majore ale rinichiului, ureterului, si vezicii urinare pentru tumori benigne cu CC catastrofale	3.6229
+L04B	L1032	11	C	Proceduri majore ale rinichiului, ureterului, si vezicii urinare pentru tumori benigne cu CC severe sau moderate	1.8461
+L04C	L1033	11	C	Proceduri majore ale rinichiului, ureterului, si vezicii urinare pentru tumori benigne fara CC	1.2790
+L05A	L1041	11	C	Prostatectomie transuretrala cu CC catastrofale sau severe	2.2241
+L05B	L1042	11	C	Prostatectomie transuretrala fara CC catastrofale sau severe	0.8821
+L06A	L1051	11	C	Proceduri minore ale vezicii urinare cu CC catastrofale sau severe	1.9847
+L06B	L1052	11	C	Proceduri minore ale vezicii urinare fara CC catastrofale sau severe	0.6364
+L07A	L1061	11	C	Proceduri transuretrale cu exceptia prostatectomiei cu CC catastrofale sau severe	1.2790
+L07B	L1062	11	C	Proceduri transuretrale cu exceptia prostatectomiei fara CC catastrofale sau severe	0.5230
+L08A	L1071	11	C	Proceduri ale uretrei cu CC	0.8569
+L08B	L1072	11	C	Proceduri ale uretrei fara CC	0.5419
+L09A	L1081	11	C	Alte proceduri pentru tulburari ale rinichiului si tractului urinar cu CC catasatrofal	4.9460
+L09B	L1082	11	C	Alte proceduri pentru tulburari ale rinichiului si tractului urinar cu CC severe	2.1233
+L09C	L1083	11	C	Alte proceduri pentru tulburari ale rinichiului si tractului urinar fara CC catastrofale sau severe	1.0459
+L40Z	L2010	11	A	Ureteroscopie	0.6238
+L41Z	L2020	11	A	Cistouretroscopie, de zi	0.2016
+L42Z	L2030	11	A	Litotripsie extracorporeala pentru litiaza urinara	0.3969
+L60A	L3011	11	M	Insuficienta renala cu CC catastrofale	2.2556
+L60B	L3012	11	M	Insuficienta renala cu CC severe	1.2160
+L60C	L3013	11	M	Insuficienta renala fara CC catastrofale sau severe	0.6364
+L61Z	L3020	11	M	Internare pentru dializa renala	0.0945
+L62A	L3031	11	M	Tumori ale rinichiului si tractului urinar cu CC catastrofale sau severe	1.2601
+L62B	L3032	11	M	Tumori ale rinichiului si tractului urinar fara CC catastrofale sau severe	0.6112
+L63A	L3041	11	M	Infectii ale rinichiului si tractului urinar cu CC catastrofale	1.6445
+L63B	L3042	11	M	Infectii ale rinichiului si tractului urinar varsta >69 SAU cu CC severe	0.7435
+L63C	L3043	11	M	Infectii ale rinichiului si tractului urinar varsta <70 fara CC catastrofale sau severe	0.4284
+L64Z	L3050	11	M	Pietre si obstructie urinara	0.3276
+L65A	L3061	11	M	Semne si simptome ale rinichiului si tractului urinar cu CC catastrofale sau severe	0.9262
+L65B	L3062	11	M	Semne si simptome ale rinichiului si tractului urinar fara CC catastrofale sau severe	0.3339
+L66Z	L3070	11	M	Strictura uretrala	0.3528
+L67A	L3081	11	M	Alte diagnostice la nivelul rinichiului si tractului urinar cu CC catastrofale	2.0603
+L67B	L3082	11	M	Alte diagnostice la nivelul rinichiului si tractului urinar cu CC severe	0.8947
+L67C	L3083	11	M	Alte diagnostice la nivelul rinichiului si tractului urinar fara CC catastrofale sau severe	0.3087
+M01Z	M1010	12	C	Proceduri majore pelvine la barbat	2.7723
+M02A	M1021	12	C	Prostatectomie transuretrala cu CC catastrofale sau severe	1.6823
+M02B	M1022	12	C	Prostatectomie transuretrala fara CC catastrofale sau severe	0.8695
+M03A	M1031	12	C	Proceduri la nivelul penisului cu CC	1.0963
+M03B	M1032	12	C	Proceduri la nivelul penisului fara CC	0.5734
+M04A	M1041	12	C	Proceduri la nivelul testiculelor cu CC	1.0711
+M04B	M1042	12	C	Proceduri la nivelul testiculelor fara CC	0.4410
+M05Z	M1050	12	C	Circumcizie	0.3213
+M06A	M1061	12	C	Alte proceduri chirugicale la nivelul sistemului reproductiv masculin pentru starea maligna	1.9217
+M06B	M1062	12	C	Alte proceduri chirugicale la nivelul sistemului reproductiv masculin exceptand cele pentru starea maligna	0.6049
+M40Z	M2010	12	A	Cistouretroscopie fara CC	0.1890
+M60A	M3011	12	M	Stare maligna a sistemului reproductiv masculin cu CC catastrofale sau severe	1.0081
+M60B	M3012	12	M	Stare maligna a sistemului reproductiv masculin fara CC catastrofale sau severe	0.3465
+M61A	M3021	12	M	Hipertrofie prostatica benigna cu CC catastrofale sau severe	1.0837
+M61B	M3022	12	M	Hipertrofie prostatica benigna fara CC catastrofale sau severe	0.2835
+M62A	M3031	12	M	Inflamatii ale sistemului reproductiv masculin cu CC	0.7687
+M62B	M3032	12	M	Inflamatii ale sistemului reproductiv masculin fara CC	0.3402
+M63Z	M3040	12	M	Sterilizare, barbati	0.2646
+M64Z	M3050	12	M	Alte diagnostice ale sistemului reproductiv masculin	0.2520
+N01Z	N1010	13	C	Eviscerare a pelvisului si vulvectomie radicala	3.3456
+N02A	N1021	13	C	Proceduri uterine si ale anexelor pentru stare maligna ovariana sau a anexelor cu CC	3.0243
+N02B	N1022	13	C	Proceduri uterine si ale anexelor pentru stare maligna ovariana sau a anexelor fara CC	1.6949
+N03A	N1031	13	C	Proceduri uterine si ale anexelor pentru stare maligna non-ovariana sau a anexelor cu CC	2.5833
+N03B	N1032	13	C	Proceduri uterine si ale anexelor pentru stare maligna non-ovariana sau a anexelor fara CC	1.5878
+N04Z	N1040	13	C	Histerectomie pentru stare nemaligna	1.1719
+N05A	N1051	13	C	Ovariectomie si proceduri complexe nemaligne ale trompei Fallope cu CC catastrofale sau severe	1.9784
+N05B	N1052	13	C	Ovariectomie si proceduri complexe nemaligne ale trompei Fallope fara CC catastrofale sau severe	0.9955
+N06Z	N1060	13	C	Proceduri de reconstructie ale sistemului reproductiv feminin	0.9514
+N07Z	N1070	13	C	Alte proceduri la nivel uterin si anexe pentru stare nemaligna	0.5104
+N08Z	N1080	13	C	Proceduri endoscopice pentru sistemul reproductiv feminin	0.4536
+N09Z	N1090	13	C	Conizatie, proceduri la nivelul vaginului, colului uterin si vulvei	0.3087
+N10Z	N1100	13	C	Curetaj diagnostic si histeroscopie diagnostica	0.2898
+N11A	N1111	13	C	Alte proceduri in sala de operatii ale sistemului reproductiv feminin varsta >64 SAU cu stare maligna SAU cu CC	2.8668
+N11B	N1112	13	C	Alte proceduri in sala de operatii ale sistemului reproductiv feminin varsta <65 fara neoplasm fara CC	0.3717
+N60A	N3011	13	M	Stare maligna a sistemului reproductiv feminin cu CC catastrofale sau severe	1.0963
+N60B	N3012	13	M	Stare maligna a sistemului reproductiv feminin fara CC catastrofale sau severe	0.5797
+N61Z	N3020	13	M	Infectii, sistem reproductiv feminin	0.3969
+N62A	N3031	13	M	Tulburari menstruale si alte tulburari ale sistemului genital feminin cu CC	0.4347
+N62B	N3032	13	M	Tulburari menstruale si alte tulburari ale sistemului genital feminin fara CC	0.1827
+O01A	O1011	14	C	Nastere prin cezariana cu CC catastrofale	2.3123
+O01B	O1012	14	C	Nastere prin cezariana cu CC severe	1.5752
+O01C	O1013	14	C	Nastere prin cezariana fara CC catastrofale sau severe	1.2223
+O02A	O1021	14	C	Nastere vaginala cu proceduri in sala de operatii cu CC catastrofale sau severe	1.2412
+O02B	O1022	14	C	Nastere vaginala cu proceduri in sala de operatii fara CC catastrofale sau severe	0.9388
+O03Z	O1030	14	C	Sarcina ectopica	0.8128
+O04Z	O1040	14	C	Postpartum si post avort cu proceduri in sala de operatii	0.5860
+O05Z	O1050	14	C	Avort cu proceduri in sala de operatii	0.2835
+O60A	O3011	14	M	Nastere vaginala cu CC catastrofale sau severe	1.0270
+O60B	O3012	14	M	Nastere vaginala fara CC catastrofale sau severe	0.7309
+O60C	O3013	14	M	Nastere vaginala singulara fara complicatii SI fara alte afectiuni	0.6238
+O61Z	O3020	14	M	Postpartum si post avort cu proceduri in sala de operatii	0.3402
+O63Z	O3030	14	M	Avort fara proceduri in sala de operatii	0.2394
+O64A	O3041	14	M	Travaliu fals inainte de 37saptamani SAU cu CC catastrofale	0.3276
+O64B	O3042	14	M	Travaliu fals dupa 37 saptamani fara CC catastrofale	0.1449
+O66A	O3051	14	M	Internare prenatala si pentru alte probleme obstetrice	0.3654
+O66B	O3052	14	M	Internare prenatala si pentru alte probleme obstetrice, de zi	0.0945
+P01Z	P1010	15	C	Nou- nascut externat ca deces sau transfer, la interval <5 zile de internare, cu proceduri semnificative in sala de operatii	0.7561
+P02Z	P1020	15	C	Proceduri cardiotoracice/vasculare pentru nou-nascuti	15.7327
+P03Z	P1030	15	C	Nou-nascut, greutate la internare 1000-1499 g cu procedura semnificativa in sala de operatii	12.4375
+P04Z	P1040	15	C	Nou-nascut, greutate la internare 1500-1999 g cu procedura semnificativa in sala de operatii	9.9109
+P05Z	P1050	15	C	Nou-nascut, greutate la internare 2000-2499 g cu procedura semnificativa in sala de operatii	6.4140
+P06A	P1061	15	C	Nou-nascut, greutate la internare > 2499 g cu procedura semnificativa in sala de operatii, cu probleme multiple majore	10.1629
+P06B	P1062	15	C	Nou-nascut, greutate la internare > 2499 g cu procedura semnificativa in sala de operatii, fara probleme multiple majore	3.2700
+P60A	P3011	15	M	internare, fara procedura semnificativa in sala de operatii, cu	0.2709
+P60B	P3012	15	M	la interval <5zile de la internare, fara procedura semnificativa in sala	0.4536
+P61Z	P3020	15	M	Nou-nascut, greutate la internare < 750 g	22.6886
+P62Z	P3030	15	M	Nou-nascut, greutate la internare 750-999 g	15.7579
+P63Z	P3040	15	M	Nou-nascut, greutate la internare 1000-1249 g fara procedura semnificativa in sala de operatii	6.0801
+P64Z	P3050	15	M	Nou-nascut, greutate la internare 1250-1499 g fara procedura semnificativa in sala de operatii	4.5113
+P65A	P3061	15	M	Nou-nascut, greutate la internare 1500-1999 g fara procedura semnificativa in sala de operatii, cu probleme multiple majore	4.6751
+P65B	P3062	15	M	Nou-nascut, greutate la internare 1500-1999 g fara procedura semnificativa in sala de operatii, cu probleme majore	3.1944
+P65C	P3063	15	M	Nou-nascut, greutate la internare 1500-1999 g fara procedura semnificativa in sala de operatii, cu alte probleme	2.3312
+P65D	P3064	15	M	Nou-nascut, greutate la internare 1500-1999 g fara procedura semnificativa in sala de operatii, fara probleme	2.1296
+P66A	P3071	15	M	Nou-nascut, greutate la internare 2000-2499 g fara procedura semnificativa in sala de operatii, cu probleme multiple majore	2.5581
+P66B	P3072	15	M	Nou-nascut, greutate la internare 2000-2499 g fara procedura semnificativa in sala de operatii, cu probleme majore	2.0918
+P66C	P3073	15	M	Nou-nascut, greutate la internare 2000-2499 g fara procedura semnificativa in sala de operatii, cu alte probleme	1.4176
+P66D	P3074	15	M	Nou-nascut, greutate la internare 2000-2499 g fara procedura semnificativa in sala de operatii, fara probleme	0.6301
+P67A	P3081	15	M	Nou-nascut, greutate la internare > 2499 g fara procedura semnificativa in sala de operatii, cu probleme multiple majore	2.2934
+P67B	P3082	15	M	Nou-nascut, greutate la internare > 2499 g fara procedura semnificativa in sala de operatii, cu probleme majore	1.3042
+P67C	P3083	15	M	Nou-nascut, greutate la internare > 2499 g fara procedura semnificativa in sala de operatii, cu alte probleme	0.7309
+P67D	P3084	15	M	Nou-nascut, greutate la internare > 2499 g fara procedura semnificativa in sala de operatii, fara probleme	0.3150
+Q01Z	Q1010	16	C	Splenectomie	2.3753
+Q02A	Q1021	16	C	Alte proceduri in sala de operatii ale sangelui si organelor hematopoietice cu CC catastrofale sau severe	3.3582
+Q02B	Q1022	16	C	Alte proceduri in sala de operatii ale sangelui si organelor hematopoietice fara CC catastrofale sau severe	0.6175
+Q60A	Q3011	16	M	Tulburari reticuloendoteliale si de imunitate cu CC catastrofale sau severe	1.5563
+Q60B	Q3012	16	M	Tulburari reticuloendoteliale si de imunitate fara CC catastrofale sau severe cu stare maligna	0.7120
+Q60C	Q3013	16	M	Tulburari reticuloendoteliale si de imunitate fara CC catastrofale sau severe fara stare maligna	0.2331
+Q61A	Q3021	16	M	Tulburari ale globulelor rosii cu CC catastrofale	1.3168
+Q61B	Q3022	16	M	Tulburari ale globulelor rosii cu CC severe	0.6490
+Q61C	Q3023	16	M	Tulburari ale globulelor rosii fara CC catastrofale sau severe	0.2268
+Q62Z	Q3030	16	M	Anomalii de coagulare	0.3969
+R01A	R1011	17	C	Limfom si leucemie cu proceduri majore in sala de operatii, cu CC catastrofale sau severe	6.3195
+R01B	R1012	17	C	Limfom si leucemie cu proceduri majore in sala de operatii, fara CC catastrofale sau severe	2.0162
+R02A	R1021	17	C	Alte tulburari neoplazice cu proceduri majore in sala de operatii, cu CC catastrofale sau severe	3.3960
+R02B	R1022	17	C	Alte tulburari neoplazice cu proceduri majore in sala de operatii, fara CC catastrofale sau severe	1.8398
+R03A	R1031	17	C	Limfom si leucemie cu alte proceduri in sala de operatii cu CC catastrofale sau severe	4.8767
+R03B	R1032	17	C	Limfom si leucemie cu alte proceduri in sala de operatii fara CC catastrofale sau severe	0.9892
+R04A	R1041	17	C	Alte tulburari neoplazice cu alte proceduri in sala de operatii cu CC catastrofale sau severe	1.5248
+R04B	R1042	17	C	Alte tulburari neoplazice cu alte proceduri in sala de operatii fara CC catastrofale sau severe	0.7120
+R60A	R3011	17	M	Leucemie acuta cu CC catastrofale	5.3870
+R60B	R3012	17	M	Leucemie acuta cu CC severe	1.0648
+R60C	R3013	17	M	Leucemie acuta fara CC catastrofale sau severe	0.6112
+R61A	R3021	17	M	Limfom si leucemie non-acuta cu CC catastrofale	3.0936
+R61B	R3022	17	M	Limfom si leucemie non-acuta fara CC catastrofale	1.0207
+R61C	R3023	17	M	Limfom si leucemie non-acuta, de zi	0.1323
+R62A	R3031	17	M	Alte tulburari neoplazice cu CC	1.1656
+R62B	R3032	17	M	Alte tulburari neoplazice fara CC	0.4914
+R63Z	R3040	17	M	Chimioterapie	0.1512
+R64Z	R3050	17	M	Radioterapie	0.4095
+S60Z	S3010	18	M	HIV, de zi	0.1890
+S65A	S3021	18	M	Boli conexe HIV cu CC catastrofale	5.4627
+S65B	S3022	18	M	Boli conexe HIV cu CC severe	2.4320
+S65C	S3023	18	M	Boli conexe HIV fara CC catastrofale sau severe	1.5941
+T01A	T1011	18	C	Proceduri in sala de operatii pentru boli infectioase si parazitare cu CC catastrofale	5.6769
+T01B	T1012	18	C	Proceduri in sala de operatii pentru boli infectioase si parazitare cu CC severe sau moderate	2.4888
+T01C	T1013	18	C	Proceduri in sala de operatii pentru boli infectioase si parazaitare fara CC	1.3231
+T60A	T3011	18	M	Septicemie cu CC catastrofale sau severe	1.7327
+T60B	T3012	18	M	Septicemie fara CC catastrofale sau severe	0.8254
+T61A	T3021	18	M	Infectii postoperatorii si posttraumatice varsta >54 SAU cu (CC catastrofale sau severe)	0.9514
+T61B	T3022	18	M	Infectii postoperatorii si posttraumatice varsta <55 fara CC catastrofale sau severe	0.5545
+T62A	T3031	18	M	Febra de origine necunoscuta cu CC	0.8443
+T62B	T3032	18	M	Febra de origine necunoscuta fara CC	0.3969
+T63A	T3041	18	M	Boala virala varsta >59 SAU cu CC	0.5734
+T63B	T3042	18	M	Boala virala varsta <60 fara CC	0.3087
+T64A	T3051	18	M	Alte boli infectioase sau parazitare cu CC catastrofale sau severe	1.8146
+T64B	T3052	18	M	Alte boli infectioase sau parazitare fara CC catastrofale sau severe	0.5608
+U40Z	U2010	19	A	Tratament al sanatatii mentale, de zi, cu terapie electroconvulsiva (ECT)	0.1197
+U60Z	U3010	19	M	Tratament al sanatatii mentale, de zi, fara terapie electroconvulsiva (ECT)	0.1134
+U61A	U3021	19	M	Tulburari schizofrenice cu statut legal al sanatatii mentale	2.3942
+U61B	U3022	19	M	Tulburari schizofrenice fara statut legal al sanatatii mentale	1.3168
+U62A	U3031	19	M	Paranoia si tulburare psihica acuta cu CC catastrofale/sever sau cu statut legal al sanatatii mentale	1.9280
+U62B	U3032	19	M	Paranoia si tulburare psihica acuta fara CC catastrofale/sever fara statut legal al sanatatii mentale	0.9325
+U63A	U3041	19	M	Tulburari afective majore varsta >69 SAU cu (CC catastrofale sau severe )	2.2367
+U63B	U3042	19	M	Tulburari afective majore varsta <70 fara CC catastrofale sau severe	1.4996
+U64Z	U3050	19	M	Alte tulburari afective si somatoforme	0.8695
+U65Z	U3060	19	M	Tulburari de anxietate	0.6553
+U66Z	U3070	19	M	Supralimentatie si tulburari obsesiv-compulsive	3.3204
+U67Z	U3080	19	M	Tulburari de personalitate si reactii acute	0.8002
+U68Z	U3090	19	M	Tulburari mentale in copilarie	1.6634
+V60A	V3011	20	M	Intoxicatie cu alcool si sevraj cu CC	0.5545
+V60B	V3012	20	M	Intoxicatie cu alcool si sevraj fara CC	0.2457
+V61Z	V3020	20	M	Intoxicatii medicamentoase si sevraj	0.7309
+V62A	V3031	20	M	Tulburare si dependenta datorita consumului de alcool	0.6805
+V62B	V3032	20	M	Tulburare si dependenta datorita consumului de alcool, de zi	0.0882
+V63A	V3041	20	M	Tulburare si dependenta datorita consumului de opiacee	0.3843
+V63B	V3042	20	M	Tulburare si dependenta datorita consumului de opiacee, pacient plecat impotriva avizului medical	0.3591
+V64Z	V3050	20	M	Alte tulburari si dependente datorita consumului de droguri	0.3843
+W01Z	W1010	21	C	Proceduri de ventilare sau craniotomie pentru traummatisme multiple semnificative	15.2538
+W02Z	W1020	21	C	Proceduri la sold, femur si membru pentru traumatisme multiple semnificative, inclusiv implant	5.9478
+W03Z	W1030	21	C	Proceduri abdominale pentru traumatisme multiple semnificative	4.5617
+W04Z	W1040	21	C	Alte proceduri in sala de operatii pentru traumatisme multiple semnificative	5.0405
+W60Z	W3010	21	M	Traumatisme multiple, decedat sau transferat la alta unitate de ingrijiri acute, LOS<5 zile	0.9766
+W61Z	W3020	21	M	Traumatisme multiple fara proceduri semnificative	2.0036
+X02Z	X1010	21	C	Transfer de tesut microvascular sau grefa de piele pentru leziuni ale mainii	0.8380
+X04A	X1021	21	C	Alte proceduri pentru leziuni ale membrului inferior varsta >59 sau cu CC	1.8272
+X04B	X1022	21	C	Alte proceduri pentru leziuni ale membrului inferior varsta <60 fara CC	0.7624
+X05Z	X1030	21	C	Alte proceduri pentru leziuni ale mainii	0.5545
+X06A	X1041	21	C	Alte proceduri pentru alte leziuni cu CC catastrofale sau severe	2.1611
+X06B	X1042	21	C	Alte proceduri pentru alte leziuni fara CC catastrofale sau severe	0.6553
+X07A	X1051	21	C	Grefe de piele pentru leziuni ale extremitatilor mainii cu transfer de tesut microvascular sau cu (CC catastrofale sau severe )	3.5158
+X07B	X1052	21	C	Grefe de piele pentru leziuni ale extremitatilor mainii cu transfer de tesut microvascular fara CC catastrofale sau severe	1.5437
+X60A	X3011	21	M	Leziuni varsta >64 cu CC	0.8506
+X60B	X3012	21	M	Leziuni varsta >64 fara CC	0.2772
+X60C	X3013	21	M	Leziuni varsta <65	0.2268
+X61Z	X3020	21	M	Reactii alergice	0.2457
+X62A	X3031	21	M	Otravire/efecte toxice ale medicamentelor si ale altor substante varsta >59 sau cu CC	0.5860
+X62B	X3032	21	M	Otravire/efecte toxice ale medicamentelor si ale altor substante varsta <60 fara CC	0.2457
+X63A	X3041	21	M	Sechele ale tratamentului cu CC catastrofale sau severe	0.9577
+X63B	X3042	21	M	Sechele ale tratamentului fara CC catastrofale sau severe	0.3906
+X64A	X3051	21	M	Alta leziune, otravire si diagnostic privind efectele toxice varsta >59 sau cu CC	0.6490
+X64B	X3052	21	M	Alta leziune, otravire si diagnostic privind efectele toxice varsta <60 fara CC	0.2268
+Y01Z	Y1010	22	C	Arsuri grave, cu adancime completa	28.8695
+Y02A	Y1021	22	C	Alte arsuri cu grefa de piele varsta >64 sau cu (CC catastrofale sau severe) sau cu proceduri complicate	5.9163
+Y02B	Y1022	22	C	Alte arsuri cu grefa de piele varsta <65 fara (CC catastrofale sau severe) fara proceduri complicate	1.9469
+Y03Z	Y1030	22	C	Alte proceduri in sala de operatii pentru alte arsuri	1.1971
+Y62A	Y2011	22	M	Alte arsuri varsta >64 sau cu (CC catastrofale sau severe) sau cu proceduri complicate	1.5311
+Y62B	Y2012	22	M	Alte arsuri varsta <65 fara (CC catastrofale sau severe) fara proceduri complicate	0.4347
+Y60Z	Y3010	22	M	Arsuri, pacienti trasferati catre alte unitati de ingrijiri acute < 5 zile	0.2520
+Y61Z	Y3020	22	M	Arsuri grave	0.9325
+Z01A	Z1011	23	C	Proceduri in sala de operatii cu diagnostice stabilite prin contacte cu alte serviciile de sanatate cu CC catastrofale/sever	1.0585
+Z01B	Z1012	23	C	Proceduri in sala de operatii cu diagnostice stabilite prin contacte cu alte serviciile de sanatate fara CC catastrofale/sever	0.4536
+Z40Z	Z2010	23	A	Monitorizare dupa tratament complet cu endoscopie	0.1701
+Z60A	Z3011	23	M	Reabilitare cu CC catastrofale sau severe	2.1989
+Z60B	Z3012	23	M	Reabilitarere fara CC catastrofale sau severe	1.1341
+Z60C	Z3013	23	M	Reabilitare, de zi	0.1575
+Z61Z	Z3020	23	M	Semne si simptome	0.4410
+Z62Z	Z3030	23	M	Monitorizare fara endoscopie	0.1890
+Z63A	Z3041	23	M	Alte post ingrijiri cu CC catastrofale sau severe	1.5122
+Z63B	Z3042	23	M	Alte post ingrijiri fara CC catastrofale sau severe	0.4914
+Z64A	Z3051	23	M	Alti factori care influenteaza starea de sanatate	0.5923
+Z64B	Z3052	23	M	Alti factori care influenteaza starea de sanatate, de zi	0.1323
+Z65Z	Z3060	23	M	Anomalii congenitale multiple, nespecificate sau altele	0.4410

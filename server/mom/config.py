@@ -13,10 +13,18 @@ WHISPER_LARGE_V3 = MODELS_DIR / "ggml-large-v3.bin"
 WHISPER_LARGE_V3_Q8 = MODELS_DIR / "ggml-large-v3-q8_0.bin"
 WHISPER_TURBO = MODELS_DIR / "ggml-large-v3-turbo.bin"
 WHISPER_TURBO_Q8 = MODELS_DIR / "ggml-large-v3-turbo-q8_0.bin"
-DEFAULT_WHISPER_MODEL = WHISPER_LARGE_V3_Q8 if WHISPER_LARGE_V3_Q8.exists() else WHISPER_LARGE_V3
+# Large V3 Turbo fine-tuned on Moldovan / Romanian speech (LoRA, turbo-md-adapter/), 8-bit; scripts/build_turbo_md.sh
+WHISPER_TURBO_MD_Q8 = MODELS_DIR / "ggml-turbo-md-q8_0.bin"
+# Default for whole-file dialog (and the web app): the fine-tuned Turbo when it is built — on the Medpark recording
+# as many minutes facts as Large V3 (24.7 vs 25.3 of 44, 3 runs each) in ~30% less time (108 vs 151 s) and half the
+# size; stock Turbo found only 17.7. Else 8-bit Large V3, else the full Large V3.
+DEFAULT_WHISPER_MODEL = next((m for m in (WHISPER_TURBO_MD_Q8, WHISPER_LARGE_V3_Q8) if m.exists()), WHISPER_LARGE_V3)
 VAD_MODEL = MODELS_DIR / "ggml-silero-v5.1.2.bin"
+# The whisper.cpp command line; WHISPER_CLI=/path/to/whisper-cli for another build (e.g. one with Core ML, which
+# runs the encoder on the Neural Engine when models/<model>-encoder.mlmodelc exists).
+WHISPER_CLI = os.environ.get("WHISPER_CLI") or "whisper-cli"
 # --model accepts these short names besides a file path
-WHISPER_SHORT_NAMES = {"turbo": WHISPER_TURBO_Q8, "large": WHISPER_LARGE_V3_Q8}
+WHISPER_SHORT_NAMES = {"turbo": WHISPER_TURBO_Q8, "large": WHISPER_LARGE_V3_Q8, "turbo-md": WHISPER_TURBO_MD_Q8}
 
 # --- Ollama models ---
 MINUTES_MODEL = "gemma4:e4b"        # minutes and speaker roles

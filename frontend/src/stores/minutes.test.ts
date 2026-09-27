@@ -6,7 +6,7 @@ import * as minutesApi from "@/api/minutes";
 import type { Line, Suggestion } from "@/api/types";
 import { doc, meeting } from "@/test/fixtures";
 
-import { acceptInto, move, searchCatalog, timeToSeconds, topicLines, useMinutesStore } from "./minutes";
+import { acceptInto, move, timeToSeconds, topicLines, useMinutesStore } from "./minutes";
 
 vi.mock("@/api/meetings");
 vi.mock("@/api/minutes");
@@ -41,15 +41,6 @@ describe("minutes helpers", () => {
   it("moves an entry and ignores moves past the ends", () => {
     expect(move([1, 2, 3], 0, 1)).toEqual([2, 1, 3]);
     expect(move([1, 2, 3], 0, -1)).toEqual([1, 2, 3]);
-  });
-
-  it("searches the catalog without codes the block has", () => {
-    expect(searchCatalog("", [])).toEqual([]);
-    const hits = searchCatalog("I21", []);
-    expect(hits[0]?.code).toBe("I21.4");
-    expect(
-      searchCatalog("I21", [{ id: "c", system: "ICD-10", code: "I21.4", label: "" }]).map((c) => c.code),
-    ).not.toContain("I21.4");
   });
 
   it("files an accepted suggestion into the chosen block, or a new one", () => {

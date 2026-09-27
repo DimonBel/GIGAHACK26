@@ -23,13 +23,18 @@ def main():
                    help="extractions per chunk merged together (1-3); more = better recall, slower unless "
                         "OLLAMA_NUM_PARALLEL >= samples")
     p.add_argument("--language", default="English")
+    p.add_argument("--chunk-words", type=int, default=420, help="words per chunk (hard cut)")
+    p.add_argument("--ctx", type=int, default=4096, help="model context in tokens")
+    p.add_argument("--no-cue-cuts", action="store_true",
+                   help="do not cut chunks where the speakers move to another bed (the model separates patients)")
     p.add_argument("--threads", type=int, default=10)
     p.add_argument("--out", type=str, help="output path prefix (writes .json, .md, .meta.json)")
     args = p.parse_args()
 
     t0 = time.perf_counter()
     builder = MinutesBuilder(args.type, args.model, args.language, args.threads, final_model=args.final_model,
-                             samples=args.samples)
+                             samples=args.samples, chunk_words=args.chunk_words, num_ctx=args.ctx,
+                             cut_at_cues=not args.no_cue_cuts)
     for line in parse_dialog(args.dialog):
         builder.add_line(line)
     minutes = builder.finalize()

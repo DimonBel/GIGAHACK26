@@ -30,12 +30,13 @@ def main():
     p.add_argument("--sequential", action="store_true", help="speakers first, then Whisper (the old way)")
     p.add_argument("--model", type=Path, default=DEFAULT_MODEL)
     p.add_argument("--label", required=True)
+    p.add_argument("--prompt", help="Whisper vocabulary prompt (tested: hurts Turbo on Medpark, see README)")
     args = p.parse_args()
     timings = {}
     t = time.perf_counter()
     dialog = transcribe_dialog_file(args.audio, model=args.model, language=args.lang, live=False,
                                     audio_filters=CLEAN_FILTERS[args.clean], parallel=not args.sequential,
-                                    timings=timings)
+                                    timings=timings, prompt=args.prompt)
     timings["total"] = round(time.perf_counter() - t, 1)
     out = ROOT / "out" / "bench" / f"{args.audio.stem}.{args.label}.txt"
     out.parent.mkdir(parents=True, exist_ok=True)

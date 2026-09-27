@@ -15,6 +15,7 @@ invent), and big models are too slow. So the transcript is processed in three st
 
   python -m mom.minutes data/Medpark_dialog.txt --type medical --out out/Medpark
 """
+import copy
 import json
 import sys
 import time
@@ -24,7 +25,7 @@ from ..config import MINUTES_MODEL as DEFAULT_MODEL
 from ..llm.ollama import chat
 from .cues import CHUNK_MAX_WORDS, CHUNK_MIN_WORDS, TOPIC_CUE, TOPIC_MIN_WORDS, bed_number, cue_name, number_said
 from .matching import ACTION, UNCHANGED, clean_item, key_numbers, locate, overlaps, similar, union
-from .prompts import CHUNK_SCHEMA, CHUNK_SYSTEM, FINAL_SCHEMA, FINAL_SYSTEM, HINTS
+from .prompts import CHUNK_SYSTEM, FINAL_SCHEMA, FINAL_SYSTEM, HINTS, chunk_schema
 from .transcript import SENTENCE
 
 MAX_IN_FLIGHT = 2  # chunks sent to Ollama at once: 1.4x faster on an M4 with OLLAMA_NUM_PARALLEL=2, 4 is slower
@@ -35,8 +36,21 @@ class MinutesBuilder:
     """Incremental minutes: feed transcript lines as they arrive, then finalize()."""
 
     def __init__(self, meeting_type="medical", model=DEFAULT_MODEL, language="English", num_thread=10,
-                 verbose=True, final_model=None, samples=1):
+                 verbose=True, final_model=None, samples=1, chunk_words=CHUNK_MAX_WORDS, num_ctx=4096,
+                 cut_at_cues=True, reidentify=False):
+        """chunk_words: hard cut of a chunk (and a soft cut at the next weak cue from half of it); num_ctx: the
+        model's context (must hold the system prompt, the chunk and the answer); cut_at_cues=False sends
+        chunks of chunk_words without cutting where the speakers move to another bed (the model splits them)."""
         self.meeting_type, self.model, self.language = meeting_type, model, language
+        self.chunk_max, self.chunk_min = chunk_words, round(chunk_words * CHUNK_MIN_WORDS / CHUNK_MAX_WORDS)
+        self.num_ctx, self.cut_at_cues = num_ctx, cut_at_cues
+        # reidentify: a chunk that does not start at a bed / room cue is matched to the patients seen so far by its
+        # content (the model is shown a one-line roster and names the patient), instead of being assumed to
+        # continue the previous one - for long meetings that come back to patients.
+        self.reidentify = reidentify
+        scale = chunk_words / CHUNK_MAX_WORDS
+        self.schema = chunk_schema(topics=3 if cut_at_cues else max(3, round(3 * scale)), scale=scale)
+        self.num_predict = round(1000 * max(1.0, scale))
         self.samples = max(1, min(samples, len(SAMPLE_TEMPERATURES) + 1))
         self.final_model = final_model or model
         self.default_owner = "ICU team" if meeting_type == "medical" else "Team"
@@ -60,7 +74,7 @@ class MinutesBuilder:
         prefix, text = line.split(": ", 1)
         sentences = SENTENCE.split(text)
         for i, sentence in enumerate(sentences):
-            name = cue_name(sentence)
+            name = cue_name(sentence) if self.cut_at_cues else None
             if name and name != self.current_name:
                 # Cut exactly at the sentence that moves on, even in the middle of a long utterance.
                 if i:
@@ -68,13 +82,13 @@ class MinutesBuilder:
                 self._start_topic(name)
                 self._append(f"{prefix}: {' '.join(sentences[i:])}")
                 return
-        if self.buffer_words >= CHUNK_MIN_WORDS and TOPIC_CUE.search(text):
+        if self.buffer_words >= self.chunk_min and TOPIC_CUE.search(text):
             self._flush()
         self._append(line)
 
     def _append(self, line: str):
         words = len(line.split())
-        if self.buffer and self.buffer_words + words > CHUNK_MAX_WORDS:
+        if self.buffer and self.buffer_words + words > self.chunk_max:
             self._flush()  # mid-discussion: the next chunk continues the current patient
         self.buffer.append(line)
         self.buffer_words += words
@@ -98,8 +112,18 @@ class MinutesBuilder:
             note = f"This part starts with {self.next_name}.\n\n"
         else:
             note = ""
+        roster = self._roster() if self.reidentify else []
+        schema = self.schema
+        if roster:
+            listing = "\n".join(f"- {name}: {summary}" for name, summary in roster)
+            note += (f"Patients already discussed:\n{listing}\nFor every topic, patient = the name from this list if "
+                     f"it is the same patient (same bed, same problems), else \"new\".\n\n")
+            schema = copy.deepcopy(self.schema)
+            item = schema["properties"]["topics"]["items"]
+            item["properties"]["patient"] = {"type": "string", "enum": [n for n, _ in roster] + ["new"]}
+            item["required"] = ["patient"] + item["required"]
         user = note + "Transcript part:\n\n" + "\n".join(self.buffer)
-        future = self.pool.submit(self._extract, user)
+        future = self.pool.submit(self._extract, user, schema)
         self.pending.append((future, self.buffer, self.buffer_words, continues, self.next_name))
         self.submitted += 1
         if not continues:
@@ -108,7 +132,14 @@ class MinutesBuilder:
         self.starts_new_topic, self.next_name = False, None
         self._merge_ready()
 
-    def _extract(self, user: str):
+    def _roster(self) -> list:
+        """(name, one-line summary) of every patient merged so far, plus a cue name not merged yet."""
+        roster = [(t["name"], (t["status"] or "; ".join(t["findings"][:2]))[:110]) for t in self.topics]
+        if self.current_name and all(n != self.current_name for n, _ in roster):
+            roster.append((self.current_name, "(being discussed)"))
+        return roster
+
+    def _extract(self, user: str, schema=None):
         # Self-consistency (--samples 2+): a small model misses a different random subset of facts on every
         # run, so extra samples at a higher temperature are merged in. Only worth it when Ollama decodes them
         # as one batch (OLLAMA_NUM_PARALLEL >= samples); otherwise each sample adds the full time again.
@@ -116,8 +147,8 @@ class MinutesBuilder:
         t = time.perf_counter()
         def sample(temp):
             try:
-                return chat(self.model, self.system, user, CHUNK_SCHEMA, num_thread=self.num_thread,
-                             temperature=temp)
+                return chat(self.model, self.system, user, schema or self.schema, num_ctx=self.num_ctx,
+                            num_thread=self.num_thread, num_predict=self.num_predict, temperature=temp)
             except json.JSONDecodeError:  # two broken answers: lose this chunk, not the whole minutes
                 print("  chunk skipped: no valid JSON after a retry", file=sys.stderr)
                 return {"topics": []}, {"wall": 0, "prompt_tokens": 0, "prompt_s": 0, "output_tokens": 0,
@@ -175,6 +206,14 @@ class MinutesBuilder:
         patients inside a chunk, and never used to merge: small models mislabel beds, and a wrong name is far
         less harmful than two patients merged into one.
         """
+        said = t.get("patient")
+        if said and not (i == 0 and cue_name):  # the model matched it to a known patient by content
+            if said != "new":
+                for idx, topic in enumerate(self.topics):
+                    if topic["name"] == said:
+                        return idx
+            elif i == 0 and continues:
+                continues = False  # "new" overrides the assumption that the discussion goes on
         if i == 0 and continues:
             idx = len(self.topics) - 1
             name = self._checked_name(t["name"], chunk_text)
@@ -260,7 +299,7 @@ class MinutesBuilder:
             # concurrently with extracting that last chunk (needs OLLAMA_NUM_PARALLEL >= samples + 1). The last
             # minutes are usually wrap-up, and key moments / tables below still include them.
             header = self.pool.submit(chat, self.final_model, system, self._facts_text(), FINAL_SCHEMA,
-                                      num_thread=self.num_thread, num_predict=400)
+                                      num_ctx=self.num_ctx, num_thread=self.num_thread, num_predict=400)
             self._flush()
             self._merge_ready(wait=True)
             head, stats = header.result()
@@ -268,7 +307,7 @@ class MinutesBuilder:
             self._flush()
             self._merge_ready(wait=True)
             head, stats = chat(self.final_model, system, self._facts_text(), FINAL_SCHEMA,
-                                num_thread=self.num_thread, num_predict=400)
+                                num_ctx=self.num_ctx, num_thread=self.num_thread, num_predict=400)
         self.pool.shutdown()
         for entry in self.decisions + self.actions + self.issues:  # patients can be renamed after recording
             entry["patient"] = self.topics[entry.pop("_topic")]["name"]

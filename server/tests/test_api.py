@@ -46,7 +46,7 @@ class FakePipeline:
         self.fail_minutes, self.transcribed, self.gate = False, 0, threading.Event()
         self.gate.set()
 
-    def transcribe(self, audio, language, speakers, on_utterance, progress):
+    def transcribe(self, audio, language, speakers, on_utterance, progress, on_text=None):
         assert audio.exists()
         self.gate.wait(5)
         self.transcribed += 1
@@ -54,6 +54,8 @@ class FakePipeline:
         progress("speakers", "done", seconds=0.2, count=2)
         for u in UTTERANCES:
             progress("transcribe", "running", at=u.end, total=9.0)
+            on_text(u)
+        for u in UTTERANCES:  # the speakers are known later
             on_utterance(u)
         progress("transcribe", "done", seconds=0.3, total=9.0)
         return list(UTTERANCES)
@@ -63,6 +65,11 @@ class FakePipeline:
 
     def roles(self, utterances, meeting_type):
         return {"SPEAKER 1": {"role": "leads the round", "name": "", "evidence": "", "seconds": 4}}
+
+    def codes(self, minutes, meeting_type):
+        return {"Bed 9": {"principal": "J96.0", "secondary": ["E87.3"],
+                          "drg": {"family": "E64", "name": "Edem pulmonar si insuficienta respiratorie",
+                                  "variants": ["E64Z"], "mdc": 4}}}
 
 
 @pytest.fixture
@@ -162,7 +169,10 @@ def test_upload_to_draft_minutes(app):
     assert doc["title"] == "Round"  # the moderator's title, not the AI's
     assert doc["participants"][0]["role"] == "leads the round"
     blocks = {b["label"]: b for b in doc["topics"][0]["blocks"]}
-    assert list(blocks) == ["Status", "Findings", "Decisions", "Tasks", "Open issues"]
+    assert list(blocks) == ["Status", "Findings", "Decisions", "Tasks", "Open issues", "Diagnosis codes (suggested)"]
+    codes = blocks["Diagnosis codes (suggested)"]["items"]
+    assert [(c["system"], c["code"]) for c in codes] == [("ICD-10", "J96.0"), ("ICD-10", "E87.3"), ("DRG", "E64")]
+    assert codes[0]["label"] == "Acute respiratory failure"
     assert blocks["Findings"]["items"][1]["unverified"] == "1.8"
     assert blocks["Findings"]["items"][1]["text"] == "Lactate 1.8"
     assert blocks["Tasks"]["items"][0]["deadline"] == "" and blocks["Tasks"]["items"][0]["priority"] == "high"

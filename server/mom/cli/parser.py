@@ -16,7 +16,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--model", default=str(DEFAULT_WHISPER_MODEL),
-                        help="ggml model file, or 'turbo' / 'large' for the installed 8-bit Large V3 Turbo / Large V3")
+                        help="ggml model file, or 'turbo' / 'large' / 'turbo-md' for the installed 8-bit Large V3 Turbo / "
+                             "Large V3 / Turbo fine-tuned on Moldovan-Romanian speech")
     common.add_argument("--clean-audio", choices=list(CLEAN_FILTERS), default="none",
                         help="dialog: clean the audio before speaker detection and Whisper (see README)")
     common.add_argument("--lang", default="auto", help="language code (en, ro, ru, ...) or auto")

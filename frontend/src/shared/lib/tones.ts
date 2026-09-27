@@ -22,4 +22,4 @@ export const STATUS_TONE: Record<MeetingStatusTone, { pill: string; dot: string 
   danger: { pill: "bg-danger-soft text-danger", dot: "bg-danger" },
 };
 
-export const CODE_TEXT: Record<CodeSystem, string> = { "ICD-10": "text-primary", ACHI: "text-info" };
+export const CODE_TEXT: Record<CodeSystem, string> = { "ICD-10": "text-primary", ACHI: "text-info", DRG: "text-warn" };

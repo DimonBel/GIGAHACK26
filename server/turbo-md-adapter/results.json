@@ -1,0 +1,148 @@
+{
+  "stock_val": {
+    "clips": 330,
+    "seconds": 83.1,
+    "wer_all": 17.7,
+    "wer_moldavian": 18.42,
+    "wer_romanian": 17.18,
+    "examples": [
+      {
+        "ref": "și să ne transmiteți motivele reale pentru că Ședința este condusă de vicepreședinte Robert Cazanciuc, ajutat de domnul secretari Ion Mocioalcă și Sorin Lavric. În România primează legea haotică a to sonda petrolieră primește amendă de până la... convenit că este foarte important să fie finalizat până în vara acestui an studiul de fezabilitate. 990, acolo lucrau 8.000 de oameni.",
+        "hyp": " și să ne transmiteți motivele reale pentru că... Ceința este condusă de vicepreședinte Robert Kazanciuc, ajutați de domnului secretari Ion Mocioalcă și Sorin Lavric....primează legea haotică a toată......sondă petrolieră......primește amendă de până la......convenit că este foarte important să fie finalizat până în vara acestui an studiul de fezabilitate....190 acolo lucrau 8.000 de oameni...",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "Matieș, din partea grupului PSD, vă rog. Scopul acestei măsuri este de a depăși astfel greutățile financiare cu care s-au confruntat în contextul pandemiei de COVID-19. senatorilor care au depus declarații politice,",
+        "hyp": " Nu mă tiești din partea grupului PSD, vă rog. Scopul acestei măsuri este de a depăși astfel greutățile financiare cu care s-au confruntat în contextul pandemiei de COVID-19. Senatorilor care au depus declaratii politice,",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "în ordonanța 12 pe 2019. bani necesari pentru continuarea unui proiect de investiții, o lucrare privind canalizarea din comuna...",
+        "hyp": " Bani necesari pentru continuarea unui proiect de investiții, o lucrare privind canalizarea din Comuna.",
+        "dialect": "romanian"
+      }
+    ]
+  },
+  "epoch1_val": {
+    "clips": 330,
+    "seconds": 146.9,
+    "wer_all": 10.99,
+    "wer_moldavian": 13.48,
+    "wer_romanian": 9.17,
+    "examples": [
+      {
+        "ref": "și să ne transmiteți motivele reale pentru că Ședința este condusă de vicepreședinte Robert Cazanciuc, ajutat de domnul secretari Ion Mocioalcă și Sorin Lavric. În România primează legea haotică a to sonda petrolieră primește amendă de până la... convenit că este foarte important să fie finalizat până în vara acestui an studiul de fezabilitate. 990, acolo lucrau 8.000 de oameni.",
+        "hyp": "și să ne transmiteți motivele reale pentru ca... Ședința este condusă de vicepreședinte Robert Kazanciuc, ajutați de domnului secretari Ion Mocioarcă și Sorin Lavric. ea primează legea haotică a sondă petrolieră... primește amendă de până la convenit că este foarte important să fie finalizat până în vara acestui an studiul de fezabilitate. 190, acolo lucrau 8.000 de oameni.",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "Matieș, din partea grupului PSD, vă rog. Scopul acestei măsuri este de a depăși astfel greutățile financiare cu care s-au confruntat în contextul pandemiei de COVID-19. senatorilor care au depus declarații politice,",
+        "hyp": "Lul Mătiești din partea grupului PSD, vă rog. Scopul acestei măsuri este de a depăși astfel greutățile financiare cu care s-au confruntat în contextul pandemiei de COVID-19. senatorilor care au depus declaratei politice.",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "în ordonanța 12 pe 2019. bani necesari pentru continuarea unui proiect de investiții, o lucrare privind canalizarea din comuna...",
+        "hyp": "în ordonanța 12 pe 2019. bani necesari pentru continuarea unui proiect de investiții, o lucrare privind canalizarea din comuna.",
+        "dialect": "romanian"
+      }
+    ]
+  },
+  "best_epoch": 3,
+  "epoch2_val": {
+    "clips": 330,
+    "seconds": 158.5,
+    "wer_all": 10.48,
+    "wer_moldavian": 12.9,
+    "wer_romanian": 8.7,
+    "examples": [
+      {
+        "ref": "și să ne transmiteți motivele reale pentru că Ședința este condusă de vicepreședinte Robert Cazanciuc, ajutat de domnul secretari Ion Mocioalcă și Sorin Lavric. În România primează legea haotică a to sonda petrolieră primește amendă de până la... convenit că este foarte important să fie finalizat până în vara acestui an studiul de fezabilitate. 990, acolo lucrau 8.000 de oameni.",
+        "hyp": "și să ne transmiteți motivele reale pentru ca... Ședința este condusă de vicepreședinte Robert Cazanciuc, ajutați de domnului secretari Ion Mocioalcă și Sorin Lavric. în ea primează legea haotică a to. sondă petrolieră... primește amendă de până la convenit că este foarte important să fie finalizat până în vara acestui an studiul de fezabilitate. 190, acolo lucrau 8.000 de oameni.",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "Matieș, din partea grupului PSD, vă rog. Scopul acestei măsuri este de a depăși astfel greutățile financiare cu care s-au confruntat în contextul pandemiei de COVID-19. senatorilor care au depus declarații politice,",
+        "hyp": "nul Mătiești din partea grupului PSD, vă rog. Scopul acestei măsuri este de a depăși astfel greutățile financiare cu care s-au confruntat în contextul pandemiei de COVID-19. senatorilor care au depus declarații politice.",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "în ordonanța 12 pe 2019. bani necesari pentru continuarea unui proiect de investiții, o lucrare privind canalizarea din comuna...",
+        "hyp": "în ordonanța 12 pe 2019. bani necesari pentru continuarea unui proiect de investiții, o lucrare privind canalizarea din comuna",
+        "dialect": "romanian"
+      }
+    ]
+  },
+  "epoch3_val": {
+    "clips": 330,
+    "seconds": 146.2,
+    "wer_all": 10.47,
+    "wer_moldavian": 12.84,
+    "wer_romanian": 8.74,
+    "examples": [
+      {
+        "ref": "și să ne transmiteți motivele reale pentru că Ședința este condusă de vicepreședinte Robert Cazanciuc, ajutat de domnul secretari Ion Mocioalcă și Sorin Lavric. În România primează legea haotică a to sonda petrolieră primește amendă de până la... convenit că este foarte important să fie finalizat până în vara acestui an studiul de fezabilitate. 990, acolo lucrau 8.000 de oameni.",
+        "hyp": "și să ne transmiteți motivele reale pentru ca... Ședința este condusă de vicepreședinte Robert Cazanciuc, ajutați de domnului secretari Ion Mocioalcă și Sorin Lavric. în ea primează legea haotică a to. sondă petrolieră Primește amendă de până la convenit că este foarte important să fie finalizat până în vara acestui an studiul de fezabilitate. 190, acolo lucrau 8000 de oameni.",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "Matieș, din partea grupului PSD, vă rog. Scopul acestei măsuri este de a depăși astfel greutățile financiare cu care s-au confruntat în contextul pandemiei de COVID-19. senatorilor care au depus declarații politice,",
+        "hyp": "Mătiești din partea grupului PSD, vă rog. Scopul acestei măsuri este de a depăși astfel greutățile financiare cu care s-au confruntat în contextul pandemiei de COVID-19. senatorilor care au depus declaratei politice.",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "în ordonanța 12 pe 2019. bani necesari pentru continuarea unui proiect de investiții, o lucrare privind canalizarea din comuna...",
+        "hyp": "în Ordonanța 12 pe 2019. bani necesari pentru continuarea unui proiect de investiții, o lucrare privind canalizarea din comuna",
+        "dialect": "romanian"
+      }
+    ]
+  },
+  "train_seconds": 3924,
+  "stock_test": {
+    "clips": 359,
+    "seconds": 91.8,
+    "wer_all": 19.69,
+    "wer_moldavian": 20.81,
+    "wer_romanian": 18.84,
+    "examples": [
+      {
+        "ref": "când va obține autorizația de demolare în condi... În paralel, menționez și la Guruslău, 3 august 1601. soluțiile pe care le identificați pentru rezolvarea prome. În opinia noastră ne lovim de o formă de discriminare nejus. Doamna senator Mirea Siminica, domnul senator Toanchină Marius-Gheorghe, domnul senator Duncă Alexandru-Marius. a discutat despre stadiul documentațiilor pentru tronsonul",
+        "hyp": " când va obține autorizația de demolare în condiție... În paralel, menționez... Și la Guruzlău, 3 august 1601. Soluțiile pe care le identificați pentru rezolvarea problemei... În opinia noastră, ne lovim de o formă de discriminare nejust... Doamna senator Mira Semenica, domnul senator Tanchile Marius Ghiurghe, domnul senator Dunc Alexandru Marius......descutat despre statul documentațiilor pentru tronsonul...",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "toate acestea, în România, prețul carburantului continuă să crească într-un ritm accelerat, litrul de motorină depășind 9 lei, iar cel de benzină fiind acum peste 8 lei. Considerăm că astfel de reglementări ce creează inechități majore între cetățeni ar trebui să",
+        "hyp": " Toate acestea, în România, prețul carburantului continu să crească într-un ritm accelerat, litru de motorină depășind 9 lei, iar cel de benzină fiind acum peste 8 lei. Considerăm că astfel de reglementări, ce creează inechități majore între cetățeni, ar trebui să seștepte.",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "Dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar care a susținut eradicarea identității naționale românești, dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar care a sprijinit uciderea lui Mihai Viteazu și ștergerea visului minenar de a unire a tuturor românilor, dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar al cărui în nume își are...",
+        "hyp": " Dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar care a susținut eradicarea identității naționale românești, dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar care a sprijinit uciderea lui Mihai Biteazu și ștergerea visului minenar de a unire a tuturor românilor, dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar al călul nume își are",
+        "dialect": "romanian"
+      }
+    ]
+  },
+  "finetuned_test": {
+    "clips": 359,
+    "seconds": 91.2,
+    "wer_all": 9.93,
+    "wer_moldavian": 11.96,
+    "wer_romanian": 8.39,
+    "examples": [
+      {
+        "ref": "când va obține autorizația de demolare în condi... În paralel, menționez și la Guruslău, 3 august 1601. soluțiile pe care le identificați pentru rezolvarea prome. În opinia noastră ne lovim de o formă de discriminare nejus. Doamna senator Mirea Siminica, domnul senator Toanchină Marius-Gheorghe, domnul senator Duncă Alexandru-Marius. a discutat despre stadiul documentațiilor pentru tronsonul",
+        "hyp": "când va obține autorizația de demolare în condi... În paralel, menționez... Și la Guruslău, 3 august 1601. soluțiile pe care le identificați pentru rezolvarea promes. În opinia noastră, ne lovim de o formă de discriminare neju Doamna senator Mira Simenica, domnul senator Toanchile Marius Ghiurghe, domnul senator Dunc Alexandru Marius. discutat despre statul documentațiilor pentru tronsonul",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "toate acestea, în România, prețul carburantului continuă să crească într-un ritm accelerat, litrul de motorină depășind 9 lei, iar cel de benzină fiind acum peste 8 lei. Considerăm că astfel de reglementări ce creează inechități majore între cetățeni ar trebui să",
+        "hyp": "Toate acestea, în România, prățul carburantului continu să crească într-un ritm accelerat litru de motorină depășit 9 lei, iar cel de benzină fiind acum peste 8 lei. Considerăm că astfel de reglementări ce creează inechități majore între cetățeni ar trebui să...",
+        "dialect": "romanian"
+      },
+      {
+        "ref": "Dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar care a susținut eradicarea identității naționale românești, dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar care a sprijinit uciderea lui Mihai Viteazu și ștergerea visului minenar de a unire a tuturor românilor, dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar al cărui în nume își are...",
+        "hyp": "Dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar care a susținut eradicarea identității naționale românești, dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar care a sprijinit uciderea lui Mihai Biteazu și ștergerea visului minenar de a unire a tuturor românilor, dacă Ministerul Culturii apreciază oportună construirea și dezvelirea unei statui a unui conducător maghiar al călului nume își are...",
+        "dialect": "romanian"
+      }
+    ]
+  }
+}

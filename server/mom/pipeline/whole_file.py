@@ -16,13 +16,13 @@ from ..asr.whisper_cli import transcribe_wav
 from ..audio.convert import to_wav16k
 from ..config import DEFAULT_WHISPER_MODEL
 from ..diarization import diarize
-from ..dialog import build_dialog, clean_text, collapse_repeats, segment_words, to_text
+from ..dialog import Utterance, build_dialog, clean_text, collapse_repeats, segment_words, to_text
 
 
 def transcribe_dialog_file(audio: Path, model: Path = DEFAULT_WHISPER_MODEL, language: str = "auto",
                            translate: bool = False, beam_size: int = 1, live: bool = True, on_utterance=None,
                            speakers: dict = None, audio_filters: str = "", parallel: bool = True,
-                           timings: dict = None, progress=None):
+                           timings: dict = None, progress=None, prompt: str = None, on_text=None):
     """Return the dialog (list of Utterance) for any audio/video file, using one Whisper run over the file.
 
     Speaker detection (pyannote) and Whisper run at the same time (parallel=True): Whisper's segments are
@@ -30,6 +30,9 @@ def transcribe_dialog_file(audio: Path, model: Path = DEFAULT_WHISPER_MODEL, lan
     speaker (e.g. to build the minutes while transcription is still running). speakers: optional hints for
     diarize() (num_speakers / min_speakers / max_speakers). audio_filters: ffmpeg filter chain for the
     conversion (see audio.CLEAN_FILTERS). timings: filled with the seconds of each stage.
+    on_text(utterance): optional, gets every recognized segment at once, before the speakers are known (speaker
+    "SPEAKER ?"): the minutes do not need the speakers and can then be built during the whole transcription
+    instead of only after speaker detection (which gates on_utterance).
     progress(stage, state, **info): optional, told when "convert" / "speakers" / "transcribe" start and end
     ("done" with seconds=, speakers also with count=; "skipped" when speaker detection is unavailable), plus
     "transcribe" "running" with at= (audio seconds transcribed) and total= (audio length) after every segment.
@@ -82,6 +85,8 @@ def transcribe_dialog_file(audio: Path, model: Path = DEFAULT_WHISPER_MODEL, lan
         def show(start, end, text):
             report("transcribe", "running", at=end, total=total)
             text = clean_text(text)
+            if text and on_text:
+                on_text(Utterance(start, end, "SPEAKER ?", text))
             if text:
                 pending.append((start, end, text))
             if ready.is_set():
@@ -91,7 +96,8 @@ def transcribe_dialog_file(audio: Path, model: Path = DEFAULT_WHISPER_MODEL, lan
         report("transcribe", "running", at=0.0, total=total)
         t = time.perf_counter()
         transcript = transcribe_wav(wav, Path(model), language, translate, beam_size=beam_size,
-                                    on_segment=show if live or on_utterance or progress else None)
+                                    on_segment=show if live or on_utterance or progress or on_text else None,
+                                    **({"prompt": prompt} if prompt else {}))
         timings["transcribe"] = round(time.perf_counter() - t, 1)
         report("transcribe", "done", seconds=timings["transcribe"], total=total)
         detector.join()

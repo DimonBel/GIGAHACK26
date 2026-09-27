@@ -53,7 +53,7 @@ class JobState:
         self._started = {}
 
     def stage(self, name: str, state: str, seconds: float = None, at: float = None, total: float = None,
-              count: int = None, **_):
+              count: int = None, detail: str = None, **_):
         with self.lock:
             s = self.stages[name]
             if state == "running" and name not in self._started:
@@ -71,6 +71,8 @@ class JobState:
                 s["percent"] = 100.0
             if count is not None:
                 s["detail"] = f"{count} speaker{'s' if count != 1 else ''}"
+            if detail is not None:
+                s["detail"] = detail
 
     def line(self, u):
         with self.lock:
@@ -160,12 +162,14 @@ class JobRunner:
             else:
                 session = self.pipeline.minutes(mtype)
 
-                def on_utterance(u):
+                def on_text(u):  # Whisper's text at once: the minutes do not wait for the speakers
                     if job.stages["minutes"]["state"] == "waiting":
                         job.stage("minutes", "running")
                     session.feed(u)
-                    job.line(u)
                     job.topics = session.topic_count()
+
+                def on_utterance(u):  # the same text with its speaker, once speaker detection is done
+                    job.line(u)
 
                 def progress(stage, state, **info):
                     job.stage(stage, state, **info)
@@ -173,7 +177,7 @@ class JobRunner:
                         self.store.update_meeting(meeting_id, duration=info["total"])  # list shows the length
 
                 utterances = self.pipeline.transcribe(folder / meeting["source"], meeting["language"],
-                                                      meeting["speakers"], on_utterance, progress)
+                                                      meeting["speakers"], on_utterance, progress, on_text=on_text)
                 # Saved before the minutes: the transcript is never lost when the LLM step fails.
                 write_json(folder / "transcript.json", [u.__dict__ for u in utterances])
                 (folder / "dialog.txt").write_text(to_text(utterances) + "\n", encoding="utf-8")
@@ -186,6 +190,8 @@ class JobRunner:
                 roles = pool.submit(self.pipeline.roles, utterances, mtype) if not roles_file.exists() else None
                 minutes = session.finish()
                 minutes["participants"] = roles.result() if roles else read_json(roles_file)
+            job.stage("minutes", "running", detail="suggesting diagnosis codes")
+            minutes["coding"] = self.pipeline.codes(minutes, mtype)
             write_json(roles_file, minutes["participants"])
             write_json(folder / "minutes.raw.json", minutes)
             doc = MinutesDoc.model_validate(minutes_doc(minutes, mtype))

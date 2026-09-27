@@ -33,6 +33,14 @@ class Attendee(Api):
     dept: str
 
 
+class Code(Api):
+    """An ICD-10 code with its names in the three languages of the app."""
+    code: str
+    ro: str = ""
+    ru: str = ""
+    en: str = ""
+
+
 class LoginIn(Api):
     email: str = Field(max_length=200)
     password: str = Field(max_length=200)

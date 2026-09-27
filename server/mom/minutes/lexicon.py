@@ -14,13 +14,13 @@ WORD_TO_NUMBER = {w: n for n, words in NUMBER_WORDS.items() for w in words.split
 # Known ASR errors and ICU slang, fixed in the transcript before any LLM call: small models copy misspelled
 # drug names instead of correcting them, and confuse abbreviations ("nor" 0.22 vs "DOB" 4) with each other.
 MEDICAL_LEXICON = [
-    (r"\bnorodrenal\w*", "noradrenalină"),
+    (r"\bnor[ao]dr\w+", "noradrenalină"),  # norodrenalină, noradrenalina, norodrimonina (fine-tuned turbo)
     (r"\b(di)?nor(ul|ului|u|i)?\b", "noradrenalină"),
     (r"\bdob(-ul|ul|u)?\b", "dobutamină"),
-    (r"\bm[ie]rop[ie]n[ae]m\w*", "meropenem"),
-    (r"\bamica?cin\w*", "amikacină"),
+    (r"\bm[ie]r[ao]p[ie]n[ae]{1,2}m\w*", "meropenem"),  # miropinem, miropineam
+    (r"\bam[ie][ck]a?cin\w*", "amikacină"),  # amicacin, amikacin, amecacin
     (r"\b[bf]uconazol\w*", "fluconazol"),
-    (r"\bclepsiell\w*|\bklepsiel\w*", "Klebsiella"),
+    (r"\b[ck]le[bp]si[ae]l\w*", "Klebsiella"),  # clepsiele, clepsielă, klepsiella
     (r"\bne(p|f)r[ao]st[oa](m|r)\w*", "nefrostomă"),
     (r"\bhidronifer\w*|\bhidronefr\w*", "hidronefroză"),
     (r"\btrombopro(f|fl)\w*", "tromboprofilaxie (thromboprophylaxis)"),
@@ -28,7 +28,7 @@ MEDICAL_LEXICON = [
     (r"\btrombe?aspira\w*", "tromboaspirație"),
     (r"\btrivascular\w*", "trivascular (boală coronariană trivasculară)"),
     (r"\bmitrala (trei|3)\b", "insuficiență mitrală gradul 3"),
-    (r"\bdiacar[bp]\w*", "Diacarb (acetazolamidă)"),
+    (r"\bd[ie]acar[bp]\w*", "Diacarb (acetazolamidă)"),  # diacarbo, deacarpul
     (r"\bforxiga\b", "Forxiga (dapagliflozin)"),
     (r"\btr[aâ]ns ?(s?u|e?s?o)?f[aă]g[ei]an\w*|\btrans ?duracec\w*", "ecografie transesofagiană (ETE)"),
     (r"\btr[aâ]ns ?t[uo]racic\w*", "ecografie transtoracică (ETT)"),
@@ -41,8 +41,8 @@ MEDICAL_LEXICON = [
     (r"\bcre?t[ie]nin\w*", "creatinină"),
     (r"\buria\b", "uree"),
     (r"\bde oameni\b", "µmol/l"),  # "200 de micromoli" heard as "200 de oameni"
-    (r"\bclerus\w*", "clearance"),
-    (r"\blictizi\w*", "atelectazie"),
+    (r"\bcl[ei]r[uo][nm]?s\w*", "clearance"),  # clerus, clerunsul, clirumsul
+    (r"\b(ate)?l[ei]ct[aei]zi\w*", "atelectazie"),  # lictizie, lectezie
     (r"\b(en)?cefalopat\w*", "encefalopatie"),
     (r"\bechilibr\w*", "gazometrie"),
     (r"\bvolemnic\b", "volemic"),
@@ -50,6 +50,7 @@ MEDICAL_LEXICON = [
     (r"\bdremul\b", "drenul"),
     (r"\bm[âa]șc[ăa]\b", "mască"),
     (r"\bne ?invaziv\w*", "ventilație neinvazivă"),
+    (r"\bbi[pb][ -]?[au]p\b", "BiPAP"),  # BIP-up, BiPAP, bipap
     (r"\btensiun\w*", "tensiunea arterială"),
     (r"\b(\d{2,3})%? pe (\d{2,3})\b%?", r"\1/\2"),  # "80 pe 40", "80% pe 40%" -> "80/40"
     (r"\balcalotic\w*", "alcaloză metabolică"),
