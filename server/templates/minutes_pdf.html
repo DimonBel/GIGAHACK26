@@ -1,131 +1,86 @@
-<!DOCTYPE html>
-<html lang="{{ lang }}">
-<head>
-<meta charset="utf-8">
-<title>{{ title }}</title>
-{# Only fixed texts (LABELS) go into the CSS; the minutes' own texts are HTML, escaped (running elements). #}
-<style>
-@page {
-  size: A4;
-  margin: 16mm 17mm 18mm;
-  @top-left { content: element(running-title); }
-  @bottom-left { content: element(running-footer); }
-  @bottom-right {
-    content: "{{ labels.page | css }} " counter(page) " {{ labels.of | css }} " counter(pages);
-    font-family: Arial, "Liberation Sans", "DejaVu Sans", sans-serif; font-size: 8pt; color: #5a6b7d;
-  }
-}
-@page :first { @top-left { content: none; } }
-html { font-family: Arial, "Liberation Sans", "DejaVu Sans", sans-serif; font-size: 10pt; line-height: 1.4;
-       color: #1f2a37; }
-body { margin: 0; }
-.running-title { position: running(running-title); font-size: 8pt; color: #5a6b7d; }
-.running-footer { position: running(running-footer); font-size: 8pt; color: #5a6b7d; }
-.kicker { margin: 0 0 4pt; font-size: 8.5pt; letter-spacing: 0.08em; text-transform: uppercase; color: #5a6b7d; }
-h1 { margin: 0 0 2pt; font-size: 17pt; letter-spacing: 0.06em; text-transform: uppercase; }
-.doc-title { margin: 0 0 10pt; font-size: 12.5pt; font-weight: bold; }
-.meta { border-collapse: collapse; margin: 0 0 6pt; }
-.meta th { padding: 1.5pt 12pt 1.5pt 0; text-align: left; font-weight: normal; color: #5a6b7d; vertical-align: top; }
-.meta td { padding: 1.5pt 0; vertical-align: top; }
-.rule { border: 0; border-top: 1.2pt solid #1f2a37; margin: 8pt 0 0; }
-h2 { margin: 14pt 0 5pt; padding-bottom: 2pt; border-bottom: 0.6pt solid #9aa5b1; font-size: 10pt;
-     letter-spacing: 0.05em; text-transform: uppercase; page-break-after: avoid; }
-p { margin: 0; }
-.summary { white-space: pre-line; }
-ul { margin: 0; padding-left: 14pt; }
-li { margin: 0 0 1.5pt; }
-.topic { padding: 7pt 0; border-top: 0.5pt solid #d5dbe2; page-break-inside: avoid; }
-.topic.first { padding-top: 1pt; border-top: 0; }
-.topic-name { margin: 0 0 4pt; font-weight: bold; font-size: 11pt; }
-.rows { width: 100%; border-collapse: collapse; }
-.rows th { width: 26mm; padding: 1.5pt 8pt 1.5pt 0; text-align: left; font-weight: normal; color: #5a6b7d;
-           vertical-align: top; }
-.rows td { padding: 1.5pt 0; vertical-align: top; }
-.pre { white-space: pre-line; }
-.tasks { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
-.tasks thead { display: table-header-group; }
-.tasks tr { page-break-inside: avoid; }
-.tasks th, .tasks td { padding: 3pt 4pt; border: 0.5pt solid #9aa5b1; text-align: left; vertical-align: top; }
-.tasks th { background: #eef2f6; font-weight: bold; }
-.high { font-weight: bold; color: #b42318; }
-.warnings { color: #7a4b00; }
-</style>
-</head>
-<body>
-<div class="running-title">{{ meeting_label }} &middot; {{ labels.minutes }} &middot; {{ title }}</div>
-<div class="running-footer">{{ meeting_title }} &middot; {{ held }}</div>
+{% extends "_pdf_base.html" %}
+{# The full minutes, for the moderator: every topic with its details. #}
+{% block content %}
+{% import "_pdf_macros.html" as ui with context %}
+{% macro cell_body(cell, span) %}
+<td class="cell-body"{% if span == 2 %} colspan="2"{% endif %}>
+{% if cell == "attendees" %}
+  {% if attendee_lines %}
+  <div class="lines">{% for a in attendee_lines %}<p>{{ a }}</p>{% endfor %}</div>
+  {% else %}<p class="muted">—</p>{% endif %}
+{% elif cell == "topics" %}
+  {% for t in m.topics %}
+  <div class="item">
+    <p><strong>{{ labels.agenda_item }} {{ loop.index }}:</strong> {{ t.name }}</p>
+    {% set status = t.status if "status" in topic_fields else "" %}
+    {% set findings = t.findings if "findings" in topic_fields else [] %}
+    {% if status or findings %}
+    <ul>
+      {% if status %}<li class="pre">{{ status }}</li>{% endif %}
+      {% for f in findings %}<li>{{ f }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% else %}<p class="muted">—</p>{% endfor %}
+{% elif cell == "decisions" %}
+  {% for name, decisions in topic_decisions %}
+  <div class="item">
+    <p class="item-name">{{ labels.item }} {{ loop.index }}: {{ name }}</p>
+    <ul>{% for d in decisions %}<li>{{ d.decision }}</li>{% endfor %}</ul>
+  </div>
+  {% endfor %}
+  {% if show_other_decisions and other_decisions %}
+  <div class="item">
+    <p class="item-name">{{ labels.other_decisions }}:</p>
+    <ul>{% for d in other_decisions %}<li>{{ d.decision }}{% if d.patient %} — {{ d.patient }}{% endif %}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if not topic_decisions and not (show_other_decisions and other_decisions) %}<p class="muted">—</p>{% endif %}
+{% else %}
+  {% for a in action_items %}
+  <div class="item">
+    <p class="item-name">{{ labels.item }} {{ loop.index }}:{% if a.patient %} {{ a.patient }}{% endif %}</p>
+    <ul>
+      <li>{% if a.owner %}<strong>{{ a.owner }}</strong> — {% endif %}{{ a.task }}</li>
+      {% if a.deadline or a.priority %}
+      <li class="muted">{% if a.deadline %}{{ labels.deadline }}: {{ a.deadline }}{% endif %}{% if a.deadline and a.priority %} &middot; {% endif %}{% if a.priority %}{{ labels.priority }}: <span{% if a.priority == "high" %} class="high"{% endif %}>{{ labels.priorities.get(a.priority, a.priority) }}</span>{% endif %}</li>
+      {% endif %}
+    </ul>
+  </div>
+  {% else %}<p class="muted">—</p>{% endfor %}
+{% endif %}
+</td>
+{% endmacro %}
 
-<p class="kicker">{{ meeting_label }}</p>
-<h1>{{ labels.minutes }}</h1>
-<p class="doc-title">{{ title }}</p>
-<table class="meta">
-  {% if meeting_title != title %}
-  <tr><th>{{ labels.meeting }}</th><td>{{ meeting_title }}</td></tr>
-  {% endif %}
-  <tr><th>{{ labels.held }}</th><td>{{ held }}</td></tr>
-  {% if duration %}
-  <tr><th>{{ labels.duration }}</th><td>{{ duration }}</td></tr>
-  {% endif %}
-  {% if approved_by %}
-  <tr><th>{{ labels.approved }}</th><td>{{ approved_by }}{% if approved_at %}, {{ approved_at }}{% endif %}</td></tr>
-  {% endif %}
-</table>
-<hr class="rule">
-{% for section in sections %}
-
-{% if section == "summary" %}
-<h2>{{ labels.summary }}</h2>
-<p class="summary">{{ m.summary }}</p>
+{# The full-width boxes, in the template's order. #}
+{% macro boxes(keys) %}
+{% for section in keys %}
+{% if section == "summary" and m.summary %}
+{% call ui.box(labels.summary) %}<p class="pre">{{ m.summary }}</p>{% endcall %}
 {% elif section == "key_moments" and m.key_moments %}
-<h2>{{ labels.key_moments }}</h2>
-<ul>{% for k in m.key_moments %}<li>{{ k.moment }}</li>{% endfor %}</ul>
-{% elif section == "topics" and m.topics %}
-<h2>{{ labels.topics }}</h2>
-{% for t in m.topics %}
-{% set decisions = m.decisions | selectattr("patient", "equalto", t.name) | list %}
-<div class="topic{% if loop.first %} first{% endif %}">
-  <p class="topic-name">{{ loop.index }}. {{ t.name }}</p>
-  <table class="rows">
-    {% if "status" in topic_fields %}
-    <tr><th>{{ labels.status }}</th><td class="pre">{{ t.status or "—" }}</td></tr>
-    {% endif %}
-    {% if "findings" in topic_fields and t.findings %}
-    <tr><th>{{ labels.findings }}</th><td><ul>{% for f in t.findings %}<li>{{ f }}</li>{% endfor %}</ul></td></tr>
-    {% endif %}
-    {% if "decisions" in topic_fields and decisions %}
-    <tr><th>{{ labels.decisions }}</th><td><ul>{% for d in decisions %}<li>{{ d.decision }}</li>{% endfor %}</ul></td></tr>
-    {% endif %}
-  </table>
-</div>
-{% endfor %}
-{% elif section == "other_decisions" and other_decisions %}
-<h2>{{ labels.other_decisions }}</h2>
-<ul>{% for d in other_decisions %}<li>{{ d.decision }}{% if d.patient %} — {{ d.patient }}{% endif %}</li>{% endfor %}</ul>
-{% elif section == "action_items" and action_items %}
-<h2>{{ labels.action_items }}</h2>
-<table class="tasks">
-  <thead>
-    <tr><th>#</th><th>{{ labels.task }}</th><th>{{ labels.topic }}</th><th>{{ labels.owner }}</th><th>{{ labels.deadline }}</th><th>{{ labels.priority }}</th></tr>
-  </thead>
-  <tbody>
-    {% for a in action_items %}
-    <tr><td>{{ loop.index }}</td><td>{{ a.task }}</td><td>{{ a.patient }}</td><td>{{ a.owner }}</td><td>{{ a.deadline }}</td><td{% if a.priority == "high" %} class="high"{% endif %}>{{ labels.priorities.get(a.priority, a.priority) }}</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% call ui.box(labels.key_moments) %}<ul>{% for k in m.key_moments %}<li>{{ k.moment }}</li>{% endfor %}</ul>{% endcall %}
 {% elif section == "open_issues" and m.open_issues %}
-<h2>{{ labels.open_issues }}</h2>
-<ul>{% for issue in m.open_issues %}<li>{{ issue }}</li>{% endfor %}</ul>
-{% elif section == "attendees" and attendees %}
-<h2>{{ labels.present }}</h2>
-<ul>{% for a in attendees %}<li>{{ a }}</li>{% endfor %}</ul>
+{% call ui.box(labels.open_issues) %}<ul>{% for issue in m.open_issues %}<li>{{ issue }}</li>{% endfor %}</ul>{% endcall %}
 {% elif section == "participants" and m.participants %}
-<h2>{{ labels.participants }}</h2>
-<ul>{% for speaker, p in m.participants.items() %}<li><strong>{{ speaker }}</strong> — {{ p.role }}{% if p.name %} ({{ p.name }}){% endif %}{% if p.seconds %} &middot; {{ labels.min_s.format(m=p.seconds // 60, s=p.seconds % 60) }}{% endif %}</li>{% endfor %}</ul>
+{% call ui.box(labels.participants) %}<ul>{% for speaker, p in m.participants.items() %}<li><strong>{{ speaker }}</strong> — {{ p.role }}{% if p.name %} ({{ p.name }}){% endif %}{% if p.seconds %} &middot; {{ labels.min_s.format(m=p.seconds // 60, s=p.seconds % 60) }}{% endif %}</li>{% endfor %}</ul>{% endcall %}
 {% elif section == "warnings" and m.warnings %}
-<h2>{{ labels.verification }}</h2>
-<ul class="warnings">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+{% call ui.box(labels.verification) %}<ul class="warnings">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endcall %}
 {% endif %}
 {% endfor %}
-</body>
-</html>
+{% endmacro %}
+
+{{ boxes(boxes_above) }}
+
+{% if grid_rows %}
+<table class="grid">
+  <colgroup><col class="half"><col class="half"></colgroup>
+  {% for row in grid_rows %}
+  {% set span = 1 if row | length == 2 else 2 %}
+  <tr class="head-row">{% for cell in row %}{{ ui.cell_head(cell, span) }}{% endfor %}</tr>
+  <tr>{% for cell in row %}{{ cell_body(cell, span) }}{% endfor %}</tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{{ boxes(boxes_below) }}
+{% endblock %}

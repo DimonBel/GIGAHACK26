@@ -356,7 +356,7 @@ function RecipientsForm({
               <IconMail size={18} />
               <Title order={4}>{t('sendTab.emailPreview.title')}</Title>
             </Group>
-            <PdfButton meetingId={meeting.id} size="xs" />
+            <PdfButton meetingId={meeting.id} size="xs" full />
           </Group>
           <Stack gap={2}>
             <Text size="sm">

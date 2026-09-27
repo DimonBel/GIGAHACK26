@@ -217,8 +217,12 @@ server also stops the transcription with everything it started (whisper-server).
   reading audited (`view_minutes`)
 - `GET /api/meetings/{id}/minutes.pdf` → the minutes as the A4 PDF that is emailed (`application/pdf`,
   `Content-Disposition: inline; filename*=UTF-8''Proces-verbal%20-%20…%20-%2024.09.2026.pdf`, `Cache-Control:
-  no-store`), laid out by the active template, in the minutes' language, without the "⚠ unverified" notes; the
-  same access as `GET …/minutes` (a recipient's is audited as `view_minutes`, detail `pdf`)
+  no-store`): one page, the summary, attendees, agenda (the topics by name), decisions and action items in a grid,
+  and open issues, as much of each list as fits ("+ N more"); laid out by the active template, in the minutes'
+  language, without the "⚠ unverified" notes; the same access as `GET …/minutes` (a recipient's is audited as
+  `view_minutes`, detail `pdf`). `?full=1` (owner moderator, admin; `403` for a recipient): every topic with its
+  status, findings and decisions, on as many pages as they take (`… (Detalii complete).pdf`); `?download=1`:
+  `Content-Disposition: attachment`, to save it
 - `PUT /api/meetings/{id}/minutes` (owner moderator, admin; status `ready`) `Minutes` → `Minutes` as stored
 - `GET /api/meetings/{id}/email-preview` (owner moderator, admin; once there are minutes, a draft too) →
   `{"subject", "language", "html", "text", "attachment"}`: the email the minutes would be sent as now (its short

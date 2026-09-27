@@ -24,11 +24,27 @@ from .settings import default_template
 TOKEN_HEADER = "X-Secure-MOM-Token"
 DELIVERY_TIMEOUT_S = 60  # n8n needs ~40 s to report that the mail server is down
 PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+BOX_SECTIONS = ("summary", "key_moments", "open_issues", "participants", "warnings")  # the PDF's full-width boxes
+# The one-page overview shows as much as fits one A4 page: the first of these limits whose page fits ("+ N more" after
+# each list cut short); the last one fits even every list full of the longest texts (tested). Each text is at most
+# OVERVIEW_TEXT characters (less in the narrow cells, see minutes_overview.html), the summary OVERVIEW_SUMMARY.
+OVERVIEW_STEPS = [
+    {"attendees": 12, "topics": 12, "decisions": 10, "action_items": 10, "open_issues": 5},
+    {"attendees": 10, "topics": 10, "decisions": 8, "action_items": 8, "open_issues": 4},
+    {"attendees": 8, "topics": 8, "decisions": 6, "action_items": 6, "open_issues": 3},
+    {"attendees": 6, "topics": 6, "decisions": 4, "action_items": 4, "open_issues": 2},
+    {"attendees": 4, "topics": 4, "decisions": 3, "action_items": 3, "open_issues": 1},
+    {"attendees": 3, "topics": 3, "decisions": 2, "action_items": 2, "open_issues": 1},
+]
+OVERVIEW_TEXT = 100
+OVERVIEW_SUMMARY = 600
 
 _templates = Environment(loader=FileSystemLoader(Path(__file__).resolve().parent / "templates"), autoescape=True,
                          undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True)
 # A fixed text inside a CSS string (the PDF's page numbers): no quote or backslash can end it early.
 _templates.filters["css"] = lambda text: re.sub(r'["\\\n]', " ", str(text))
+_templates.filters["short"] = lambda text, limit=OVERVIEW_TEXT: (
+    text if len(text) <= limit else text[:limit - 1].rstrip() + "…")
 UNSAFE_IN_FILENAMES = re.compile(r'[/\\:*?"<>|\x00-\x1f]+')
 
 
@@ -98,18 +114,27 @@ def _paragraphs(note: str) -> list[str]:
     return [paragraph.strip("\n") for paragraph in re.split(r"\n{2,}", "\n".join(lines).strip()) if paragraph.strip()]
 
 
-def minutes_pdf(meeting: Meeting, minutes: dict, template: dict | None = None) -> bytes:
-    """The minutes as an A4 PDF, as the email lays them out (template, language, no notes for the moderator), with
-    the meeting's details on top and page numbers."""
-    return _pdf(_context(meeting, minutes, template))
+def minutes_pdf(meeting: Meeting, minutes: dict, template: dict | None = None, full: bool = False) -> bytes:
+    """The minutes as an A4 PDF laid out by the template, in their language, without the notes for the moderator:
+    by default the one-page overview that is emailed (what was discussed, decided and is to be done, long lists cut
+    short); full, for the moderator, every topic with its details, on as many pages as they take."""
+    context = _context(meeting, minutes, template)
+    if full:
+        return _render("minutes_pdf.html", context).write_pdf()
+    for limits in OVERVIEW_STEPS:
+        document = _render("minutes_overview.html", {**context, **_overview(context, limits)})
+        if len(document.pages) == 1:
+            break
+    return document.write_pdf()
 
 
-def pdf_filename(meeting: Meeting) -> str:
+def pdf_filename(meeting: Meeting, full: bool = False) -> str:
     """ "Proces-verbal - Raport de gardă - 24.09.2026.pdf": the minutes' word, the meeting and the day it was held,
-    without characters a file name can't have."""
+    without characters a file name can't have ("... (Detalii complete).pdf" for the full minutes)."""
     labels = LABELS[meeting.minutes_language]
     title = _one_line(UNSAFE_IN_FILENAMES.sub(" ", meeting.title))[:100].strip() or labels["minutes"]
-    return f"{labels['minutes']} - {title} - {_local_day(meeting.created_at)}.pdf"
+    detail = f" ({labels['full_details']})" if full else ""
+    return f"{labels['minutes']} - {title} - {_local_day(meeting.created_at)}{detail}.pdf"
 
 
 def _context(meeting: Meeting, minutes: dict, template: dict | None) -> dict:
@@ -117,7 +142,11 @@ def _context(meeting: Meeting, minutes: dict, template: dict | None) -> dict:
     minutes = for_recipients(minutes)
     labels = LABELS[meeting.minutes_language]
     template = template or default_template(meeting.meeting_type)
+    sections = [s["key"] for s in template["sections"] if s["enabled"]]
+    topic_fields = [field for field, shown in template["topic_fields"].items() if shown]
+    attendees = [attendee_line(a) for a in minutes.get("attendees", [])]
     return {
+        **_grid(minutes, sections, topic_fields, attendees),
         "m": minutes,
         "lang": meeting.minutes_language,
         "labels": labels,
@@ -128,20 +157,60 @@ def _context(meeting: Meeting, minutes: dict, template: dict | None) -> dict:
         "duration": _duration(meeting.duration_s, labels),
         "approved_by": meeting.approved_by.full_name if meeting.approved_by else "",
         "approved_at": _local_time(meeting.approved_at) if meeting.approved_at else "",
-        "attendees": [attendee_line(a) for a in minutes.get("attendees", [])],
+        "attendees": attendees,
         "warnings": [without_time(w) for w in minutes["warnings"]],  # none in minutes from before them
         "other_decisions": other_decisions(minutes),
         "action_items": sorted(minutes["action_items"], key=lambda a: PRIORITY_ORDER.get(a["priority"], 3)),
-        "sections": [s["key"] for s in template["sections"] if s["enabled"]],
-        "topic_fields": [field for field, shown in template["topic_fields"].items() if shown],
+        "sections": sections,
+        "topic_fields": topic_fields,
     }
 
 
-def _pdf(context: dict) -> bytes:
+def _grid(minutes: dict, sections: list[str], topic_fields: list[str], attendees: list[str]) -> dict:
+    """The PDF's 2x2 grid (Attendees | Agenda, Decisions | Action items): which cells the template shows and what
+    they list; the other sections are boxes, above the grid if the template puts them before its first grid
+    section (the summary, by default), below it otherwise."""
+    topics_on = "topics" in sections
+    by_topic = [(t["name"], [d for d in minutes["decisions"] if d["patient"] == t["name"]])
+                for t in minutes["topics"]] if topics_on and "decisions" in topic_fields else []
+    # No one added as present: the speakers the moderator named (their roles are only guessed, so not shown).
+    names = [p["name"] for p in minutes["participants"].values() if p["name"].strip()]
+    cells = {"attendees": "attendees" in sections, "topics": topics_on,
+             "decisions": bool(by_topic) or "other_decisions" in sections, "action_items": "action_items" in sections}
+    rows = [[cell for cell in row if cells[cell]] for row in (("attendees", "topics"), ("decisions", "action_items"))]
+    boxes = [s for s in sections if s in BOX_SECTIONS]
+    first_cell = next((i for i, s in enumerate(sections) if s not in BOX_SECTIONS), len(sections))
+    return {
+        "grid_rows": [row for row in rows if row],  # a cell alone in its row spans both columns
+        "attendee_lines": attendees or names,
+        "topic_decisions": [(name, decisions) for name, decisions in by_topic if decisions],
+        "show_other_decisions": "other_decisions" in sections,
+        "boxes_above": [s for s in boxes if sections.index(s) < first_cell],
+        "boxes_below": [s for s in boxes if sections.index(s) > first_cell],
+    }
+
+
+def _overview(context: dict, limits: dict) -> dict:
+    """What the one-page overview lists in each cell and box: the decisions of every topic in one list, not per
+    topic; each list at most limits long, and how many more there are."""
+    m = context["m"]
+    decisions = [d for _, topic_decisions in context["topic_decisions"] for d in topic_decisions]
+    if context["show_other_decisions"]:
+        decisions += context["other_decisions"]
+    lists = {"attendees": context["attendee_lines"], "topics": [t["name"] for t in m["topics"]],
+             "decisions": [d["decision"] for d in decisions], "action_items": context["action_items"],
+             "open_issues": m["open_issues"]}
+    return {"overview": {key: items[:limits[key]] for key, items in lists.items()},
+            "overview_more": {key: max(0, len(items) - limits[key]) for key, items in lists.items()},
+            "summary_limit": OVERVIEW_SUMMARY}
+
+
+def _render(template: str, context: dict):
+    """The laid-out pages (a weasyprint Document: its pages counted, then written as a PDF)."""
     from weasyprint import HTML  # a second to load: only when a PDF is made
 
-    html = _templates.get_template("minutes_pdf.html").render(**context)
-    return HTML(string=html, url_fetcher=_fetch_nothing).write_pdf()
+    html = _templates.get_template(template).render(**context)
+    return HTML(string=html, url_fetcher=_fetch_nothing).render()
 
 
 def _fetch_nothing(url: str, *args, **kwargs):

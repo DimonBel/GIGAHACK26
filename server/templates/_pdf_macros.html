@@ -1,0 +1,15 @@
+{# Shared by the minutes PDFs (imported with their context). #}
+{# One grid cell: its heading and what it lists. #}
+{% macro cell_head(cell, span) %}
+<td class="cell-head"{% if span == 2 %} colspan="2"{% endif %}>
+  {% if cell == "attendees" %}{{ labels.attendees }}{% elif cell == "topics" %}{{ labels.agenda }}{% elif cell == "decisions" %}{{ labels.decisions }}{% else %}{{ labels.action_items }}{% endif %}
+</td>
+{% endmacro %}
+
+{# A full-width box: an orange-bordered heading bar and its content. #}
+{% macro box(heading) %}
+<table class="box">
+  <tr class="head-row"><td class="cell-head">{{ heading }}</td></tr>
+  <tr><td class="cell-body">{{ caller() }}</td></tr>
+</table>
+{% endmacro %}

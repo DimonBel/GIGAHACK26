@@ -3,6 +3,7 @@ delivery only to this machine."""
 import base64
 import dataclasses
 import io
+import re
 from datetime import datetime
 from typing import ClassVar
 
@@ -38,7 +39,8 @@ MINUTES = minutes_doc({
 })
 ENGLISH = ("Summary", "Key moments", "Topics", "Status", "Findings", "Decisions", "Other decisions", "Action items",
            "Task", "Owner", "Deadline", "Priority", "Open issues", "Present", "Participants", "Roles are guessed",
-           "Verification notes", "Minutes", "meeting", "approved by", "Drafted by", "Processed entirely", ">high<")
+           "Verification notes", "Minutes", "meeting", "approved by", "Drafted by", "Processed entirely", ">high<",
+           "Agenda", "Attendees", "Date + Time")
 
 
 HELD = datetime(2026, 9, 26, 6, 17)  # UTC; :17 local in any time zone, never one of the minutes' times
@@ -60,6 +62,11 @@ def _pdf_text(data: bytes) -> str:
     return "\n".join(page.extract_text() for page in pypdf.PdfReader(io.BytesIO(data)).pages)
 
 
+def _squeezed(text: str) -> str:
+    """Without any whitespace: a long title wraps inside its box, wherever the line happens to break."""
+    return re.sub(r"\s", "", text)
+
+
 def _everything(meeting_type: str = "medical") -> dict:
     """A template with every section on, the ones off by default too."""
     return {**default_template(meeting_type), "sections": [{"key": key, "enabled": True} for key in SECTIONS]}
@@ -67,8 +74,13 @@ def _everything(meeting_type: str = "medical") -> dict:
 
 def _minutes(meeting_type: str = "medical", minutes_language: str = "en", minutes: dict = MINUTES,
              template: dict | None = None) -> str:
-    """The text of the attached PDF: the minutes themselves."""
-    return _pdf_text(_email(meeting_type, minutes_language, minutes, template, pdf=True).attachment.data)
+    """The text of the full minutes' PDF (the moderator's): every topic with its details."""
+    return _pdf_text(mail.minutes_pdf(_meeting(meeting_type, minutes_language), minutes, template, full=True))
+
+
+def _overview(minutes_language: str = "en", minutes: dict = MINUTES, template: dict | None = None) -> bytes:
+    """The PDF attached to the email: the minutes on one page."""
+    return _email(minutes_language=minutes_language, minutes=minutes, template=template, pdf=True).attachment.data
 
 
 @pytest.mark.parametrize(("language", "note"), [
@@ -110,23 +122,25 @@ def test_the_moderator_can_write_the_note_themselves():
 
 def test_the_pdf_shows_what_was_typed_as_text():
     text = _minutes()
-    assert "Round <script>alert('title')</script>" in text and "<b>stable</b>" in text  # text, never markup
+    assert _squeezed("Round <script>alert('title')</script>") in _squeezed(text)  # text, never markup
+    assert "<b>stable</b>" in text
     assert "Ion <i>Rusu</i>" in text and "11 min 43 s" in text and "Call cardiology" in text  # a decision of no topic
 
 
 def test_high_priority_first_and_labels_per_type():
     text = _minutes("executive")
     assert text.index("Blood tests") < text.index("Echo")
-    assert "EXECUTIVE MEETING" in text and "MINUTES" in text and "TOPICS" in text and "Patients" not in text
+    assert "EXECUTIVE MEETING" in text and "Minutes" in text and "Agenda" in text and "Patients" not in text
 
 
 @pytest.mark.parametrize(("language", "labels"), [
-    ("ro", ["Ședință medicală", "Proces-verbal", "Rezumat", "Subiecte", "Stare", "Constatări", "Decizii",
-            "Alte decizii", "Sarcini", "Sarcină", "Subiect", "Responsabil", "Termen", "Prioritate", "ridicată",
-            "scăzută", "Probleme nerezolvate", "Prezenți", "11 min 43 s", "Aprobat de", "Durata"]),
-    ("ru", ["Медицинское совещание", "Протокол", "Краткое содержание", "Темы", "Состояние", "Данные", "Решения",
-            "Другие решения", "Поручения", "Ответственный", "Срок", "Приоритет", "высокий", "низкий",
-            "Открытые вопросы", "Присутствовали", "11 мин 43 с", "Утверждено", "Продолжительность"]),
+    ("ro", ["Ședință medicală", "Proces-verbal", "Titlul ședinței", "Data și ora", "Rezumat", "Ordinea de zi",
+            "Punctul 1: Bed 8", "Decizii", "Alte decizii", "Sarcini", "Termen", "Prioritate", "ridicată", "scăzută",
+            "Probleme nerezolvate", "Prezenți", "11 min 43 s", "Aprobat de", "Durata"]),
+    ("ru", ["Медицинское совещание", "Протокол", "Название совещания", "Дата и время", "Краткое содержание",
+            "Повестка дня", "Пункт повестки 1: Bed 8", "Решения", "Другие решения", "Поручения", "Срок",
+            "Приоритет", "высокий", "низкий", "Открытые вопросы", "Присутствовали", "11 мин 43 с", "Утверждено",
+            "Продолжительность"]),
 ])
 def test_the_pdf_is_in_the_minutes_language(language, labels):
     text = _minutes(minutes_language=language).casefold()
@@ -136,17 +150,18 @@ def test_the_pdf_is_in_the_minutes_language(language, labels):
         assert english.casefold() not in text, english
 
 
-@pytest.mark.parametrize(("language", "present", "voices"), [("en", "Present", "Participants"),
+@pytest.mark.parametrize(("language", "present", "voices"), [("en", "Attendees", "Participants"),
                                                              ("ro", "Prezenți", "Participanți"),
                                                              ("ru", "Присутствовали", "Участники")])
 def test_attendees_are_listed_before_the_voices(language, present, voices):
-    """Everyone present, also those who did not speak: name, then job title, position and specialty if known."""
-    text = _minutes(minutes_language=language, template=_everything()).casefold()
-    ana = "Ana Popescu — Head of cardiology, Doctor, Cardiologist".casefold()
-    assert text.index(present.casefold()) < text.index(ana) < text.index(voices.casefold())
-    assert "guest <b>surgeon</b>" in text
-    nobody = _minutes(minutes_language=language, minutes=minutes_doc({**MINUTES, "attendees": []}))
-    assert present.casefold() not in nobody.casefold()
+    """Everyone present, also those who did not speak: name, then job title, position and specialty if known; no
+    one added as present: the speakers the moderator named, without the roles the AI guessed."""
+    text = _squeezed(_minutes(minutes_language=language, template=_everything()).casefold())
+    ana = _squeezed("Ana Popescu — Head of cardiology, Doctor, Cardiologist".casefold())
+    assert text.index(_squeezed(present.casefold())) < text.index(ana) < text.index(voices.casefold())
+    assert _squeezed("guest <b>surgeon</b>") in text
+    nobody = _minutes(minutes_language=language, minutes=minutes_doc({**MINUTES, "attendees": []})).casefold()
+    assert nobody.index(present.casefold()) < nobody.index("dr. <u>x</u>") and "leads the round" not in nobody
 
 
 def test_the_minutes_read_as_minutes_not_as_ai_output():
@@ -169,14 +184,15 @@ def test_the_notes_for_the_moderator_are_not_in_the_minutes():
 
 
 @pytest.mark.parametrize(("language", "labels"), [
-    ("en", ["MINUTES", "MEDICAL MEETING", "Held", "Duration", "Approved by", "SUMMARY", "1. Bed 8", "Page 1 of 1"]),
-    ("ro", ["PROCES-VERBAL", "ȘEDINȚĂ MEDICALĂ", "Data", "Durata", "Aprobat de", "REZUMAT", "1. Bed 8",
+    ("en", ["Minutes", "MEDICAL MEETING", "Date + Time", "Duration", "Approved by", "Summary", "Agenda",
+            "Page 1 of 1"]),
+    ("ro", ["Proces-verbal", "ȘEDINȚĂ MEDICALĂ", "Data și ora", "Durata", "Aprobat de", "Rezumat", "Ordinea de zi",
             "Pagina 1 din 1"]),
-    ("ru", ["ПРОТОКОЛ", "МЕДИЦИНСКОЕ СОВЕЩАНИЕ", "Дата", "Продолжительность", "Утверждено", "КРАТКОЕ СОДЕРЖАНИЕ",
-            "1. Bed 8", "Страница 1 из 1"]),
+    ("ru", ["Протокол", "МЕДИЦИНСКОЕ СОВЕЩАНИЕ", "Дата и время", "Продолжительность", "Утверждено",
+            "Краткое содержание", "Повестка дня", "Страница 1 из 1"]),
 ])
 def test_the_minutes_are_attached_as_a_pdf(language, labels):
-    """In the minutes' language, laid out as the email (no minute marks, no notes for the moderator), with a file
+    """The one-page overview, in the minutes' language (no minute marks, no notes for the moderator), with a file
     name a mail header can carry."""
     minutes = {**MINUTES, "decisions": [{"decision": "Order tests ⚠ unverified: 2", "time": "00:04",
                                          "patient": "Bed 8"}]}
@@ -188,26 +204,79 @@ def test_the_minutes_are_attached_as_a_pdf(language, labels):
     text = _pdf_text(attachment.data)
     for label in labels:
         assert label in text, label
-    assert "Order tests" in text and "Round <script>alert('title')</script>" in text  # text, never markup
+    assert "Order tests" in text and _squeezed("Round <script>alert('title')</script>") in _squeezed(text)
     for hidden in ("unverified", "00:03", "00:04", "05:00", "Key moments", "38.5 not found"):
         assert hidden not in text, hidden
     assert _email(minutes_language=language).attachment is None  # the preview makes no PDF
 
 
+def test_the_email_attaches_the_minutes_on_one_page():
+    """What was discussed, decided and is to be done: the topics by name, every decision in one list (not under its
+    topic), the tasks with who does them; each topic's status and findings are in the full minutes only."""
+    data = _overview()
+    assert len(pypdf.PdfReader(io.BytesIO(data)).pages) == 1
+    text = _pdf_text(data)
+    for shown in ("Fever.", "Ana Popescu", "Bed 8", "Order tests", "Call cardiology", "nurse", "Blood tests",
+                  "Echo <script>", "Open issues"):
+        assert shown in text, shown
+    assert text.index("Blood tests") < text.index("Echo")  # high priority first
+    assert text.index("Order tests") < text.index("Call cardiology")  # the topics' decisions, then the others
+    for hidden in ("<b>stable</b>", "<iframe>", "Item 1", "Agenda item", "Other decisions", "Key moments",
+                   "leads the round", "38.5 not found"):
+        assert hidden not in text, hidden
+
+
+@pytest.mark.parametrize("language", ["en", "ro", "ru"])
+def test_the_overview_fits_one_page_however_long_the_minutes(language):
+    """Every list full of the longest texts: as much as fits on the page, "+ N more" for the rest."""
+    long = "Pacientul din salonul opt are nevoie de consult cardiologic și ecografie de control mâine dimineață "
+    text = lambda n: (long * 5)[:n]  # noqa: E731
+    minutes = minutes_doc({
+        "title": text(80), "summary": text(2000),
+        "topics": [{"name": f"{i} {text(36)}", "status": text(300), "findings": [text(160)] * 7} for i in range(22)],
+        "decisions": [{"decision": text(160), "patient": f"{i} {text(36)}"} for i in range(22)],
+        "action_items": [{"task": text(160), "owner": text(60), "deadline": text(40), "priority": "high"}] * 18,
+        "open_issues": [text(160)] * 9,
+        "attendees": [{"name": text(40), "job_title": text(60), "position": text(30), "specialty": text(30)}] * 20,
+    })
+    meeting = _meeting(minutes_language=language)
+    meeting.title = text(200)
+    data = mail.minutes_pdf(meeting, minutes)
+    assert len(pypdf.PdfReader(io.BytesIO(data)).pages) == 1
+    assert mail.LABELS[language]["more"].split("{n}")[0].strip() in _pdf_text(data)
+    assert len(pypdf.PdfReader(io.BytesIO(mail.minutes_pdf(meeting, minutes, full=True))).pages) > 5
+
+
+def test_the_overview_shows_everything_that_fits():
+    """A short meeting's lists are shown whole, without "more"."""
+    text = _pdf_text(_overview())
+    assert "more" not in text and "Guest <b>Surgeon</b>" in text and "Echo <script>" in text
+
+
 def test_the_template_lays_out_the_minutes():
-    """The template's sections in its order, the disabled ones left out, and topics with its fields only."""
+    """The grid (Attendees | Agenda, Decisions | Action items), the boxes the template puts before its first grid
+    section above it, in its order, the others below; the disabled sections left out, topics with its fields only."""
     order = ["open_issues", "summary", "topics", "attendees", "key_moments", "other_decisions", "action_items",
              "participants", "warnings"]
     sections = [{"key": key, "enabled": key not in ("key_moments", "participants")} for key in order]
     template = {**default_template("medical"), "sections": sections,
                 "topic_fields": {"status": False, "findings": True, "decisions": False}}
     text = _minutes(template=template)
-    assert text.index("OPEN ISSUES") < text.index("SUMMARY") < text.index("TOPICS") < text.index("PRESENT")
-    for hidden in ("Key moments", "KEY MOMENTS", "Tests ordered", "PARTICIPANTS", "Roles are guessed", "Status",
-                   "stable", "Order tests"):
+    assert text.index("Open issues") < text.index("Summary") < text.index("Attendees") < text.index("Agenda")
+    assert text.index("Agenda") < text.index("Decisions") < text.index("Action items") < text.index("Verification")
+    for hidden in ("Key moments", "Tests ordered", "Participants", "leads the round", "Roles are guessed", "stable",
+                   "Order tests"):
         assert hidden not in text, hidden
-    assert "Findings" in text  # the other topic fields
+    assert "<iframe>" in text  # the other topic fields: the findings
     assert "Call cardiology — Box" in text  # a decision about no topic
+
+
+def test_a_disabled_grid_cell_leaves_its_row_to_the_other():
+    sections = [{"key": key, "enabled": key not in ("attendees", "action_items")} for key in SECTIONS]
+    text = _minutes(template={**default_template("medical"), "sections": sections})
+    assert "Agenda" in text and "Decisions" in text
+    for hidden in ("Attendees", "Ana Popescu", "Action items", "Blood tests"):
+        assert hidden not in text, hidden
 
 
 def test_older_minutes_show_no_suggestions():

@@ -149,19 +149,24 @@ def email_preview(meeting_id: str, user: Manager, db: Db) -> dict:
 
 
 @router.get("/{meeting_id}/minutes.pdf")
-def get_minutes_pdf(meeting_id: str, user: CurrentUser, db: Db) -> Response:
-    """The minutes as the PDF that is emailed, laid out by the active template: for the moderator from the draft on,
-    for a recipient once sent (audited, like reading them)."""
+def get_minutes_pdf(meeting_id: str, user: CurrentUser, db: Db, download: bool = False,
+                    full: bool = False) -> Response:
+    """The minutes as the PDF that is emailed (the one-page overview), laid out by the active template: for the
+    moderator from the draft on, for a recipient once sent (audited, like reading them). With full, every topic with
+    its details, for the moderator only (403 otherwise); with download, saved as a file instead of shown."""
     meeting = _meeting(db, meeting_id, user)
     if meeting.minutes is None:
         raise HTTPException(409, "The minutes are not ready yet")
     if not _can_manage(user, meeting):
+        if full:
+            raise HTTPException(403, "The full minutes are for the moderator")
         audit(db, "view_minutes", user, meeting.id, "pdf")
         db.commit()
-    pdf = minutes_pdf(meeting, minutes_doc(meeting.minutes.current), active_template(db, meeting.meeting_type))
-    filename = pdf_filename(meeting)
+    pdf = minutes_pdf(meeting, minutes_doc(meeting.minutes.current), active_template(db, meeting.meeting_type),
+                      full=full)
+    filename = pdf_filename(meeting, full=full)
     return Response(pdf, media_type="application/pdf", headers={
-        "Content-Disposition": f"inline; filename*=UTF-8''{quote(filename)}",
+        "Content-Disposition": f"{'attachment' if download else 'inline'}; filename*=UTF-8''{quote(filename)}",
         "Cache-Control": "no-store",  # patient data: not kept by the browser
     })
 

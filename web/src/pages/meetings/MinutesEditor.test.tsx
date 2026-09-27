@@ -216,9 +216,43 @@ describe('MinutesEditor', () => {
     // The minutes it carries: the PDF, shown as it will be attached.
     expect(dialog.getByText('Attachment: Proces-verbal - Medical board - 26.09.2026.pdf')).toBeInTheDocument();
     expect(dialog.getByTitle('The minutes (PDF)')).toHaveAttribute('src', '/api/meetings/m1/minutes.pdf');
-    expect(dialog.getByRole('link', { name: 'Open PDF' })).toHaveAttribute('href', '/api/meetings/m1/minutes.pdf');
+    expect(dialog.getByRole('link', { name: 'Export PDF' })).toHaveAttribute('href', '/api/meetings/m1/minutes.pdf');
     expect(save).toHaveBeenCalledOnce();
     expect(save.mock.invocationCallOrder[0]).toBeLessThan(preview.mock.invocationCallOrder[0]);
+  });
+
+  it('exports the draft as the PDF, saving the changes first so it shows them', async () => {
+    const save = vi.spyOn(meetingsApi, 'saveMinutes').mockImplementation((_, minutes) => Promise.resolve(minutes));
+    const tab = { opener: {}, location: { href: '' }, close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    renderEditor();
+
+    const toolbar = within(screen.getByRole('link', { name: 'Download PDF' }).closest('.mantine-Paper-root')!);
+    expect(toolbar.getByRole('link', { name: 'Download PDF' })).toHaveAttribute(
+      'href',
+      '/api/meetings/m1/minutes.pdf?download=1',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove open issue 1' }));
+    await userEvent.click(toolbar.getByRole('link', { name: 'Export PDF' }));
+
+    await vi.waitFor(() => expect(tab.location.href).toBe('/api/meetings/m1/minutes.pdf'));
+    expect(open).toHaveBeenCalledWith('', '_blank');
+    expect(tab.opener).toBeNull();
+    expect(save).toHaveBeenCalledOnce();
+  });
+
+  it('offers the moderator the full minutes, every topic with its details', async () => {
+    renderEditor();
+    await userEvent.click(screen.getByRole('button', { name: 'More PDF options' }));
+    expect(await screen.findByRole('menuitem', { name: 'Open full details' })).toHaveAttribute(
+      'href',
+      '/api/meetings/m1/minutes.pdf?full=1',
+    );
+    expect(screen.getByRole('menuitem', { name: 'Download full details' })).toHaveAttribute(
+      'href',
+      '/api/meetings/m1/minutes.pdf?full=1&download=1',
+    );
   });
 
   it('measures its toolbar once, instead of again after every render', async () => {

@@ -102,8 +102,10 @@ export const meetingsApi = {
     request<Meeting>(meetingPath(id, '/send'), { method: 'POST', body: { ...recipients, note } }),
   remove: (id: string) => request<void>(meetingPath(id), { method: 'DELETE' }),
   audioUrl: (id: string) => apiUrl(meetingPath(id, '/audio')),
-  /** The minutes as the PDF that is emailed (opened in the browser's own viewer). */
-  pdfUrl: (id: string) => apiUrl(meetingPath(id, '/minutes.pdf')),
+  /** The minutes as the PDF that is emailed (one page), or full: every topic with its details (the moderator's);
+   *  opened in the browser's own viewer, or saved as a file (download). */
+  pdfUrl: (id: string, { download = false, full = false } = {}) =>
+    apiUrl(meetingPath(id, '/minutes.pdf'), { full: full ? 1 : undefined, download: download ? 1 : undefined }),
   emailPreview: (id: string) => request<EmailPreview>(meetingPath(id, '/email-preview')),
 };
 

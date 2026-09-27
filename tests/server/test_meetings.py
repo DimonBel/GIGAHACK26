@@ -88,7 +88,7 @@ def test_lifecycle(login, upload, wait, mailer):
     minutes_pdf = _pdf_text(email.attachment.data)  # the minutes; the email is a short note
     assert "Medical board: bed 8" in minutes_pdf and "<script>" not in email.html
     assert '<html lang="ro">' in email.html and "Bună ziua," in email.text  # the minutes' language, by default
-    assert "REZUMAT" in minutes_pdf and email.text.endswith("Moderator Test\n")  # signed by who sent it
+    assert "Rezumat" in minutes_pdf and email.text.endswith("Moderator Test\n")  # signed by who sent it
     assert moderator.post(path + "/send", json={"to": ["ana@medpark.md"]}).status_code == 409  # sent already
 
     reader = login("user")
@@ -231,6 +231,12 @@ def test_the_minutes_pdf_is_emailed_and_can_be_opened(ready, login, mailer):
     assert draft.status_code == 200 and draft.headers["content-type"] == "application/pdf"
     assert draft.content.startswith(b"%PDF-") and draft.headers["cache-control"] == "no-store"
     assert draft.headers["content-disposition"].startswith("inline; filename*=UTF-8''Proces-verbal%20-%20")
+    saved = moderator.get(path + "/minutes.pdf", params={"download": 1})  # the Export button's Download
+    assert saved.headers["content-disposition"].startswith("attachment; filename*=UTF-8''Proces-verbal%20-%20")
+    assert saved.content.startswith(b"%PDF-")
+    full = moderator.get(path + "/minutes.pdf", params={"full": 1})  # every topic with its details
+    assert full.status_code == 200 and "Detalii%20complete" in full.headers["content-disposition"]
+    assert "Punctul 1: " in _pdf_text(full.content) and "Punctul 1: " not in _pdf_text(draft.content)
     reader = login("user")
     assert reader.get(path + "/minutes.pdf").status_code == 404  # not sent to them (yet)
     assert moderator.post(path + "/approve").status_code == 200
@@ -239,6 +245,7 @@ def test_the_minutes_pdf_is_emailed_and_can_be_opened(ready, login, mailer):
     assert email.attachment.content_type == "application/pdf" and email.attachment.data.startswith(b"%PDF-")
     sent = reader.get(path + "/minutes.pdf")
     assert sent.status_code == 200 and sent.content.startswith(b"%PDF-")
+    assert reader.get(path + "/minutes.pdf", params={"full": 1}).status_code == 403  # for the moderator only
     audit = login("admin").get("/api/audit", params={"meeting_id": meeting["id"]}).json()
     assert audit[0]["action"] == "view_minutes" and audit[0]["detail"] == "pdf"
 

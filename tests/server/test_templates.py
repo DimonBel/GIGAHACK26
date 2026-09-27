@@ -140,10 +140,10 @@ def test_the_email_follows_the_active_template(login, upload, wait, mailer):
     admin.post("/api/templates/medical", json=_body(sections=sections, topic_fields={**ALL_FIELDS, "status": False}))
     assert send() == "to: ana@medpark.md; cc: -; template v1"
     built_in, templated = (_pdf_text(email.attachment.data) for email in mailer.sent)  # the minutes: the PDF
-    assert built_in.index("SUMMARY") < built_in.index("TOPICS") < built_in.index("Status")
-    assert "KEY MOMENTS" not in built_in  # off in the built-in template
-    assert templated.index("OPEN ISSUES") < templated.index("SUMMARY") < templated.index("TOPICS")
-    for hidden in ("KEY MOMENTS", "Blood tests ordered", "Status"):  # the status topic field is off too
+    assert built_in.index("Summary") < built_in.index("Agenda") < built_in.index("Open issues")
+    assert "Key moments" not in built_in  # off in the built-in template
+    assert templated.index("Open issues") < templated.index("Summary") < templated.index("Agenda")
+    for hidden in ("Key moments", "Blood tests ordered"):
         assert hidden not in templated, hidden
 
 

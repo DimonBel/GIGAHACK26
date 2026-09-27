@@ -46,7 +46,7 @@ function ApprovalBar({ meeting }: { meeting: Meeting }) {
         </Group>
         <Group gap="xs">
           <EmailPreviewButton meetingId={meeting.id} />
-          <PdfButton meetingId={meeting.id} />
+          <PdfButton meetingId={meeting.id} full />
           {!sent && (
             <Button
               variant="default"

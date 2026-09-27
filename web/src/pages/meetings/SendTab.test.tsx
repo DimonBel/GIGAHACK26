@@ -88,7 +88,11 @@ describe('SendTab', () => {
 
     expect(await screen.findByText(/Vă transmitem atașat procesul-verbal/)).toBeInTheDocument();
     expect(screen.getByText('Proces-verbal - Medical board - 26.09.2026.pdf')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open PDF' })).toHaveAttribute('href', '/api/meetings/m1/minutes.pdf');
+    expect(screen.getByRole('link', { name: 'Export PDF' })).toHaveAttribute('href', '/api/meetings/m1/minutes.pdf');
+    expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute(
+      'href',
+      '/api/meetings/m1/minutes.pdf?download=1',
+    );
   });
 
   it('sends the email note the moderator wrote, and can go back to the default one', async () => {

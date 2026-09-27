@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+{# The minutes PDFs' page, styles and header; minutes_overview.html and minutes_pdf.html fill it. #}
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<title>{{ title }}</title>
+{# Only fixed texts (LABELS) go into the CSS; the minutes' own texts are HTML, escaped (running elements). #}
+<style>
+@page {
+  size: A4;
+  margin: 16mm 16mm 18mm;
+  @top-left { content: element(running-title); }
+  @bottom-left { content: element(running-footer); }
+  @bottom-right {
+    content: "{{ labels.page | css }} " counter(page) " {{ labels.of | css }} " counter(pages);
+    font-family: Arial, "Liberation Sans", "DejaVu Sans", sans-serif; font-size: 8pt; color: #8a5a44;
+  }
+}
+@page :first { @top-left { content: none; } }
+html { font-family: Arial, "Liberation Sans", "DejaVu Sans", sans-serif; font-size: 10.5pt; line-height: 1.4;
+       color: #1f1f1f; }
+body { margin: 0; }
+p { margin: 0; }
+ul { margin: 0; padding-left: 13pt; }
+li { margin: 0 0 2pt; }
+.running-title { position: running(running-title); font-size: 8pt; color: #8a5a44; }
+.running-footer { position: running(running-footer); font-size: 8pt; color: #8a5a44; }
+
+/* Header: the big title on the left, the meeting's details in cream boxes on the right. */
+.head { width: 100%; border-collapse: collapse; margin: 0 0 16pt; }
+.head td { vertical-align: top; padding: 0; }
+.head td.title-cell { width: 60%; padding-right: 10pt; }
+.kicker { margin: 0 0 2pt; font-size: 8.5pt; letter-spacing: 0.08em; text-transform: uppercase; color: #8a5a44; }
+h1 { margin: 0; font-size: 34pt; line-height: 1.05; font-weight: bold; color: #f0541e; }
+.subtitle { margin: 4pt 0 0; font-size: 14pt; color: #f0541e; }
+.meta { border-collapse: separate; border-spacing: 0 5pt; margin-left: auto; }
+.meta th { padding: 0 8pt 0 0; text-align: right; font-weight: bold; white-space: nowrap; vertical-align: middle; }
+.meta td { padding: 5pt 9pt; background: #fdf1e8; font-size: 9.5pt; font-weight: bold; min-width: 34mm; }
+
+/* The 2x2 grid and the full-width boxes: orange borders, cream heading bars. */
+.grid, .box { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 12pt; }
+.grid td, .box td { border: 1pt solid #f0541e; vertical-align: top; }
+.grid td.cell-head, .box td.cell-head { padding: 7pt 10pt; background: #fdf1e8; font-size: 13pt; font-weight: bold; }
+.grid tr.head-row, .box tr.head-row { page-break-after: avoid; }
+.box { page-break-inside: avoid; }
+.grid td.cell-body, .box td.cell-body { padding: 9pt 10pt 11pt; }
+.grid col.half { width: 50%; }  /* the columns, not the cells: a cell's padding would widen the grid */
+.item { margin: 0 0 7pt; page-break-inside: avoid; }
+.item:last-child { margin-bottom: 0; }
+.item-name { margin: 0 0 2pt; font-weight: bold; }
+.lines p { margin: 0 0 1.5pt; }
+.pre { white-space: pre-line; }
+.muted { color: #8a5a44; }
+.high { font-weight: bold; color: #b42318; }
+.warnings { color: #7a4b00; }
+</style>
+{% block style %}{% endblock %}
+</head>
+<body>
+<div class="running-title">{{ meeting_label }} &middot; {{ labels.minutes }} &middot; {{ title }}</div>
+<div class="running-footer">{{ meeting_title | short(80) }} &middot; {{ held }}</div>
+
+
+<table class="head">
+  <tr>
+    <td class="title-cell">
+      <p class="kicker">{{ meeting_label }}</p>
+      <h1>{{ labels.minutes }}</h1>
+      <p class="subtitle">{{ labels.meeting_title }}: {{ title | short(90) }}</p>
+    </td>
+    <td>
+      <table class="meta">
+        <tr><th>{{ labels.date_time }}:</th><td>{{ held }}</td></tr>
+        {% if duration %}
+        <tr><th>{{ labels.duration }}:</th><td>{{ duration }}</td></tr>
+        {% endif %}
+        {% if meeting_title != title %}
+        <tr><th>{{ labels.meeting }}:</th><td>{{ meeting_title | short(60) }}</td></tr>
+        {% endif %}
+        {% if approved_by %}
+        <tr><th>{{ labels.approved }}:</th><td>{{ approved_by | short(40) }}{% if approved_at %}, {{ approved_at }}{% endif %}</td></tr>
+        {% endif %}
+      </table>
+    </td>
+  </tr>
+</table>
+
+{% block content %}{% endblock %}
+</body>
+</html>

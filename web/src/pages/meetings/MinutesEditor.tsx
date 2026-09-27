@@ -28,6 +28,7 @@ import {
   type MinutesFormValues,
 } from '../../lib/minutesForm';
 import { notifySuccess } from '../../lib/notify';
+import { PdfButton } from '../../components/PdfButton';
 import { EmailPreviewButton } from './EmailPreview';
 import { SplitEditor } from './SplitEditor';
 
@@ -296,6 +297,7 @@ export function MinutesEditor({ meeting, minutes, active, onApproved }: MinutesE
               </Button.Group>
               {saveButtons}
               <EmailPreviewButton meetingId={meeting.id} beforeOpen={savedForPreview} disabled={busy} />
+              <PdfButton meetingId={meeting.id} beforeOpen={savedForPreview} disabled={busy} full />
               <Button leftSection={<IconThumbUp size={16} />} onClick={confirmAgree} loading={agreeing} disabled={busy}>
                 {t('minutesEditor.agree')}
               </Button>
