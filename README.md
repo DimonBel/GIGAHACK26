@@ -62,6 +62,9 @@ Create the first admin (there are no default accounts); add the other people in 
 .venv/bin/python -m server.cli create-admin --email admin@medpark.md --name "Ana Admin" --position IT
 ```
 
+To try the app locally, `scripts/seed_demo_users.py` adds made-up moderators, doctors, nurses and staff with
+`@medpark.md` emails; their password is in `demo-accounts.txt` (not in git). Never on a real server.
+
 ## Run (offline)
 
 ```bash
