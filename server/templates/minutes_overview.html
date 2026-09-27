@@ -1,0 +1,74 @@
+{% extends "_pdf_base.html" %}
+{# The minutes on one page, as they are emailed: what was discussed, decided and is to be done, without each topic's
+   details (the moderator has those in the app and in the full PDF). Long lists stop where the page is full (mail.OVERVIEW_STEPS), with
+   "+ N more"; long texts are cut short. #}
+{% block style %}
+<style>
+html { font-size: 9.5pt; line-height: 1.3; }
+.head { margin-bottom: 8pt; }
+.meta { border-spacing: 0 3pt; }
+.meta td { padding: 4pt 8pt; }
+h1 { font-size: 30pt; }
+.grid, .box { margin-bottom: 9pt; }
+.grid td.cell-head, .box td.cell-head { padding: 5pt 9pt; font-size: 11.5pt; }
+.grid td.cell-body, .box td.cell-body { padding: 7pt 9pt 8pt; }
+li { margin: 0 0 2.5pt; }
+.more { margin: 3pt 0 0; font-style: italic; }
+.one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }  /* one line per topic */
+</style>
+{% endblock %}
+
+{% block content %}
+{% import "_pdf_macros.html" as ui with context %}
+
+{% macro more(key) %}
+{% if overview_more[key] %}<p class="more muted">{{ labels.more.format(n=overview_more[key]) }}</p>{% endif %}
+{% endmacro %}
+
+{% macro cell_body(cell, span) %}
+<td class="cell-body"{% if span == 2 %} colspan="2"{% endif %}>
+{% set items = overview[cell] %}
+{% if not items %}
+  <p class="muted">—</p>
+{% elif cell == "attendees" %}
+  <div class="lines">{% for a in items %}<p>{{ a | short(45) }}</p>{% endfor %}</div>
+{% elif cell == "topics" %}
+  <div class="lines">{% for name in items %}<p class="one-line">{{ loop.index }}. {{ name }}</p>{% endfor %}</div>
+{% elif cell == "decisions" %}
+  <ul>{% for d in items %}<li>{{ d | short }}</li>{% endfor %}</ul>
+{% else %}
+  <ul>
+    {% for a in items %}
+    <li>{% if a.owner %}<strong>{{ a.owner | short(30) }}</strong> — {% endif %}{{ a.task | short }}{% if a.deadline %} <span class="muted">&middot; {{ a.deadline | short(20) }}</span>{% endif %}{% if a.priority == "high" %} <span class="high">&middot; {{ labels.priorities.high }}</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{{ more(cell) }}
+</td>
+{% endmacro %}
+
+{% macro boxes(keys) %}
+{% for section in keys %}
+{% if section == "summary" and m.summary %}
+{% call ui.box(labels.summary) %}<p class="pre">{{ m.summary | short(summary_limit) }}</p>{% endcall %}
+{% elif section == "open_issues" and overview.open_issues %}
+{% call ui.box(labels.open_issues) %}<ul>{% for issue in overview.open_issues %}<li>{{ issue | short(110) }}</li>{% endfor %}</ul>{{ more("open_issues") }}{% endcall %}
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{{ boxes(boxes_above) }}
+
+{% if grid_rows %}
+<table class="grid">
+  <colgroup><col class="half"><col class="half"></colgroup>
+  {% for row in grid_rows %}
+  {% set span = 1 if row | length == 2 else 2 %}
+  <tr class="head-row">{% for cell in row %}{{ ui.cell_head(cell, span) }}{% endfor %}</tr>
+  <tr>{% for cell in row %}{{ cell_body(cell, span) }}{% endfor %}</tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{{ boxes(boxes_below) }}
+{% endblock %}

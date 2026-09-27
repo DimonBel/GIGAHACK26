@@ -1,2 +1,30 @@
+# Microphone recording
 sounddevice
 numpy
+# Speaker diarization (pyannote 3.1, runs locally on Apple GPU / CPU)
+pyannote.audio>=3.3,<4
+torch>=2.2,<2.9
+torchaudio>=2.2,<2.9
+soundfile
+huggingface_hub<0.26  # pyannote 3.x still passes use_auth_token
+# English accent ID (local SpeechBrain model, see scripts/download_models.py)
+speechbrain>=1.0,<2
+# Faster Whisper on Apple Silicon (--engine mlx; models: scripts/download_models.py --mlx)
+mlx-whisper==0.4.3; sys_platform == "darwin" and platform_machine == "arm64"
+# Word-level language tags (offline word frequencies for ro/ru/en), misheard-word correction
+wordfreq
+rapidfuzz
+# Web backend (server/): API, uploads, SQLite, password hashing, email templates, n8n webhook calls
+fastapi>=0.141,<1
+uvicorn>=0.30
+python-multipart>=0.0.20
+SQLAlchemy>=2.0,<3
+argon2-cffi>=23.1
+Jinja2>=3.1
+httpx2>=2.13  # n8n webhook calls; also the TestClient of the tests
+# The minutes as an A4 PDF attached to the email; needs Pango (macOS: brew install pango;
+# Debian/Ubuntu: apt install libpango-1.0-0 libpangoft2-1.0-0)
+weasyprint>=66
+# Tests
+pytest
+pypdf  # reads the minutes PDF back

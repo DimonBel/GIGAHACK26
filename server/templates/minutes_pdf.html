@@ -1,0 +1,86 @@
+{% extends "_pdf_base.html" %}
+{# The full minutes, for the moderator: every topic with its details. #}
+{% block content %}
+{% import "_pdf_macros.html" as ui with context %}
+{% macro cell_body(cell, span) %}
+<td class="cell-body"{% if span == 2 %} colspan="2"{% endif %}>
+{% if cell == "attendees" %}
+  {% if attendee_lines %}
+  <div class="lines">{% for a in attendee_lines %}<p>{{ a }}</p>{% endfor %}</div>
+  {% else %}<p class="muted">—</p>{% endif %}
+{% elif cell == "topics" %}
+  {% for t in m.topics %}
+  <div class="item">
+    <p><strong>{{ labels.agenda_item }} {{ loop.index }}:</strong> {{ t.name }}</p>
+    {% set status = t.status if "status" in topic_fields else "" %}
+    {% set findings = t.findings if "findings" in topic_fields else [] %}
+    {% if status or findings %}
+    <ul>
+      {% if status %}<li class="pre">{{ status }}</li>{% endif %}
+      {% for f in findings %}<li>{{ f }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% else %}<p class="muted">—</p>{% endfor %}
+{% elif cell == "decisions" %}
+  {% for name, decisions in topic_decisions %}
+  <div class="item">
+    <p class="item-name">{{ labels.item }} {{ loop.index }}: {{ name }}</p>
+    <ul>{% for d in decisions %}<li>{{ d.decision }}</li>{% endfor %}</ul>
+  </div>
+  {% endfor %}
+  {% if show_other_decisions and other_decisions %}
+  <div class="item">
+    <p class="item-name">{{ labels.other_decisions }}:</p>
+    <ul>{% for d in other_decisions %}<li>{{ d.decision }}{% if d.patient %} — {{ d.patient }}{% endif %}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if not topic_decisions and not (show_other_decisions and other_decisions) %}<p class="muted">—</p>{% endif %}
+{% else %}
+  {% for a in action_items %}
+  <div class="item">
+    <p class="item-name">{{ labels.item }} {{ loop.index }}:{% if a.patient %} {{ a.patient }}{% endif %}</p>
+    <ul>
+      <li>{% if a.owner %}<strong>{{ a.owner }}</strong> — {% endif %}{{ a.task }}</li>
+      {% if a.deadline or a.priority %}
+      <li class="muted">{% if a.deadline %}{{ labels.deadline }}: {{ a.deadline }}{% endif %}{% if a.deadline and a.priority %} &middot; {% endif %}{% if a.priority %}{{ labels.priority }}: <span{% if a.priority == "high" %} class="high"{% endif %}>{{ labels.priorities.get(a.priority, a.priority) }}</span>{% endif %}</li>
+      {% endif %}
+    </ul>
+  </div>
+  {% else %}<p class="muted">—</p>{% endfor %}
+{% endif %}
+</td>
+{% endmacro %}
+
+{# The full-width boxes, in the template's order. #}
+{% macro boxes(keys) %}
+{% for section in keys %}
+{% if section == "summary" and m.summary %}
+{% call ui.box(labels.summary) %}<p class="pre">{{ m.summary }}</p>{% endcall %}
+{% elif section == "key_moments" and m.key_moments %}
+{% call ui.box(labels.key_moments) %}<ul>{% for k in m.key_moments %}<li>{{ k.moment }}</li>{% endfor %}</ul>{% endcall %}
+{% elif section == "open_issues" and m.open_issues %}
+{% call ui.box(labels.open_issues) %}<ul>{% for issue in m.open_issues %}<li>{{ issue }}</li>{% endfor %}</ul>{% endcall %}
+{% elif section == "participants" and m.participants %}
+{% call ui.box(labels.participants) %}<ul>{% for speaker, p in m.participants.items() %}<li><strong>{{ speaker }}</strong> — {{ p.role }}{% if p.name %} ({{ p.name }}){% endif %}{% if p.seconds %} &middot; {{ labels.min_s.format(m=p.seconds // 60, s=p.seconds % 60) }}{% endif %}</li>{% endfor %}</ul>{% endcall %}
+{% elif section == "warnings" and m.warnings %}
+{% call ui.box(labels.verification) %}<ul class="warnings">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endcall %}
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{{ boxes(boxes_above) }}
+
+{% if grid_rows %}
+<table class="grid">
+  <colgroup><col class="half"><col class="half"></colgroup>
+  {% for row in grid_rows %}
+  {% set span = 1 if row | length == 2 else 2 %}
+  <tr class="head-row">{% for cell in row %}{{ ui.cell_head(cell, span) }}{% endfor %}</tr>
+  <tr>{% for cell in row %}{{ cell_body(cell, span) }}{% endfor %}</tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{{ boxes(boxes_below) }}
+{% endblock %}

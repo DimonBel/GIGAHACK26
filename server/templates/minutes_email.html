@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+</head>
+{# A short note (the default one or the moderator's): the minutes themselves are the attached PDF. #}
+<body style="margin:0;padding:20px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1f2a37;">
+{% for lines in paragraphs %}
+<p style="margin:0 0 14px;">{% for line in lines %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</p>
+{% endfor %}
+</body>
+</html>

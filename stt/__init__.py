@@ -1,1 +1,1 @@
-"""Local speech-to-text with whisper.cpp (Whisper Large V3)."""
+"""Secure MOM: meeting audio -> multilingual transcript -> speakers -> Minutes of Meeting, all local."""

@@ -1,0 +1,79 @@
+# Secure MOM delivery: n8n turns approved minutes into an email, MailHog catches it locally.
+# Every port is published on 127.0.0.1 only. Start it with ./setup.sh (creates .env, imports the workflow).
+# The images are pinned by digest: a changed image under the same tag is never pulled.
+name: secure-mom
+
+# MailHog's login: user:bcrypt hash from .env, written into the container only (readable by MailHog alone).
+configs:
+  mailhog_auth:
+    content: "${MAILHOG_USER:?run ./setup.sh to create .env}:${MAILHOG_PASSWORD_HASH:?run ./setup.sh to create .env}"
+
+services:
+  mailhog:
+    image: mailhog/mailhog@sha256:8d76a3d4ffa32a3661311944007a415332c4bb855657f4f6c57996405c009bea # v1.0.1
+    platform: linux/amd64 # the only architecture MailHog publishes; emulated on Apple Silicon
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025" # SMTP, no login: the backend's direct delivery
+      - "127.0.0.1:8025:8025" # web inbox and API, basic auth
+    configs:
+      - source: mailhog_auth
+        target: /home/mailhog/auth
+        uid: "1000"
+        mode: 0400
+    environment:
+      MH_AUTH_FILE: /home/mailhog/auth
+    healthcheck: # SMTP answers (the web inbox needs the login)
+      test: ["CMD-SHELL", "echo QUIT | nc -w 2 127.0.0.1 1025 | grep -q '^220'"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  n8n:
+    image: n8nio/n8n@sha256:ffeb52485f78b1b06c9a832205853cf75da72a07a514c9a27724df85979d6c34 # 2.40.7
+    restart: unless-stopped
+    depends_on:
+      mailhog:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - ./n8n:/import:ro
+    environment:
+      TZ: Europe/Chisinau
+      GENERIC_TIMEZONE: Europe/Chisinau
+      N8N_WEBHOOK_URL: http://127.0.0.1:5678/
+      N8N_SECURE_COOKIE: "false" # plain http, reachable only from this machine
+      # Never call n8n's servers or npm: the "Isolate n8n" settings plus what 2.40 adds.
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_DIAGNOSTICS_CONFIG_FRONTEND: ""
+      N8N_DIAGNOSTICS_CONFIG_BACKEND: ""
+      EXTERNAL_FRONTEND_HOOKS_URLS: ""
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_WHATS_NEW_ENABLED: "false"
+      N8N_DYNAMIC_BANNERS_ENABLED: "false"
+      N8N_TEMPLATES_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_HIRING_BANNER_ENABLED: "false"
+      N8N_COMMUNITY_PACKAGES_ENABLED: "false"
+      N8N_DISABLED_MODULES: mcp-registry # refreshes an MCP server list from api.n8n.io
+      N8N_PUBLIC_API_DISABLED: "true" # setup.sh uses the n8n CLI instead
+      # Workflows can't read the environment. The webhook checks the token with its Header Auth credential.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "true"
+      # The editor login comes from .env, so nobody can claim the instance through the sign-up page.
+      N8N_INSTANCE_OWNER_MANAGED_BY_ENV: "true"
+      N8N_INSTANCE_OWNER_EMAIL: ${N8N_OWNER_EMAIL:?run ./setup.sh to create .env}
+      N8N_INSTANCE_OWNER_FIRST_NAME: Secure MOM
+      N8N_INSTANCE_OWNER_LAST_NAME: Admin
+      N8N_INSTANCE_OWNER_PASSWORD_HASH: ${N8N_OWNER_PASSWORD_HASH:?run ./setup.sh to create .env}
+      # n8n stores every run, with the minutes, while it executes. Runs it does not keep (all successful
+      # ones, see the workflow settings) are purged within a minute instead of 15; failed ones after a week.
+      EXECUTIONS_DATA_PRUNE_HARD_DELETE_INTERVAL: "1"
+      EXECUTIONS_DATA_MAX_AGE: "168"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5678/healthz/readiness"]
+      interval: 5s
+      timeout: 5s
+      retries: 36
+      start_period: 20s

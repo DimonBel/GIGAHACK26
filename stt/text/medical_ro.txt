@@ -1,0 +1,52 @@
+# Medical Romanian that wordfreq's word list lacks, for the spelling check (spelling.py): these words are never
+# "corrected", and a misheard word close to one of them becomes it. One term per line with its common forms.
+# Add the words of your ward here.
+
+pacient pacientul pacientului pacienta pacientei pacienți pacienții pacienților pacientă
+salon salonul saloane boxa boxă boxe
+reanimare reanimarea reanimării reanimator reanimatorul reanimație reanimația reanimații reanimației
+terapie intensivă intensiv intensivist
+internat internată internare internarea externat externare externarea transferat transferată transferul
+infarct infarctul miocardic miocardică miocardului miocardită
+coronarografie coronarografia coronarian coronariană coronarieni trivascular trivasculară
+tromboaspirație tromboaspirația trombectomie trombectomia tromboliză tromboza tromboză
+stent stentul stenturi stenturile stentare stentarea stentat stentată
+mitral mitrală mitrala tricuspid tricuspidă tricuspida valvă valva valvular valvulară
+insuficiență insuficiența insuficienței regurgitare regurgitarea
+fracție fracția fracției ejecție ejecția ejecției
+cordaj cordajul cordaje cordajului
+ecocardiografie ecocardiografia ecografie ecografia eco ecoul ecocardiografic
+transtoracic transtoracică transesofagian transesofagiană endocardită endocardita endocarditei vegetații vegetație
+hemodinamic hemodinamică hemodinamica instabil instabilă instabilitate instabilitatea stabil stabilă
+hipotensiune hipotensiunea hipertensiune hipertensiunea tensiune tensiunea
+noradrenalină noradrenalina norepinefrină adrenalină adrenalina dobutamină dobutamina dopamină dopamina
+vasopresor vasopresoare presor presoare suport suportul
+volemic volemică volemie volum volumul reîncărcare reîncărcarea umplere umplerea descărcat descărcare
+artera arteră arterial arterială cateter cateterul
+monitorizare monitorizarea monitorizăm monitorizat
+tromboprofilaxie tromboprofilaxia antiagregant antiagregante anticoagulant anticoagulante heparină heparina
+creatinină creatinina creatininei uree ureea clearance clearance-ul
+lactat lactatul lactatului acidoză alcaloză alcalotic alcalotică bicarbonat
+hemoglobină hemoglobina hemoglobinei hematocrit anemie anemia hemotransfuzie
+saturație saturația saturații saturațiile oxigen oxigenul oxigenoterapie
+hipercapnic hipercapnică hipercapnie hipoxemie hipoxemic
+ventilație ventilația neinvaziv neinvazivă invaziv invazivă intubat intubată intubație intubare extubat extubare
+sedare sedat sedată delir delirul hiperactiv hiperactivă encefalopatie encefalopatia
+diacarb diacarbul forxiga furosemid furosemidul diuretic diuretice diureză diureza
+pleurezie pleurezia lichid lichidul plămân plămâni plămânii pulmonar pulmonară
+hidronefroză hidronefroza nefrostomă nefrostoma nefrostomie urolog urologul urologie ureter ureterul
+ganglionar ganglionară ganglioni compresie compresia extrinsec extrinsecă
+antibiotic antibioticul antibiotice antibioterapie meropenem meropenemul amikacină amikacina amicacină amicacina
+vancomicină vancomicina ceftriaxonă ceftriaxona
+antimicotic antimicotice fluconazol fluconazolul empiric empirică
+urocultură urocultura hemocultură hemocultura sensibil sensibilă rezistent rezistentă
+urosepsis sepsis septic septică șoc șocul
+pacemaker cardiostimulator stimulator electrofiziolog electrofiziologul electrofiziologii frecvență frecvența
+ritm ritmul sinusal fibrilație fibrilația atrial atrială tahicardie bradicardie
+oncolog oncologul oncologie histologie histologia histologic paliativ paliativă
+dren drenul drenaj drenajul ventricular ventriculară
+membre membrele hemipareză pareză
+adrenalectomie adrenalectomia stomă stoma laparotomie laparotomia epidurală epidurala anestezie anestezia anestezist
+traumatologie traumatologia chirurgie chirurgia
+febră febra subfebril subfebrilă
+glicemie glicemia insulină insulina potasiu sodiu

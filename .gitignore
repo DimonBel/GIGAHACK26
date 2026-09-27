@@ -13,12 +13,16 @@ env/
 # --- Environment / secrets ---
 .env
 .env.*
+!.env.example
 
 # --- Whisper / VAD models (large, download separately — see README) ---
 models/*.bin
 models/*.gguf
+models/speechbrain/
+models/mlx-*/
 
 # --- Audio / video inputs (large files, may contain patient data) ---
+/data/
 *.m4a
 *.mp3
 *.wav
@@ -28,17 +32,39 @@ models/*.gguf
 *.webm
 *.aac
 
-# --- Transcription outputs ---
+# --- Transcription outputs (may contain patient data) ---
 *_transcript.txt
+*_dialog.txt
+/*.txt
+!/requirements.txt
+/*.json
 *.srt
 *.vtt
 
 # --- Tools ---
 .omc/
 .claude/settings.local.json
+.claude/project-map/
 
 # --- OS / editors ---
 .DS_Store
 .idea/
 .vscode/
 *.swp
+
+# --- Web app, automation, server data ---
+web/node_modules/
+web/dist/
+automation/.env
+automation/n8n_data/
+server/.env
+
+# --- Local models, experiments and data (large; the database and outputs may contain patient data) ---
+server/models/
+server/turbo-md-adapter/
+server/bench/
+server/build/
+server/lid_mac_test/
+server/out/
+server/storage/
+frontend/node_modules/

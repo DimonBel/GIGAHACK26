@@ -1,0 +1,387 @@
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .mantine-AppShell-main {
+    padding: 0 !important;
+  }
+}
+
+/* Every animation and transition in the app (including Mantine's own) collapses to (near) nothing for anyone who
+   asked their system for less motion. This is the one place that guarantee lives: new motion added below does not
+   need its own reduced-motion handling as long as it is expressed as a CSS animation or transition. The few
+   JavaScript-driven exceptions (the live transcript's auto-scroll, the count-up numbers) check
+   `useReducedMotion()` themselves. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- Route change: a calm fade + rise, so a new page never just snaps into place. ---- */
+.route-fade {
+  animation: route-fade-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes route-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---- Live processing: stage tracker card, live transcript feed, minutes-so-far preview. ---- */
+.processing-card {
+  animation: card-rise 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* The small pulsing dot next to "Live transcript" / "Processing". */
+.live-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--mantine-color-red-6);
+  box-shadow: 0 0 0 0 var(--mantine-color-red-4);
+  animation: live-pulse 1.8s ease-out infinite;
+}
+
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--mantine-color-red-5) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.live-transcript-viewport {
+  height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+/* Each newly heard line slides and fades in; re-rendering an existing line (its text grew) does not replay this,
+   since the animation runs once on mount, not on every update. */
+.live-line {
+  animation: live-line-in 0.3s ease-out both;
+}
+
+@keyframes live-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* A soft "still working on it" breathing effect for the speaker-unknown placeholder. */
+.live-identifying-badge {
+  animation: live-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes live-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* A blinking text caret after the newest line, while it is still being heard. */
+.live-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.9em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--mantine-color-teal-6);
+  animation: live-caret-blink 1s steps(1) infinite;
+}
+
+@keyframes live-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.live-count-icon-grape {
+  color: var(--mantine-color-grape-6);
+}
+
+.live-count-icon-orange {
+  color: var(--mantine-color-orange-6);
+}
+
+/* A topic chip pops in as it is found; index-based animation-delay (set inline) staggers a batch of them. */
+.topic-chip {
+  animation: chip-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes chip-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+.success-check {
+  animation: success-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes success-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+.success-fade {
+  animation: fade-in 0.4s ease-out 0.15s both;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---- Recorder: a pulsing ring around the level meter's dot while actively recording. ---- */
+.recording-pulse {
+  animation: live-pulse 1.6s ease-out infinite;
+}
+
+/* ---- New meeting: numbered step badge, dropzone drag feedback, selected-file card entrance. ---- */
+.step-badge {
+  animation: chip-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.upload-dropzone {
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.upload-dropzone[data-idle]:hover {
+  border-color: var(--mantine-color-teal-5);
+  background: var(--mantine-color-teal-0);
+}
+
+.upload-dropzone[data-accept] {
+  transform: scale(1.01);
+}
+
+.upload-dropzone[data-idle] .upload-dropzone-icon,
+.upload-dropzone[data-accept] .upload-dropzone-icon,
+.upload-dropzone[data-reject] .upload-dropzone-icon {
+  transition: transform 0.2s ease;
+}
+
+.upload-dropzone[data-accept] .upload-dropzone-icon {
+  transform: translateY(-4px) scale(1.1);
+}
+
+.selected-file-card {
+  animation: card-rise 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ---- Dashboard: rows fade in with a small stagger (delay set inline per row), stat and sent-minutes cards lift
+   slightly on hover so the dashboard feels a little more alive without being distracting. ---- */
+.dashboard-row {
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.dashboard-row:hover {
+  transform: translateX(2px);
+}
+
+/* Mount-only fade-in, kept separate from .dashboard-row/.dashboard-card so their own hover transforms (translateX,
+   translateY) are never fighting this one over the `transform` property. Combine freely, e.g.
+   className="dashboard-card fade-in-stagger". Pair with the rowDelay() helper's inline animation-delay to stagger
+   a list. */
+.fade-in-stagger {
+  animation: row-fade-in 0.3s ease-out both;
+}
+
+@keyframes row-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.stat-card,
+.dashboard-card {
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.stat-card:hover,
+.dashboard-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--mantine-shadow-sm);
+}
+
+/* Minutes document: a sidebar of sections next to the open one. */
+.minutes-document {
+  display: grid;
+  gap: var(--mantine-spacing-lg);
+  align-items: start;
+}
+
+@media (min-width: 62em) {
+  .minutes-document {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+
+  .minutes-document-compact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* "04:12" in the minutes: opens the transcript at that line. */
+.time-link {
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-teal-7);
+  white-space: nowrap;
+}
+
+.time-link:not(.time-link-plain):not(:disabled):hover {
+  background: var(--mantine-color-teal-0);
+}
+
+.time-link-plain,
+.time-link:disabled {
+  color: var(--mantine-color-dimmed);
+}
+
+.stat:hover {
+  background: var(--mantine-color-gray-0) !important;
+}
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+
+  .screen-only {
+    display: none !important;
+  }
+}
+
+/* A meeting in a dashboard list. */
+.dashboard-row {
+  display: block;
+  border-radius: var(--mantine-radius-md);
+}
+
+.dashboard-row:hover {
+  background: var(--mantine-color-gray-0);
+}
+
+/* The side menu next to the page, inside the centred column. */
+.app-columns {
+  display: grid;
+  gap: var(--mantine-spacing-xl);
+  align-items: start;
+}
+
+@media (min-width: 75em) {
+  .app-columns {
+    grid-template-columns: 232px minmax(0, 1fr);
+  }
+}
+
+.app-sidebar {
+  position: sticky;
+  top: calc(68px + var(--mantine-spacing-xl));
+}
+
+/* The minutes as the email shows them: a card on screen, the plain page when printed. */
+@media print {
+  .minutes-page {
+    border: none !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}
+
+/* Edit with live preview: the editor and the email side by side, each scrolling on its own. */
+.split-editor {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+.split-editor-header {
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-sm);
+  border-bottom: 1px solid var(--mantine-color-gray-3);
+}
+
+.split-editor-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 !important;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-y: auto;
+}
+
+.split-editor-pane {
+  padding: var(--mantine-spacing-lg);
+  background: var(--mantine-color-gray-0);
+}
+
+.split-editor-preview {
+  background: #f3f5f7;
+}
+
+@media (min-width: 62em) {
+  .split-editor-body {
+    grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+    overflow: hidden;
+  }
+
+  .split-editor-pane {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .split-editor-preview {
+    border-left: 1px solid var(--mantine-color-gray-3);
+  }
+}

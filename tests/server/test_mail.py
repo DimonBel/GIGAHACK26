@@ -1,0 +1,408 @@
+"""The minutes email: escaping of LLM output, the text version, the n8n payload, the SMTP message, and
+delivery only to this machine."""
+import base64
+import dataclasses
+import io
+import re
+from datetime import datetime
+from typing import ClassVar
+
+import httpx2
+import pypdf
+import pytest
+
+from server import mail
+from server.config import Config
+from server.db import Meeting, User
+from server.mail import DeliveryError, Mailer, compose
+from server.schemas import minutes_doc
+from server.settings import default_template
+from stt.minutes.markdown import SECTIONS
+
+SETTINGS = {"delivery": "n8n", "n8n_webhook_url": "http://127.0.0.1:5678/webhook/secure-mom",
+            "smtp_host": "127.0.0.1", "smtp_port": 1025}
+MINUTES = minutes_doc({
+    "title": "Round <script>alert('title')</script>",
+    "summary": "Fever.\n<img src=x onerror=alert(1)>",
+    "key_moments": [{"time": "00:04", "moment": "Tests ordered — Bed 8"}],
+    "topics": [{"name": "Bed 8", "time": "00:03", "status": "<b>stable</b>", "findings": ["<iframe>"]}],
+    "decisions": [{"decision": "Order tests", "time": "00:04", "patient": "Bed 8"},
+                  {"decision": "Call cardiology", "time": "05:00", "patient": "Box"}],
+    "action_items": [{"task": "Echo <script>", "owner": "ICU", "deadline": "today", "priority": "low"},
+                     {"task": "Blood tests", "owner": "nurse", "deadline": "now", "priority": "high"}],
+    "open_issues": ["Bed 8: recheck <a href='http://evil'>here</a>"],
+    "warnings": ["[00:03] 38.5 not found"],
+    "attendees": [{"user_id": 7, "name": "Ana Popescu", "job_title": "Head of cardiology", "position": "Doctor",
+                   "specialty": "Cardiologist"},
+                  {"user_id": None, "name": "Guest <b>Surgeon</b>", "job_title": "", "position": "", "specialty": ""}],
+    "participants": {"SPEAKER 1": {"role": "leads the round", "name": "Dr. <u>X</u>", "seconds": 312}},
+})
+ENGLISH = ("Summary", "Key moments", "Topics", "Status", "Findings", "Decisions", "Other decisions", "Action items",
+           "Task", "Owner", "Deadline", "Priority", "Open issues", "Present", "Participants", "Roles are guessed",
+           "Verification notes", "Minutes", "meeting", "approved by", "Drafted by", "Processed entirely", ">high<",
+           "Agenda", "Attendees", "Date + Time")
+
+
+HELD = datetime(2026, 9, 26, 6, 17)  # UTC; :17 local in any time zone, never one of the minutes' times
+
+
+def _meeting(meeting_type: str = "medical", minutes_language: str = "en") -> Meeting:
+    approver = User(full_name="Ion <i>Rusu</i>", email="ion@medpark.md", role="moderator", password_hash="-")
+    return Meeting(id="f" * 32, title="Board 26.09\r\nBcc: spy@example.com", meeting_type=meeting_type,
+                   minutes_language=minutes_language, created_at=HELD, duration_s=703.2, approved_by=approver)
+
+
+def _email(meeting_type: str = "medical", minutes_language: str = "en", minutes: dict = MINUTES,
+           template: dict | None = None, pdf: bool = False) -> mail.Email:
+    return compose(_meeting(meeting_type, minutes_language), minutes, "secure-mom@medpark.local",
+                   ["ana@medpark.md"], ["quality@medpark.md"], template, pdf)
+
+
+def _pdf_text(data: bytes) -> str:
+    return "\n".join(page.extract_text() for page in pypdf.PdfReader(io.BytesIO(data)).pages)
+
+
+def _squeezed(text: str) -> str:
+    """Without any whitespace: a long title wraps inside its box, wherever the line happens to break."""
+    return re.sub(r"\s", "", text)
+
+
+def _everything(meeting_type: str = "medical") -> dict:
+    """A template with every section on, the ones off by default too."""
+    return {**default_template(meeting_type), "sections": [{"key": key, "enabled": True} for key in SECTIONS]}
+
+
+def _minutes(meeting_type: str = "medical", minutes_language: str = "en", minutes: dict = MINUTES,
+             template: dict | None = None) -> str:
+    """The text of the full minutes' PDF (the moderator's): every topic with its details."""
+    return _pdf_text(mail.minutes_pdf(_meeting(meeting_type, minutes_language), minutes, template, full=True))
+
+
+def _overview(minutes_language: str = "en", minutes: dict = MINUTES, template: dict | None = None) -> bytes:
+    """The PDF attached to the email: the minutes on one page."""
+    return _email(minutes_language=minutes_language, minutes=minutes, template=template, pdf=True).attachment.data
+
+
+@pytest.mark.parametrize(("language", "note"), [
+    ("en", ["Hello,", "Please find attached the minutes of the meeting “Board 26.09 Bcc: spy@example.com” held on",
+            "They were approved by Ion <i>Rusu</i>.", "Summary:\nFever.\n<img src=x onerror=alert(1)>\n\nKind regards,",
+            "Kind regards,\nAna Popescu"]),
+    ("ro", ["Bună ziua,", "Vă transmitem atașat procesul-verbal al ședinței „Board 26.09 Bcc: spy@example.com” din",
+            "Acesta a fost aprobat de Ion <i>Rusu</i>.", "Rezumat:\nFever.", "Cu stimă,\nAna Popescu"]),
+    ("ru", ["Здравствуйте!", "Во вложении — протокол совещания «Board 26.09 Bcc: spy@example.com» от",
+            "Протокол утверждён: Ion <i>Rusu</i>.", "Краткое содержание:\nFever.", "С уважением,\nAna Popescu"]),
+])
+def test_the_email_is_a_short_note_in_the_minutes_language(language, note):
+    """The minutes are the attached PDF: the email says what it carries and sums up what was said (the minutes'
+    summary), signed by who sends it, in one-line subject and names and the summary escaped in the HTML."""
+    email = compose(_meeting(minutes_language=language), MINUTES, "secure-mom@medpark.local", ["ana@medpark.md"], [],
+                    signed_by="Ana Popescu")
+    for line in note:
+        assert line in email.text, line
+    assert f'<html lang="{language}">' in email.html
+    assert "Ion &lt;i&gt;Rusu&lt;/i&gt;" in email.html and "<i>Rusu" not in email.html
+    assert "&lt;img src=x onerror=alert(1)&gt;" in email.html and "<img" not in email.html
+    for content in ("Round", "Blood tests", "Call cardiology"):  # the rest of the minutes is in the PDF only
+        assert content not in email.html + email.text, content
+    no_summary = compose(_meeting(minutes_language=language), {**MINUTES, "summary": " "}, "secure-mom@medpark.local",
+                         ["ana@medpark.md"], [])
+    assert ":\n" not in no_summary.text  # no summary: no empty heading
+    assert email.subject == "[Medical] Board 26.09 Bcc: spy@example.com"  # the web app shows the English type
+
+
+def test_the_moderator_can_write_the_note_themselves():
+    """Their text replaces the default note: paragraphs at blank lines, line breaks kept, escaped in the HTML."""
+    note = "Stimați colegi,\r\n\r\nAtașat: procesul-verbal <b>de azi</b>.\nVă rog să confirmați.  \n\n\nDr. Ana Popescu\n"
+    email = compose(_meeting(minutes_language="ro"), MINUTES, "secure-mom@medpark.local", ["ana@medpark.md"], [],
+                    signed_by="Ana Popescu", note=note)
+    assert email.text == ("Stimați colegi,\n\nAtașat: procesul-verbal <b>de azi</b>.\nVă rog să confirmați.\n\n"
+                          "Dr. Ana Popescu\n")
+    assert '<p style="margin:0 0 14px;">Atașat: procesul-verbal &lt;b&gt;de azi&lt;/b&gt;.<br>Vă rog să confirmați.</p>' \
+        in email.html
+    assert "Vă transmitem" not in email.text  # not the default note
+    blank = compose(_meeting(minutes_language="ro"), MINUTES, "secure-mom@medpark.local", ["ana@medpark.md"], [],
+                    note=" \n \n")
+    assert blank.text.startswith("Bună ziua,\n\nVă transmitem atașat")  # nothing written: the default note
+
+
+def test_the_pdf_shows_what_was_typed_as_text():
+    text = _minutes()
+    assert _squeezed("Round <script>alert('title')</script>") in _squeezed(text)  # text, never markup
+    assert "<b>stable</b>" in text
+    assert "Ion <i>Rusu</i>" in text and "11 min 43 s" in text and "Call cardiology" in text  # a decision of no topic
+
+
+def test_high_priority_first_and_labels_per_type():
+    text = _minutes("executive")
+    assert text.index("Blood tests") < text.index("Echo")
+    assert "EXECUTIVE MEETING" in text and "Minutes" in text and "Agenda" in text and "Patients" not in text
+
+
+@pytest.mark.parametrize(("language", "labels"), [
+    ("ro", ["Ședință medicală", "Proces-verbal", "Titlul ședinței", "Data și ora", "Rezumat", "Ordinea de zi",
+            "Punctul 1: Bed 8", "Decizii", "Alte decizii", "Sarcini", "Termen", "Prioritate", "ridicată", "scăzută",
+            "Probleme nerezolvate", "Prezenți", "11 min 43 s", "Aprobat de", "Durata"]),
+    ("ru", ["Медицинское совещание", "Протокол", "Название совещания", "Дата и время", "Краткое содержание",
+            "Повестка дня", "Пункт повестки 1: Bed 8", "Решения", "Другие решения", "Поручения", "Срок",
+            "Приоритет", "высокий", "низкий", "Открытые вопросы", "Присутствовали", "11 мин 43 с", "Утверждено",
+            "Продолжительность"]),
+])
+def test_the_pdf_is_in_the_minutes_language(language, labels):
+    text = _minutes(minutes_language=language).casefold()
+    for label in labels:
+        assert label.casefold() in text, label
+    for english in ENGLISH:
+        assert english.casefold() not in text, english
+
+
+@pytest.mark.parametrize(("language", "present", "voices"), [("en", "Attendees", "Participants"),
+                                                             ("ro", "Prezenți", "Participanți"),
+                                                             ("ru", "Присутствовали", "Участники")])
+def test_attendees_are_listed_before_the_voices(language, present, voices):
+    """Everyone present, also those who did not speak: name, then job title, position and specialty if known; no
+    one added as present: the speakers the moderator named, without the roles the AI guessed."""
+    text = _squeezed(_minutes(minutes_language=language, template=_everything()).casefold())
+    ana = _squeezed("Ana Popescu — Head of cardiology, Doctor, Cardiologist".casefold())
+    assert text.index(_squeezed(present.casefold())) < text.index(ana) < text.index(voices.casefold())
+    assert _squeezed("guest <b>surgeon</b>") in text
+    nobody = _minutes(minutes_language=language, minutes=minutes_doc({**MINUTES, "attendees": []})).casefold()
+    assert nobody.index(present.casefold()) < nobody.index("dr. <u>x</u>") and "leads the round" not in nobody
+
+
+def test_the_minutes_read_as_minutes_not_as_ai_output():
+    """No minute marks, no timeline style and no notes about the AI, whatever the template shows; by default the
+    timeline, the voices and the automatic check's notes are left out: they are for the moderator."""
+    for template in (None, _everything()):
+        text = _minutes(template=template)
+        for mark in ("00:03", "00:04", "05:00", "Drafted by", "local AI", "Roles are guessed", "Processed entirely"):
+            assert mark not in text, mark
+    default = _minutes().casefold()
+    for hidden in ("Key moments", "Participants", "Verification notes", "38.5 not found"):
+        assert hidden.casefold() not in default, hidden
+    assert "Tests ordered — Bed 8" in _minutes(template=_everything())
+
+
+def test_the_notes_for_the_moderator_are_not_in_the_minutes():
+    decision = {"decision": "Start 2 g ⚠ unverified: 2 g", "time": "00:04", "patient": "Bed 8"}
+    text = _minutes(minutes={**MINUTES, "decisions": [decision]}, template=_everything())
+    assert "Start 2 g" in text and "unverified" not in text
+
+
+@pytest.mark.parametrize(("language", "labels"), [
+    ("en", ["Minutes", "MEDICAL MEETING", "Date + Time", "Duration", "Approved by", "Summary", "Agenda",
+            "Page 1 of 1"]),
+    ("ro", ["Proces-verbal", "ȘEDINȚĂ MEDICALĂ", "Data și ora", "Durata", "Aprobat de", "Rezumat", "Ordinea de zi",
+            "Pagina 1 din 1"]),
+    ("ru", ["Протокол", "МЕДИЦИНСКОЕ СОВЕЩАНИЕ", "Дата и время", "Продолжительность", "Утверждено",
+            "Краткое содержание", "Повестка дня", "Страница 1 из 1"]),
+])
+def test_the_minutes_are_attached_as_a_pdf(language, labels):
+    """The one-page overview, in the minutes' language (no minute marks, no notes for the moderator), with a file
+    name a mail header can carry."""
+    minutes = {**MINUTES, "decisions": [{"decision": "Order tests ⚠ unverified: 2", "time": "00:04",
+                                         "patient": "Bed 8"}]}
+    email = _email(minutes_language=language, minutes=minutes, pdf=True)
+    attachment = email.attachment
+    assert attachment.content_type == "application/pdf" and attachment.data.startswith(b"%PDF-")
+    assert attachment.filename.endswith(".pdf") and "Board 26.09 Bcc spy@example.com" in attachment.filename
+    assert "\n" not in attachment.filename and "\r" not in attachment.filename
+    text = _pdf_text(attachment.data)
+    for label in labels:
+        assert label in text, label
+    assert "Order tests" in text and _squeezed("Round <script>alert('title')</script>") in _squeezed(text)
+    for hidden in ("unverified", "00:03", "00:04", "05:00", "Key moments", "38.5 not found"):
+        assert hidden not in text, hidden
+    assert _email(minutes_language=language).attachment is None  # the preview makes no PDF
+
+
+def test_the_email_attaches_the_minutes_on_one_page():
+    """What was discussed, decided and is to be done: one line per topic (its name only), every decision in one
+    list (not under its topic), the tasks with who does them; each topic's status and findings are in the full
+    minutes only."""
+    data = _overview()
+    assert len(pypdf.PdfReader(io.BytesIO(data)).pages) == 1
+    text = _pdf_text(data)
+    for shown in ("Fever.", "Ana Popescu", "1. Bed 8", "Order tests", "Call cardiology", "nurse", "Blood tests",
+                  "Echo <script>", "Open issues"):
+        assert shown in text, shown
+    assert text.index("Blood tests") < text.index("Echo")  # high priority first
+    assert text.index("Order tests") < text.index("Call cardiology")  # the topics' decisions, then the others
+    for hidden in ("<b>stable</b>", "<iframe>", "Item 1", "Agenda item", "Other decisions", "Key moments",
+                   "leads the round", "38.5 not found"):
+        assert hidden not in text, hidden
+
+
+@pytest.mark.parametrize("language", ["en", "ro", "ru"])
+def test_the_overview_fits_one_page_however_long_the_minutes(language):
+    """Every list full of the longest texts: as much as fits on the page, "+ N more" for the rest."""
+    long = "Pacientul din salonul opt are nevoie de consult cardiologic și ecografie de control mâine dimineață "
+    text = lambda n: (long * 5)[:n]  # noqa: E731
+    minutes = minutes_doc({
+        "title": text(80), "summary": text(2000),
+        "topics": [{"name": f"{i} {text(36)}", "status": text(300), "findings": [text(160)] * 7} for i in range(22)],
+        "decisions": [{"decision": text(160), "patient": f"{i} {text(36)}"} for i in range(22)],
+        "action_items": [{"task": text(160), "owner": text(60), "deadline": text(40), "priority": "high"}] * 18,
+        "open_issues": [text(160)] * 9,
+        "attendees": [{"name": text(40), "job_title": text(60), "position": text(30), "specialty": text(30)}] * 20,
+    })
+    meeting = _meeting(minutes_language=language)
+    meeting.title = text(200)
+    data = mail.minutes_pdf(meeting, minutes)
+    assert len(pypdf.PdfReader(io.BytesIO(data)).pages) == 1
+    assert mail.LABELS[language]["more"].split("{n}")[0].strip() in _pdf_text(data)
+    assert len(pypdf.PdfReader(io.BytesIO(mail.minutes_pdf(meeting, minutes, full=True))).pages) > 5
+
+
+def test_the_overview_shows_everything_that_fits():
+    """A short meeting's lists are shown whole, without "more"."""
+    text = _pdf_text(_overview())
+    assert "more" not in text and "Guest <b>Surgeon</b>" in text and "Echo <script>" in text
+
+
+def test_the_template_lays_out_the_minutes():
+    """The grid (Attendees | Agenda, Decisions | Action items), the boxes the template puts before its first grid
+    section above it, in its order, the others below; the disabled sections left out, topics with its fields only."""
+    order = ["open_issues", "summary", "topics", "attendees", "key_moments", "other_decisions", "action_items",
+             "participants", "warnings"]
+    sections = [{"key": key, "enabled": key not in ("key_moments", "participants")} for key in order]
+    template = {**default_template("medical"), "sections": sections,
+                "topic_fields": {"status": False, "findings": True, "decisions": False}}
+    text = _minutes(template=template)
+    assert text.index("Open issues") < text.index("Summary") < text.index("Attendees") < text.index("Agenda")
+    assert text.index("Agenda") < text.index("Decisions") < text.index("Action items") < text.index("Verification")
+    for hidden in ("Key moments", "Tests ordered", "Participants", "leads the round", "Roles are guessed", "stable",
+                   "Order tests"):
+        assert hidden not in text, hidden
+    assert "<iframe>" in text  # the other topic fields: the findings
+    assert "Call cardiology — Box" in text  # a decision about no topic
+
+
+def test_a_disabled_grid_cell_leaves_its_row_to_the_other():
+    sections = [{"key": key, "enabled": key not in ("attendees", "action_items")} for key in SECTIONS]
+    text = _minutes(template={**default_template("medical"), "sections": sections})
+    assert "Agenda" in text and "Decisions" in text
+    for hidden in ("Attendees", "Ana Popescu", "Action items", "Blood tests"):
+        assert hidden not in text, hidden
+
+
+def test_older_minutes_show_no_suggestions():
+    """Minutes stored while the LLM still wrote AI suggestions: the PDF leaves them out."""
+    text = _minutes(minutes={**MINUTES, "suggestions": ["Recheck the fever tonight"]})
+    assert "Recheck the fever" not in text and "suggestion" not in text.lower()
+
+
+def test_n8n_gets_the_documented_payload(monkeypatch):
+    calls = []
+
+    def post(url, **kwargs):
+        calls.append((url, kwargs))
+        return httpx2.Response(200, json={"sent": True})
+
+    monkeypatch.setattr(mail.httpx2, "post", post)
+    email = _email(pdf=True)
+    Mailer(Config(n8n_token="shared-secret")).deliver(email, SETTINGS)
+    [(url, kwargs)] = calls
+    assert url == SETTINGS["n8n_webhook_url"]
+    assert kwargs["headers"] == {"X-Secure-MOM-Token": "shared-secret"}
+    assert kwargs["trust_env"] is False and kwargs["follow_redirects"] is False
+    payload = kwargs["json"]
+    assert set(payload) == {"meeting_id", "meeting_type", "language", "subject", "to", "cc", "html", "text", "from",
+                            "attachment"}
+    assert payload["attachment"] == {"filename": email.attachment.filename, "content_type": "application/pdf",
+                                     "data": base64.b64encode(email.attachment.data).decode("ascii")}
+    assert (payload["to"], payload["cc"], payload["from"]) == (["ana@medpark.md"], ["quality@medpark.md"],
+                                                               "secure-mom@medpark.local")
+
+
+@pytest.mark.parametrize(("answer", "error", "detail"), [
+    (httpx2.Response(500), "n8n answered 500", "n8n answered 500"),
+    (httpx2.Response(502, json={"sent": False, "detail": "mail server error: connect ECONNREFUSED 172.18.0.2:1025"}),
+     "n8n answered 502", "n8n answered 502: mail server error: connect ECONNREFUSED 172.18.0.2:1025"),
+    (httpx2.Response(200, json={"sent": False, "detail": "queued at 172.18.0.2"}), "n8n did not send the email",
+     "n8n did not send the email: queued at 172.18.0.2"),
+])
+def test_n8n_failures(monkeypatch, answer, error, detail):
+    """The message is for the moderator; n8n's own words (hosts, addresses) only go to the server log."""
+    monkeypatch.setattr(mail.httpx2, "post", lambda url, **kwargs: answer)
+    with pytest.raises(DeliveryError) as failure:
+        Mailer(Config(n8n_token="t")).deliver(_email(), SETTINGS)
+    assert (str(failure.value), failure.value.detail) == (error, detail)
+
+
+def test_n8n_timeout(monkeypatch):
+    def slow(url, **kwargs):
+        raise httpx2.ReadTimeout("timed out")
+
+    monkeypatch.setattr(mail.httpx2, "post", slow)
+    with pytest.raises(DeliveryError, match="did not answer within"):
+        Mailer(Config(n8n_token="t")).deliver(_email(), SETTINGS)
+
+
+def test_n8n_needs_the_token_and_a_running_n8n():
+    with pytest.raises(DeliveryError, match="SECURE_MOM_N8N_TOKEN"):
+        Mailer(Config()).deliver(_email(), SETTINGS)
+    closed_port = {**SETTINGS, "n8n_webhook_url": "http://127.0.0.1:9/webhook/secure-mom"}
+    with pytest.raises(DeliveryError, match="^n8n is not reachable$") as failure:
+        Mailer(Config(n8n_token="t")).deliver(_email(), closed_port)
+    assert "http://127.0.0.1:9/webhook/secure-mom" in failure.value.detail
+
+
+class FakeSMTP:
+    sent: ClassVar[list] = []
+    error: ClassVar[OSError | None] = None
+
+    def __init__(self, host, port, local_hostname=None, timeout=None):
+        if FakeSMTP.error:
+            raise FakeSMTP.error
+        self.address = (host, port)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def send_message(self, message):
+        FakeSMTP.sent.append((self.address, message))
+
+
+def test_smtp_message(monkeypatch):
+    FakeSMTP.sent = []
+    monkeypatch.setattr(mail.smtplib, "SMTP", FakeSMTP)
+    email = _email(minutes_language="ro", pdf=True)
+    Mailer(Config()).deliver(email, {**SETTINGS, "delivery": "smtp"})
+    [(address, message)] = FakeSMTP.sent
+    assert address == ("127.0.0.1", 1025)
+    assert (message["To"], message["Cc"], message["From"]) == ("ana@medpark.md", "quality@medpark.md",
+                                                               "secure-mom@medpark.local")
+    assert message["Subject"] == "[Medical] Board 26.09 Bcc: spy@example.com" and message["Bcc"] is None
+    html = message.get_body(("html",)).get_content()
+    assert "Ion &lt;i&gt;Rusu&lt;/i&gt;" in html and "<i>" not in html
+    assert "Vă transmitem atașat procesul-verbal" in message.get_body(("plain",)).get_content()
+    [pdf] = message.iter_attachments()
+    assert pdf.get_content_type() == "application/pdf" and pdf.get_filename() == email.attachment.filename
+    assert pdf.get_content() == email.attachment.data and email.attachment.filename.startswith("Proces-verbal - ")
+
+
+def test_smtp_failure_hides_the_server(monkeypatch):
+    FakeSMTP.sent, FakeSMTP.error = [], ConnectionRefusedError(61, "Connection refused")
+    monkeypatch.setattr(mail.smtplib, "SMTP", FakeSMTP)
+    with pytest.raises(DeliveryError, match="^the SMTP server failed$") as failure:
+        Mailer(Config()).deliver(_email(), {**SETTINGS, "delivery": "smtp"})
+    FakeSMTP.error = None
+    assert "127.0.0.1:1025" in failure.value.detail
+
+
+def test_delivery_stays_on_this_machine(monkeypatch):
+    FakeSMTP.sent = []
+    monkeypatch.setattr(mail.smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setattr(mail.httpx2, "post", lambda url, **kwargs: pytest.fail("posted to a remote host"))
+    local_only = Mailer(Config(n8n_token="t"))
+    with pytest.raises(DeliveryError, match="not on this machine") as failure:
+        local_only.deliver(_email(), {**SETTINGS, "delivery": "smtp", "smtp_host": "smtp.gmail.com"})
+    assert "smtp.gmail.com" not in str(failure.value) and "smtp.gmail.com" in failure.value.detail
+    with pytest.raises(DeliveryError, match="not on this machine"):
+        local_only.deliver(_email(), {**SETTINGS, "n8n_webhook_url": "https://hooks.example.com/x"})
+    allowed = Mailer(dataclasses.replace(Config(), allow_remote_delivery=True))
+    allowed.deliver(_email(), {**SETTINGS, "delivery": "smtp", "smtp_host": "mail.medpark.md"})
+    assert FakeSMTP.sent[0][0] == ("mail.medpark.md", 1025)
