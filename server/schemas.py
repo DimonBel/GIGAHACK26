@@ -1,11 +1,13 @@
 """Request bodies and the Minutes document, validated with Pydantic."""
 import re
+import unicodedata
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
 from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints, model_validator
 
 from stt.minutes.builder import MEETING_TYPES
+from stt.minutes.markdown import SECTIONS
 
 MIN_PASSWORD = 12
 MAX_PASSWORD = 256
@@ -18,6 +20,8 @@ MAX_LIST_MEMBERS = 500
 MAX_ITEMS = 500  # entries in one list of the minutes
 MAX_TEXT = 4000  # one line / field of the minutes
 MAX_SUMMARY = 20000
+MAX_INSTRUCTIONS = 1000  # a minutes template's instructions for the LLM
+MAX_NOTE = 200  # what changed in a template version
 PRIORITIES = ("high", "medium", "low")
 
 # Deliberately stricter than RFC 5322: no quotes, spaces, commas or angle brackets, which could inject headers.
@@ -83,6 +87,8 @@ class UserIn(Input):
     email: Email
     full_name: Name
     position: Position = ""
+    specialty: Position = ""
+    job_title: Position = ""
     role: Role
     password: Password
 
@@ -90,6 +96,8 @@ class UserIn(Input):
 class UserPatch(Input):
     full_name: Name | None = None
     position: Position | None = None
+    specialty: Position | None = None
+    job_title: Position | None = None
     role: Role | None = None
     active: bool | None = None
     password: Password | None = None
@@ -143,6 +151,38 @@ class SendIn(Input):
     cc: list[Email] = Field(default_factory=list, max_length=MAX_RECIPIENTS)
 
 
+class SectionIn(Input):
+    key: Literal[SECTIONS]
+    enabled: bool
+
+
+class TopicFieldsIn(Input):
+    status: bool
+    findings: bool
+    decisions: bool
+
+
+def _each_section_once(sections: list[SectionIn]) -> list[SectionIn]:
+    if sorted(s.key for s in sections) != sorted(SECTIONS):
+        raise ValueError(f"must list each section exactly once: {', '.join(SECTIONS)}")
+    return sections
+
+
+def _without_control_characters(value: str) -> str:
+    """The text without control characters, except line breaks and tabs: it goes on the command line of the
+    transcription process, which can't take a NUL."""
+    return "".join(c for c in value if c in "\n\t" or unicodedata.category(c) != "Cc")
+
+
+class TemplateIn(Input):
+    """A new version of a meeting type's minutes template."""
+    sections: Annotated[list[SectionIn], AfterValidator(_each_section_once)]
+    topic_fields: TopicFieldsIn
+    instructions: Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_INSTRUCTIONS),
+                            AfterValidator(_without_control_characters)] = ""
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_NOTE)] = ""
+
+
 # The minutes come from the LLM and from the moderator's editor: unknown fields are dropped, numbers become text.
 Text = Annotated[str, StringConstraints(max_length=MAX_TEXT)]
 Texts = Annotated[list[Text], Field(max_length=MAX_ITEMS)]
@@ -179,10 +219,20 @@ def _priority(value) -> str:
 class ActionItem(Loose):
     task: Text = ""
     owner: Text = ""
+    owner_user_id: int | None = None  # the owner when chosen from the app's users
     deadline: Text = ""
     priority: Annotated[Literal[PRIORITIES], BeforeValidator(_priority)] = "medium"
     time: Text = ""
     patient: Text = ""
+
+
+class Attendee(Loose):
+    """Someone present at the meeting, also without speaking (added by the moderator, never by the LLM)."""
+    user_id: int | None = None  # None: someone outside the directory
+    name: Text = ""
+    job_title: Text = ""
+    position: Text = ""
+    specialty: Text = ""
 
 
 class Participant(Loose):
@@ -195,13 +245,13 @@ class Participant(Loose):
 class MinutesDoc(Loose):
     title: Text = ""
     summary: Annotated[str, StringConstraints(max_length=MAX_SUMMARY)] = ""
-    suggestions: Texts = []
     key_moments: Annotated[list[KeyMoment], Field(max_length=MAX_ITEMS)] = []
     topics: Annotated[list[Topic], Field(max_length=MAX_ITEMS)] = []
     decisions: Annotated[list[Decision], Field(max_length=MAX_ITEMS)] = []
     action_items: Annotated[list[ActionItem], Field(max_length=MAX_ITEMS)] = []
     open_issues: Texts = []
     warnings: Texts = []
+    attendees: Annotated[list[Attendee], Field(max_length=MAX_ITEMS)] = []
     participants: Annotated[dict[Text, Participant], Field(max_length=MAX_ITEMS)] = {}
 
 

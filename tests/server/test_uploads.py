@@ -95,9 +95,13 @@ def test_files_without_audio_are_415(login, upload, config, tmp_path):
     assert list(config.audio_dir.iterdir()) == []
 
 
-def test_form_is_checked(login, upload, tmp_path):
+def test_form_is_checked(login, upload, tmp_path, config):
     moderator = login("moderator")
     assert upload(moderator, meeting_type="party").status_code == 400
+    for language in ("de", "RO", ""):
+        response = upload(moderator, minutes_language=language)
+        assert response.status_code == 400, language
+        assert response.json()["detail"] == "minutes_language must be one of: ro, ru, en"
     assert moderator.post("/api/meetings", data={"meeting_type": "medical"}).status_code == 400
     assert moderator.post("/api/meetings", json={"meeting_type": "medical"}).status_code == 400
     no_file = moderator.post("/api/meetings", files={"other": ("a.wav", b"123")}, data={"meeting_type": "medical"})
@@ -108,6 +112,7 @@ def test_form_is_checked(login, upload, tmp_path):
     too_long = moderator.post("/api/meetings", files={"file": ("a.wav", b"123")},
                               data={"meeting_type": "medical", "title": "x" * 5000})
     assert too_long.status_code == 400
+    assert list(config.audio_dir.iterdir()) == []
 
 
 def test_storage_is_private(config, login, upload, pipeline, wait):

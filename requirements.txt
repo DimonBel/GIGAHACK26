@@ -22,5 +22,9 @@ SQLAlchemy>=2.0,<3
 argon2-cffi>=23.1
 Jinja2>=3.1
 httpx2>=2.13  # n8n webhook calls; also the TestClient of the tests
+# The minutes as an A4 PDF attached to the email; needs Pango (macOS: brew install pango;
+# Debian/Ubuntu: apt install libpango-1.0-0 libpangoft2-1.0-0)
+weasyprint>=66
 # Tests
 pytest
+pypdf  # reads the minutes PDF back

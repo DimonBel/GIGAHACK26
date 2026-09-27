@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, Request
-from sqlalchemy import JSON, ForeignKey, String, Text, create_engine, event, text
+from sqlalchemy import JSON, ForeignKey, String, Text, UniqueConstraint, create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
 
 PRIVATE_FILE = 0o600
@@ -30,7 +30,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(200))
-    position: Mapped[str] = mapped_column(String(200), default="")
+    position: Mapped[str] = mapped_column(String(200), default="")  # e.g. "doctor"
+    specialty: Mapped[str] = mapped_column(String(200), default="")  # e.g. "neurologist"
+    job_title: Mapped[str] = mapped_column(String(200), default="")  # the function, e.g. "vice president"
     role: Mapped[str] = mapped_column(String(16))
     password_hash: Mapped[str] = mapped_column(String(255))
     must_change_password: Mapped[bool] = mapped_column(default=False)  # someone else chose it (an admin)
@@ -91,6 +93,7 @@ class Meeting(Base):
     audio_file: Mapped[str | None] = mapped_column(String(64))  # name in the audio folder; None once deleted
     duration_s: Mapped[float | None]
     language: Mapped[str | None] = mapped_column(String(8))
+    minutes_language: Mapped[str] = mapped_column(String(2), default="ro")  # what the minutes are written in
     error: Mapped[str | None] = mapped_column(Text)
     attempts: Mapped[int] = mapped_column(default=0)  # processing runs started (a restart may interrupt one)
     approved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
@@ -143,6 +146,25 @@ class Minutes(Base):
         return self.draft if self.edited is None else self.edited
 
 
+class MinutesTemplate(Base):
+    """One version of how a meeting type's minutes are written and shown. Versions are never changed; the newest
+    is the active one."""
+    __tablename__ = "minutes_templates"
+    __table_args__ = (UniqueConstraint("meeting_type", "version"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    meeting_type: Mapped[str] = mapped_column(String(20))
+    version: Mapped[int]  # 1, 2, 3... per meeting type
+    sections: Mapped[list] = mapped_column(JSON)  # [{"key", "enabled"}]: every section once, in display order
+    topic_fields: Mapped[dict] = mapped_column(JSON)  # {"status", "findings", "decisions"}: shown or not
+    instructions: Mapped[str] = mapped_column(Text, default="")  # for the LLM that writes the minutes
+    note: Mapped[str] = mapped_column(String(200), default="")  # what changed in this version
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    created_by: Mapped[User] = relationship(lazy="joined")
+
+
 class Setting(Base):
     __tablename__ = "settings"
 
@@ -162,14 +184,28 @@ class AuditLog(Base):
     detail: Mapped[str] = mapped_column(Text, default="")
 
 
+# Columns added to existing tables since the first release: (table, column, SQL definition). create_all() only
+# creates missing tables, so connect() adds these to an older database; its rows get the definition's default.
+ADDED_COLUMNS = [
+    ("meetings", "minutes_language", "VARCHAR(2) NOT NULL DEFAULT 'en'"),  # older minutes were written in English
+    ("users", "specialty", "VARCHAR(200) NOT NULL DEFAULT ''"),
+    ("users", "job_title", "VARCHAR(200) NOT NULL DEFAULT ''"),
+]
+
+
 def connect(db_path: Path) -> sessionmaker:
-    """Session factory for the SQLite file (created 0600, WAL mode), with the tables created."""
+    """Session factory for the SQLite file (created 0600, WAL mode), with the tables created and ADDED_COLUMNS
+    added."""
     if not db_path.exists():
         os.close(os.open(db_path, os.O_CREAT | os.O_WRONLY, PRIVATE_FILE))
     os.chmod(db_path, PRIVATE_FILE)
     engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
     event.listen(engine, "connect", _sqlite_pragmas)
     Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        for table, column, definition in ADDED_COLUMNS:
+            if column not in {row.name for row in connection.execute(text(f"PRAGMA table_info({table})"))}:
+                connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
     return sessionmaker(engine, expire_on_commit=False)
 
 

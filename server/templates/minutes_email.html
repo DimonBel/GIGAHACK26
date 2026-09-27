@@ -1,126 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }}</title>
 </head>
-<body style="margin:0;padding:24px 12px;background:#f3f5f7;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1f2a37;">
-<div style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #dfe4ea;border-radius:8px;padding:28px;">
-  <p style="margin:0 0 6px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#5a6b7d;">{{ type_label }} meeting &middot; Minutes</p>
-  <h1 style="margin:0 0 8px;font-size:22px;line-height:1.3;">{{ title }}</h1>
-  <p style="margin:0 0 20px;font-size:13px;color:#5a6b7d;">
-    {{ meeting_title }} &middot; {{ held }}{% if duration %} &middot; {{ duration }}{% endif %}{% if approved_by %} &middot; approved by {{ approved_by }}{% endif %}
-  </p>
-
-  <h2 style="margin:24px 0 8px;font-size:16px;border-bottom:1px solid #e6eaef;padding-bottom:4px;">Summary</h2>
-  <p style="margin:0;white-space:pre-line;">{{ m.summary }}</p>
-
-{% if m.key_moments %}
-  <h2 style="margin:24px 0 8px;font-size:16px;border-bottom:1px solid #e6eaef;padding-bottom:4px;">Key moments</h2>
-  <ul style="margin:0;padding-left:20px;">
-  {% for k in m.key_moments %}
-    <li><span style="font-family:Menlo,Consolas,monospace;color:#5a6b7d;">{{ k.time }}</span> {{ k.moment }}</li>
-  {% endfor %}
-  </ul>
+{# A short note: the minutes themselves are the attached PDF (minutes_pdf.html). #}
+<body style="margin:0;padding:20px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#1f2a37;">
+<p style="margin:0 0 14px;">{{ labels.greeting }}</p>
+<p style="margin:0 0 14px;">{{ cover }}{% if approved %} {{ approved }}{% endif %}</p>
+{% if signed_by %}
+<p style="margin:0;">{{ labels.regards }}<br>{{ signed_by }}</p>
 {% endif %}
-
-{% if m.topics %}
-  <h2 style="margin:24px 0 8px;font-size:16px;border-bottom:1px solid #e6eaef;padding-bottom:4px;">{{ topics_label }}</h2>
-  {% for t in m.topics %}
-  {% set decisions = m.decisions | selectattr("patient", "equalto", t.name) | list %}
-  <div style="margin:0 0 14px;padding:10px 14px;border-left:3px solid #2f6f9f;background:#f7f9fb;">
-    <p style="margin:0 0 4px;font-weight:bold;">{{ t.name }} <span style="font-weight:normal;font-family:Menlo,Consolas,monospace;color:#5a6b7d;">{{ t.time }}</span></p>
-    <p style="margin:0 0 4px;white-space:pre-line;"><strong>Status:</strong> {{ t.status or "—" }}</p>
-    {% if t.findings %}
-    <p style="margin:6px 0 2px;"><strong>Findings</strong></p>
-    <ul style="margin:0;padding-left:20px;">
-      {% for f in t.findings %}<li>{{ f }}</li>{% endfor %}
-    </ul>
-    {% endif %}
-    {% if decisions %}
-    <p style="margin:6px 0 2px;"><strong>Decisions</strong></p>
-    <ul style="margin:0;padding-left:20px;">
-      {% for d in decisions %}<li><span style="font-family:Menlo,Consolas,monospace;color:#5a6b7d;">{{ d.time }}</span> {{ d.decision }}</li>{% endfor %}
-    </ul>
-    {% endif %}
-  </div>
-  {% endfor %}
-{% endif %}
-
-{% if other_decisions %}
-  <h2 style="margin:24px 0 8px;font-size:16px;border-bottom:1px solid #e6eaef;padding-bottom:4px;">Other decisions</h2>
-  <ul style="margin:0;padding-left:20px;">
-  {% for d in other_decisions %}
-    <li><span style="font-family:Menlo,Consolas,monospace;color:#5a6b7d;">{{ d.time }}</span> {{ d.decision }}{% if d.patient %} — {{ d.patient }}{% endif %}</li>
-  {% endfor %}
-  </ul>
-{% endif %}
-
-{% if action_items %}
-  <h2 style="margin:24px 0 8px;font-size:16px;border-bottom:1px solid #e6eaef;padding-bottom:4px;">Action items</h2>
-  <table style="width:100%;border-collapse:collapse;font-size:13px;">
-    <thead>
-      <tr style="background:#eef2f6;text-align:left;">
-        <th style="padding:6px;border:1px solid #dfe4ea;">#</th>
-        <th style="padding:6px;border:1px solid #dfe4ea;">Task</th>
-        <th style="padding:6px;border:1px solid #dfe4ea;">{{ item_label }}</th>
-        <th style="padding:6px;border:1px solid #dfe4ea;">Owner</th>
-        <th style="padding:6px;border:1px solid #dfe4ea;">Deadline</th>
-        <th style="padding:6px;border:1px solid #dfe4ea;">Priority</th>
-        <th style="padding:6px;border:1px solid #dfe4ea;">Time</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for a in action_items %}
-      <tr>
-        <td style="padding:6px;border:1px solid #dfe4ea;">{{ loop.index }}</td>
-        <td style="padding:6px;border:1px solid #dfe4ea;">{{ a.task }}</td>
-        <td style="padding:6px;border:1px solid #dfe4ea;">{{ a.patient }}</td>
-        <td style="padding:6px;border:1px solid #dfe4ea;">{{ a.owner }}</td>
-        <td style="padding:6px;border:1px solid #dfe4ea;">{{ a.deadline }}</td>
-        <td style="padding:6px;border:1px solid #dfe4ea;{% if a.priority == 'high' %}color:#b42318;font-weight:bold;{% endif %}">{{ a.priority }}</td>
-        <td style="padding:6px;border:1px solid #dfe4ea;font-family:Menlo,Consolas,monospace;">{{ a.time }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-{% endif %}
-
-{% if m.open_issues %}
-  <h2 style="margin:24px 0 8px;font-size:16px;border-bottom:1px solid #e6eaef;padding-bottom:4px;">Open issues</h2>
-  <ul style="margin:0;padding-left:20px;">
-  {% for issue in m.open_issues %}<li>{{ issue }}</li>{% endfor %}
-  </ul>
-{% endif %}
-
-{% if m.participants %}
-  <h2 style="margin:24px 0 8px;font-size:16px;border-bottom:1px solid #e6eaef;padding-bottom:4px;">Participants</h2>
-  <ul style="margin:0;padding-left:20px;">
-  {% for speaker, p in m.participants.items() %}
-    <li><strong>{{ speaker }}</strong> — {{ p.role }}{% if p.name %} ({{ p.name }}){% endif %}{% if p.seconds %} &middot; {{ p.seconds // 60 }} min {{ "%02d" | format(p.seconds % 60) }} s{% endif %}</li>
-  {% endfor %}
-  </ul>
-  <p style="margin:4px 0 0;font-size:12px;color:#5a6b7d;">Roles are guessed by the local AI from what each voice says.</p>
-{% endif %}
-
-{% if m.suggestions %}
-  <h2 style="margin:24px 0 8px;font-size:16px;border-bottom:1px solid #e6eaef;padding-bottom:4px;">AI suggestions (not decided in the meeting)</h2>
-  <ul style="margin:0;padding-left:20px;">
-  {% for s in m.suggestions %}<li>{{ s }}</li>{% endfor %}
-  </ul>
-{% endif %}
-
-{% if m.warnings %}
-  <h2 style="margin:24px 0 8px;font-size:16px;border-bottom:1px solid #e6eaef;padding-bottom:4px;">Verification notes</h2>
-  <ul style="margin:0;padding-left:20px;color:#7a4b00;">
-  {% for w in m.warnings %}<li>{{ w }}</li>{% endfor %}
-  </ul>
-{% endif %}
-
-  <p style="margin:28px 0 0;padding-top:12px;border-top:1px solid #e6eaef;font-size:12px;color:#5a6b7d;">
-    Drafted by a local AI from the meeting recording{% if approved_by %} and approved by {{ approved_by }}{% endif %}. Processed entirely on the hospital's own server.
-  </p>
-</div>
 </body>
 </html>

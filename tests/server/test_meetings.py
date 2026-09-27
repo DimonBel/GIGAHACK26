@@ -1,4 +1,6 @@
 """The meeting lifecycle: upload -> processing -> ready -> edit -> approve ("I agree") -> send -> read."""
+import io
+import json
 import os
 import selectors
 import shutil
@@ -6,7 +8,9 @@ import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
+import pypdf
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -14,7 +18,7 @@ from sqlalchemy import select
 
 from server.app import create_app
 from server.db import Meeting, Minutes, Transcript, User
-from server.jobs import INTERRUPTED, SttPipeline
+from server.jobs import INTERRUPTED, SttPipeline, Transcription
 from server.mail import DeliveryError
 from server.routes.meetings import MAX_UNFINISHED
 from server.schemas import minutes_doc
@@ -31,6 +35,11 @@ STARTS_A_HELPER = ("import json, subprocess, sys, time; "
 ENDED_WAIT_S = 10
 
 
+def _pdf_text(data: bytes) -> str:
+    """The text of a PDF: the minutes the email carries."""
+    return "\n".join(page.extract_text() for page in pypdf.PdfReader(io.BytesIO(data)).pages)
+
+
 def test_lifecycle(login, upload, wait, mailer):
     moderator = login("moderator")
     response = upload(moderator, title="Medical board 26.09")
@@ -38,7 +47,7 @@ def test_lifecycle(login, upload, wait, mailer):
     created = response.json()
     assert created["status"] == "queued" and created["title"] == "Medical board 26.09"
     assert created["meeting_type"] == "medical" and created["created_by"]["full_name"] == "Moderator Test"
-    assert created["duration_s"] == 0.5
+    assert created["duration_s"] == 0.5 and created["has_audio"] is True and created["minutes_language"] == "ro"
     meeting = wait(moderator, created["id"])
     assert meeting["status"] == "ready" and meeting["language"] == "ro" and meeting["error"] is None
     assert meeting["progress"] == {"stage": "done", "done": 0, "total": 0, "message": "Done"}
@@ -51,6 +60,7 @@ def test_lifecycle(login, upload, wait, mailer):
                                            "role": "leads the round", "languages": ["ro"], "accent": "",
                                            "text": "Pacientul din patul 8 are febră."}
     assert moderator.get(path + "/audio").status_code == 404  # keep_audio_days 0: deleted once processed
+    assert moderator.get(path).json()["has_audio"] is False
 
     minutes = moderator.get(path + "/minutes").json()
     assert minutes["topics"][0]["name"] == "Bed 8"
@@ -75,7 +85,10 @@ def test_lifecycle(login, upload, wait, mailer):
     [email] = mailer.sent
     assert (email.to, email.cc) == (["ana@medpark.md"], ["quality@medpark.md"])
     assert email.subject == "[Medical] Medical board 26.09" and email.meeting_type == "medical"
-    assert "Medical board: bed 8" in email.html and "<script>" not in email.html
+    minutes_pdf = _pdf_text(email.attachment.data)  # the minutes; the email is a short note
+    assert "Medical board: bed 8" in minutes_pdf and "<script>" not in email.html
+    assert '<html lang="ro">' in email.html and "Bună ziua," in email.text  # the minutes' language, by default
+    assert "REZUMAT" in minutes_pdf and email.text.endswith("Moderator Test\n")  # signed by who sent it
     assert moderator.post(path + "/send", json={"to": ["ana@medpark.md"]}).status_code == 409  # sent already
 
     reader = login("user")
@@ -134,6 +147,10 @@ def test_failure_is_readable_without_paths_or_urls(login, upload, wait, pipeline
     moderator = login("moderator")
     meeting = wait(moderator, upload(moderator).json()["id"])
     assert meeting["status"] == "failed" and meeting["error"] == shown
+    # The worker deletes the recording right after it marks the meeting failed.
+    deadline = time.monotonic() + 10
+    while list(config.audio_dir.iterdir()) and time.monotonic() < deadline:
+        time.sleep(0.02)
     assert list(config.audio_dir.iterdir()) == []
 
 
@@ -180,6 +197,40 @@ def test_minutes_errors_do_not_quote_the_minutes():
     with pytest.raises(ValidationError) as error:
         minutes_doc({"summary": "Pacientul Ion Popescu din patul 8. " * 1000})
     assert "summary" in str(error.value) and "Popescu" not in str(error.value)
+
+
+def test_the_minutes_pdf_is_emailed_and_can_be_opened(ready, login, mailer):
+    """The PDF: the moderator's from the draft on, a recipient's once sent (audited); the email carries it."""
+    moderator, meeting = ready
+    path = f"/api/meetings/{meeting['id']}"
+    draft = moderator.get(path + "/minutes.pdf")
+    assert draft.status_code == 200 and draft.headers["content-type"] == "application/pdf"
+    assert draft.content.startswith(b"%PDF-") and draft.headers["cache-control"] == "no-store"
+    assert draft.headers["content-disposition"].startswith("inline; filename*=UTF-8''Proces-verbal%20-%20")
+    reader = login("user")
+    assert reader.get(path + "/minutes.pdf").status_code == 404  # not sent to them (yet)
+    assert moderator.post(path + "/approve").status_code == 200
+    assert moderator.post(path + "/send", json={"to": ["ana@medpark.md"]}).status_code == 200
+    [email] = mailer.sent
+    assert email.attachment.content_type == "application/pdf" and email.attachment.data.startswith(b"%PDF-")
+    sent = reader.get(path + "/minutes.pdf")
+    assert sent.status_code == 200 and sent.content.startswith(b"%PDF-")
+    audit = login("admin").get("/api/audit", params={"meeting_id": meeting["id"]}).json()
+    assert audit[0]["action"] == "view_minutes" and audit[0]["detail"] == "pdf"
+
+
+def test_a_recipient_reads_the_minutes_without_the_notes_for_the_moderator(ready, login, mailer):
+    moderator, meeting = ready
+    path = f"/api/meetings/{meeting['id']}"
+    minutes = moderator.get(path + "/minutes").json()
+    minutes["topics"][0]["findings"] = ["Creatinine 240 ⚠ unverified: 240"]
+    assert moderator.put(path + "/minutes", json=minutes).status_code == 200
+    assert moderator.post(path + "/approve").status_code == 200
+    assert moderator.post(path + "/send", json={"to": ["ana@medpark.md"]}).status_code == 200
+    assert login("user").get(path + "/minutes").json()["topics"][0]["findings"] == ["Creatinine 240"]
+    assert moderator.get(path + "/minutes").json()["topics"][0]["findings"] == ["Creatinine 240 ⚠ unverified: 240"]
+    [email] = mailer.sent
+    assert "unverified" not in email.html and "unverified" not in email.text
 
 
 def test_send_checks_the_recipients(ready, mailer):
@@ -368,10 +419,10 @@ def test_scratch_files_are_deleted_after_each_meeting(config, login, upload, wai
     """A child killed while it transcribes (out of memory) leaves the decoded recording behind."""
     transcribe = pipeline.transcribe
 
-    def killed_child(audio, settings, on_progress, meeting_type=None):
+    def killed_child(audio, settings, on_progress, meeting_type=None, minutes_language="ro", instructions=""):
         (config.temp_dir / "tmpabc123").mkdir()
         (config.temp_dir / "tmpabc123" / "input.wav").write_bytes(b"RIFF")
-        return transcribe(audio, settings, on_progress, meeting_type)
+        return transcribe(audio, settings, on_progress, meeting_type, minutes_language, instructions)
 
     monkeypatch.setattr(pipeline, "transcribe", killed_child)
     moderator = login("moderator")
@@ -402,8 +453,8 @@ def test_minutes_written_during_the_transcription_are_used(login, upload, wait, 
     """The child writes the minutes while it transcribes; they are not written again here."""
     transcribe = pipeline.transcribe
 
-    def with_minutes(audio, settings, on_progress, meeting_type=None):
-        transcription = transcribe(audio, settings, on_progress, meeting_type)
+    def with_minutes(audio, settings, on_progress, meeting_type=None, minutes_language="ro", instructions=""):
+        transcription = transcribe(audio, settings, on_progress, meeting_type, minutes_language, instructions)
         on_progress("minutes")
         transcription.minutes = {"title": "Written during the transcription", "summary": "Bed 8 is stable."}
         return transcription
@@ -427,3 +478,150 @@ def test_a_playback_starting_with_any_range_is_audited(login, upload, wait):
     assert moderator.get(path, headers={"Range": "bytes=2-9"}).status_code == 206  # the same playback goes on
     actions = [e["action"] for e in admin.get("/api/audit", params={"meeting_id": meeting["id"]}).json()]
     assert actions.count("view_audio") == 1
+
+
+@pytest.mark.parametrize("language", ["ro", "ru", "en", None])
+def test_the_minutes_language_goes_to_the_pipeline(login, upload, wait, pipeline, language):
+    """The moderator picks the language of the minutes (Romanian unless chosen); the job hands it to the
+    transcription (whose child may write the minutes) and to the minutes written after it."""
+    moderator = login("moderator")
+    created = upload(moderator, minutes_language=language).json()
+    expected = language or "ro"
+    assert created["minutes_language"] == expected
+    assert wait(moderator, created["id"])["minutes_language"] == expected
+    assert pipeline.minutes_languages == [("transcribe", expected), ("minutes", expected)]
+
+
+def test_the_real_pipeline_gets_the_minutes_language(tmp_path, monkeypatch):
+    """The transcription child is told the language when it writes the minutes, and so is the fallback."""
+    commands, popen = [], subprocess.Popen
+    answer = json.dumps({"result": {"language": "ro", "utterances": [], "minutes": None}})
+
+    def child(command, **kwargs):
+        commands.append(command)
+        return popen([sys.executable, "-c", f"print({answer!r})"], **kwargs)
+
+    monkeypatch.setattr(subprocess, "Popen", child)
+    monkeypatch.setattr("server.jobs.overlap_minutes", lambda: True)
+    settings = {**CHILD_SETTINGS, "llm_model": "gemma4:e4b"}
+    SttPipeline(tmp_path).transcribe(tmp_path / "a.wav", settings, lambda *progress: None, "medical", "ru")
+    assert commands[0][-3:] == ["--minutes=medical", "--minutes-language=ru", "--llm=gemma4:e4b"]
+    calls = []
+    monkeypatch.setattr("stt.pipeline.meeting_minutes", lambda dialog, *args: calls.append(args) or {"title": "t"})
+    said = Transcription("ro", [{"start": 0.5, "end": 4.2, "speaker": "SPEAKER 1", "text": "Bine."}])
+    assert SttPipeline(tmp_path).minutes(said, "executive", settings, "en") == {"title": "t"}
+    assert calls == [("executive", "gemma4:e4b", "en", "")]  # no template instructions
+
+
+def test_the_real_pipeline_gets_the_template_instructions(tmp_path, monkeypatch):
+    """The instructions of the meeting type's template go to the transcription child, as one argument that can't
+    be taken for an option, and to the minutes written after it."""
+    commands, popen = [], subprocess.Popen
+    answer = json.dumps({"result": {"language": "ro", "utterances": [], "minutes": None}})
+    monkeypatch.setattr(subprocess, "Popen", lambda command, **kwargs: commands.append(command) or popen(
+        [sys.executable, "-c", f"print({answer!r})"], **kwargs))
+    monkeypatch.setattr("server.jobs.overlap_minutes", lambda: True)
+    settings = {**CHILD_SETTINGS, "llm_model": "gemma4:e4b"}
+    instructions = "- Name every patient by bed.\n- Doses in mg."
+    SttPipeline(tmp_path).transcribe(tmp_path / "a.wav", settings, lambda *progress: None, "medical", "ro",
+                                     instructions)
+    assert commands[0][-1] == f"--instructions={instructions}"
+    calls = []
+    monkeypatch.setattr("stt.pipeline.meeting_minutes", lambda dialog, *args: calls.append(args) or {"title": "t"})
+    said = Transcription("ro", [{"start": 0.5, "end": 4.2, "speaker": "SPEAKER 1", "text": "Bine."}])
+    SttPipeline(tmp_path).minutes(said, "medical", settings, "ro", instructions)
+    assert calls == [("medical", "gemma4:e4b", "ro", instructions)]
+
+
+def test_has_audio_until_the_retention_deletes_the_recording(app, login, upload, wait, config, monkeypatch):
+    """has_audio says whether GET .../audio can play the recording: the retention lets go of it before the file
+    is deleted."""
+    admin = login("admin")
+    assert admin.put("/api/settings", json={"keep_audio_days": 7}).status_code == 200
+    moderator = login("moderator")
+    meeting = wait(moderator, upload(moderator).json()["id"])
+    path = f"/api/meetings/{meeting['id']}"
+    assert meeting["has_audio"] is True and moderator.get(path + "/audio").status_code == 200
+    app.state.jobs.stop()  # the retention runs here, not in the worker at the same time
+    assert admin.put("/api/settings", json={"keep_audio_days": 0}).status_code == 200
+    referred, unlink = [], Path.unlink
+
+    def delete(file, missing_ok=False):
+        with app.state.db() as db:
+            referred.append(db.get(Meeting, meeting["id"]).audio_file)
+        unlink(file, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", delete)
+    app.state.jobs._purge_audio()
+    assert referred == [None]  # the meeting no longer referred to the file when it was deleted
+    assert moderator.get(path).json()["has_audio"] is False and moderator.get(path + "/audio").status_code == 404
+    assert list(config.audio_dir.iterdir()) == []
+
+
+def test_older_minutes_lose_their_suggestions(app, ready):
+    """Minutes stored while the LLM still wrote AI suggestions load and save without them."""
+    moderator, meeting = ready
+    with app.state.db() as db:
+        minutes = db.get(Minutes, meeting["id"])
+        minutes.draft = {**minutes.draft, "suggestions": ["Check the temperature again tonight"]}
+        db.commit()
+    path = f"/api/meetings/{meeting['id']}/minutes"
+    stored = moderator.get(path).json()
+    assert "suggestions" not in stored and stored["topics"][0]["name"] == "Bed 8"
+    saved = moderator.put(path, json={**stored, "suggestions": ["Recheck"]})
+    assert saved.status_code == 200 and "suggestions" not in saved.json()
+
+
+def test_attendees_are_kept_as_the_moderator_edits_them(app, ready):
+    """New drafts have no attendees (the LLM never adds any); the moderator's list is validated like the others."""
+    moderator, meeting = ready
+    path = f"/api/meetings/{meeting['id']}/minutes"
+    with app.state.db() as db:
+        assert db.get(Minutes, meeting["id"]).draft["attendees"] == []
+    minutes = moderator.get(path).json()
+    assert minutes["attendees"] == []
+    minutes["attendees"] = [{"user_id": 3, "name": "Ana Popescu", "job_title": "Head of cardiology",
+                             "position": "Doctor", "specialty": "Cardiologist", "email": "ana@medpark.md"},
+                            {"user_id": None, "name": "Guest surgeon"}]
+    saved = moderator.put(path, json=minutes)
+    assert saved.status_code == 200
+    assert moderator.get(path).json()["attendees"] == [
+        {"user_id": 3, "name": "Ana Popescu", "job_title": "Head of cardiology", "position": "Doctor",
+         "specialty": "Cardiologist"},
+        {"user_id": None, "name": "Guest surgeon", "job_title": "", "position": "", "specialty": ""}]
+    too_many = [{"name": f"Person {i}"} for i in range(501)]
+    assert moderator.put(path, json={**minutes, "attendees": too_many}).status_code == 400
+    assert moderator.put(path, json={**minutes, "attendees": [{"user_id": "not a user", "name": "X"}]}).status_code \
+        == 400
+
+
+def test_email_preview_shows_what_would_be_sent(ready, login):
+    """The moderator sees the email of the minutes as they are now, laid out by the template; others may not."""
+    moderator, meeting = ready
+    path = f"/api/meetings/{meeting['id']}"
+    minutes = moderator.get(f"{path}/minutes").json()
+    minutes["summary"] = "Edited <b>summary</b>"
+    assert moderator.put(f"{path}/minutes", json=minutes).status_code == 200
+    preview = moderator.get(f"{path}/email-preview")
+    assert preview.status_code == 200
+    body = preview.json()
+    assert set(body) == {"subject", "language", "html", "text", "attachment"}
+    assert body["attachment"].startswith("Proces-verbal - ") and body["attachment"].endswith(".pdf")
+    assert body["subject"].startswith("[Medical]") and body["language"] == meeting["minutes_language"]
+    assert body["text"].endswith("Moderator Test\n") and "Edited" not in body["text"]  # the note, signed
+    assert "Edited <b>summary</b>" in _pdf_text(moderator.get(f"{path}/minutes.pdf").content)  # the minutes now
+    assert login("user").get(f"{path}/email-preview").status_code in (403, 404)
+
+
+def test_an_action_item_keeps_the_user_it_is_assigned_to(ready):
+    """An owner chosen from the app's users keeps their id; one typed by hand has none."""
+    moderator, meeting = ready
+    path = f"/api/meetings/{meeting['id']}/minutes"
+    minutes = moderator.get(path).json()
+    minutes["action_items"] = [
+        {"task": "Echocardiography", "owner": "Ana Popescu", "owner_user_id": 3, "priority": "high"},
+        {"task": "Call the lab", "owner": "Night nurse"},
+    ]
+    assert moderator.put(path, json=minutes).status_code == 200
+    owners = [(a["owner"], a["owner_user_id"]) for a in moderator.get(path).json()["action_items"]]
+    assert owners == [("Ana Popescu", 3), ("Night nurse", None)]

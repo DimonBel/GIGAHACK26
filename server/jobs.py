@@ -24,7 +24,7 @@ from stt.config import ROOT, overlap_minutes
 from .config import Config
 from .db import Meeting, Minutes, Transcript, utcnow
 from .schemas import minutes_doc
-from .settings import load_settings
+from .settings import active_template, load_settings
 from .transcribe import ProcessingError, readable_error
 
 log = logging.getLogger(__name__)
@@ -48,10 +48,13 @@ class Transcription:
 
 
 class Pipeline(Protocol):
-    def transcribe(self, audio: Path, settings: dict, on_progress: Callable,
-                   meeting_type: str | None = None) -> Transcription: ...
+    """instructions: those of the meeting type's minutes template, for the LLM that writes the minutes."""
 
-    def minutes(self, transcription: Transcription, meeting_type: str, settings: dict) -> dict: ...
+    def transcribe(self, audio: Path, settings: dict, on_progress: Callable, meeting_type: str | None = None,
+                   minutes_language: str = "ro", instructions: str = "") -> Transcription: ...
+
+    def minutes(self, transcription: Transcription, meeting_type: str, settings: dict, minutes_language: str,
+                instructions: str = "") -> dict: ...
 
     def cancel(self):
         """Stops a transcription that is running (the server is stopping)."""
@@ -69,14 +72,17 @@ class SttPipeline:
         self._child: subprocess.Popen | None = None
         self._lock = threading.Lock()  # the group is killed only before the child is reaped: then its id is free
 
-    def transcribe(self, audio: Path, settings: dict, on_progress: Callable,
-                   meeting_type: str | None = None) -> Transcription:
+    def transcribe(self, audio: Path, settings: dict, on_progress: Callable, meeting_type: str | None = None,
+                   minutes_language: str = "ro", instructions: str = "") -> Transcription:
         command = [sys.executable, "-m", "server.transcribe", str(audio), f"--engine={settings['asr_engine']}",
                    f"--model={settings['asr_model']}", f"--language={settings['language']}"]
         if settings.get("max_duration_min"):  # enforced while decoding too, in case the file lies about its length
             command.append(f"--max-seconds={settings['max_duration_min'] * 60}")
         if meeting_type and overlap_minutes():  # else the minutes are written here, after the child freed its memory
-            command += [f"--minutes={meeting_type}", f"--llm={settings['llm_model']}"]
+            command += [f"--minutes={meeting_type}", f"--minutes-language={minutes_language}",
+                        f"--llm={settings['llm_model']}"]
+            if instructions:
+                command.append(f"--instructions={instructions}")
         result, error = None, None
         # stdin stays open (the child exits when it closes); stderr gets every transcript line: discarded.
         with subprocess.Popen(command, cwd=ROOT, env={**os.environ, "TMPDIR": str(self.temp_dir)},
@@ -108,12 +114,13 @@ class SttPipeline:
             if self._child is not None:
                 _kill_group(self._child)
 
-    def minutes(self, transcription: Transcription, meeting_type: str, settings: dict) -> dict:
+    def minutes(self, transcription: Transcription, meeting_type: str, settings: dict, minutes_language: str,
+                instructions: str = "") -> dict:
         from stt.pipeline import meeting_minutes
         from stt.speakers.dialog import Utterance
 
         dialog = [Utterance(u["start"], u["end"], u["speaker"], u["text"]) for u in transcription.utterances]
-        return meeting_minutes(dialog, meeting_type, settings["llm_model"])
+        return meeting_minutes(dialog, meeting_type, settings["llm_model"], minutes_language, instructions)
 
 
 class JobRunner:
@@ -166,7 +173,8 @@ class JobRunner:
             meeting.status, meeting.attempts, meeting.error = "processing", meeting.attempts + 1, None
             _set_progress(meeting, "converting")
             audio = self.config.audio_dir / meeting.audio_file if meeting.audio_file else None
-            meeting_type, settings = meeting.meeting_type, load_settings(db)
+            meeting_type, minutes_language, settings = meeting.meeting_type, meeting.minutes_language, load_settings(db)
+            instructions = active_template(db, meeting_type)["instructions"]
             db.commit()
         log.info("Processing meeting %s", meeting_id)
         started = time.perf_counter()
@@ -180,13 +188,15 @@ class JobRunner:
                     ready.append(time.perf_counter())
                 self._progress(meeting_id, stage, done, total)
 
-            transcription = self.pipeline.transcribe(audio, settings, progress, meeting_type)
+            transcription = self.pipeline.transcribe(audio, settings, progress, meeting_type, minutes_language,
+                                                     instructions)
             transcribed = ready[0] if ready else time.perf_counter()
             self._save_transcript(meeting_id, transcription, transcribed - started)
             if transcription.minutes is not None:
                 minutes = minutes_doc(transcription.minutes)
             elif transcription.utterances:
-                minutes = minutes_doc(self.pipeline.minutes(transcription, meeting_type, settings))
+                minutes = minutes_doc(self.pipeline.minutes(transcription, meeting_type, settings, minutes_language,
+                                                            instructions))
             else:  # nothing for the LLM to summarize: it would invent minutes
                 minutes = minutes_doc({"title": "No speech detected",
                                        "summary": "The recording contains no speech that could be transcribed.",
@@ -254,17 +264,20 @@ class JobRunner:
 
     def _purge_audio(self):
         """Deletes the recordings of processed meetings older than keep_audio_days (0: all of them), and audio
-        files no meeting refers to."""
+        files no meeting refers to. A meeting lets go of its recording before the file goes: has_audio is never
+        true for a recording that is deleted."""
         with self.db() as db:
             cutoff = utcnow() - timedelta(days=load_settings(db)["keep_audio_days"])
-            kept = set()
+            kept, expired = set(), []
             for meeting in db.scalars(select(Meeting).where(Meeting.audio_file.is_not(None))):
                 if meeting.status in UNFINISHED or meeting.created_at > cutoff:
                     kept.add(meeting.audio_file)
                 else:
-                    (self.config.audio_dir / meeting.audio_file).unlink(missing_ok=True)
+                    expired.append(meeting.audio_file)
                     meeting.audio_file = None
             db.commit()
+        for name in expired:
+            (self.config.audio_dir / name).unlink(missing_ok=True)
         for path in self.config.audio_dir.iterdir():
             if path.name not in kept and time.time() - path.stat().st_mtime > ORPHAN_AGE_S:
                 path.unlink(missing_ok=True)

@@ -11,7 +11,7 @@ from .config import Config, load_config, prepare_dirs
 from .db import connect
 from .jobs import JobRunner, Pipeline, SttPipeline
 from .mail import Mailer
-from .routes import audit, auth, directory, lists, meetings, settings, users
+from .routes import audit, auth, directory, lists, meetings, settings, templates, users
 from .security import MAX_JSON_BYTES, BodyLimit, LoginLimiter, SecurityHeaders
 
 API_PREFIX = "/api"
@@ -36,7 +36,7 @@ def create_app(config: Config | None = None, pipeline: Pipeline | None = None, m
     app.state.mailer = mailer or Mailer(config)
     app.state.limiter = LoginLimiter()
     app.add_exception_handler(RequestValidationError, _invalid_input)
-    for module in (auth, users, directory, lists, settings, meetings, audit):
+    for module in (auth, users, directory, lists, settings, templates, meetings, audit):
         app.include_router(module.router, prefix=API_PREFIX)
     if (config.web_dist / "index.html").is_file():
         _serve_web(app, config.web_dist)

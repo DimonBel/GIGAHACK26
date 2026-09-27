@@ -1,7 +1,7 @@
 """Database rows as the JSON documents of docs/api.md."""
 from datetime import datetime
 
-from .db import AuditLog, DistributionList, Meeting, User
+from .db import AuditLog, DistributionList, Meeting, MinutesTemplate, User
 
 
 def iso(moment: datetime | None) -> str | None:
@@ -10,8 +10,8 @@ def iso(moment: datetime | None) -> str | None:
 
 def user_json(user: User) -> dict:
     return {"id": user.id, "email": user.email, "full_name": user.full_name, "position": user.position,
-            "role": user.role, "active": user.active, "must_change_password": user.must_change_password,
-            "created_at": iso(user.created_at)}
+            "specialty": user.specialty, "job_title": user.job_title, "role": user.role, "active": user.active,
+            "must_change_password": user.must_change_password, "created_at": iso(user.created_at)}
 
 
 def person_json(user: User | None) -> dict | None:
@@ -29,7 +29,9 @@ def meeting_json(meeting: Meeting) -> dict:
         "created_by": person_json(meeting.created_by),
         "created_at": iso(meeting.created_at),
         "duration_s": meeting.duration_s,
+        "has_audio": meeting.audio_file is not None,  # the retention clears audio_file before deleting the file
         "language": meeting.language,
+        "minutes_language": meeting.minutes_language,
         "error": meeting.error,
         "approved_by": person_json(meeting.approved_by),
         "approved_at": iso(meeting.approved_at),
@@ -49,6 +51,12 @@ def list_json(dist: DistributionList) -> dict:
         elif m.user.active:
             members.append({"user_id": m.user.id, "email": m.user.email, "name": m.user.full_name, "kind": m.kind})
     return {"id": dist.id, "name": dist.name, "meeting_type": dist.meeting_type, "members": members}
+
+
+def template_json(template: MinutesTemplate) -> dict:
+    return {"meeting_type": template.meeting_type, "version": template.version, "sections": template.sections,
+            "topic_fields": template.topic_fields, "instructions": template.instructions, "note": template.note,
+            "created_by": person_json(template.created_by), "created_at": iso(template.created_at)}
 
 
 def audit_json(entry: AuditLog) -> dict:

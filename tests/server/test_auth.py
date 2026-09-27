@@ -21,8 +21,8 @@ def test_login_me_logout(client, users, password):
     body = response.json()
     assert body["user"] == {**body["user"], "email": "ion@medpark.md", "role": "moderator", "active": True,
                             "must_change_password": False}
-    assert set(body["user"]) == {"id", "email", "full_name", "position", "role", "active", "must_change_password",
-                                 "created_at"}
+    assert set(body["user"]) == {"id", "email", "full_name", "position", "specialty", "job_title", "role", "active",
+                                 "must_change_password", "created_at"}
     cookie = response.headers["set-cookie"].lower()
     assert cookie.startswith(f"{SESSION_COOKIE}=") and "httponly" in cookie and "samesite=strict" in cookie
     assert "secure" not in cookie.replace("samesite", "")  # plain http in tests

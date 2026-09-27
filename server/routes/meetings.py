@@ -5,6 +5,7 @@ recipients. Anyone else gets 404, so meeting ids reveal nothing."""
 import logging
 import threading
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
@@ -12,15 +13,16 @@ from fastapi.responses import FileResponse
 from sqlalchemy import false, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from stt.minutes.builder import MEETING_TYPES
+from stt.minutes.builder import MEETING_TYPES, MINUTES_LANGUAGES
+from stt.minutes.markdown import for_recipients
 
 from ..db import AuditLog, Db, Meeting, Recipient, User, audit, checkpoint, utcnow
 from ..jobs import STAGE_MESSAGES, UNFINISHED
-from ..mail import DeliveryError, compose
-from ..schemas import MinutesDoc, SendIn
+from ..mail import DeliveryError, compose, minutes_pdf, pdf_filename
+from ..schemas import MinutesDoc, SendIn, minutes_doc
 from ..security import CurrentUser, Manager
 from ..serialize import meeting_json
-from ..settings import check_recipient_domains, load_settings
+from ..settings import active_template, check_recipient_domains, load_settings
 from ..uploads import MB, Upload, probe, receive_audio
 
 log = logging.getLogger(__name__)
@@ -38,7 +40,8 @@ AUDIO_TYPES = {"wav": "audio/wav", "mp3": "audio/mpeg", "m4a": "audio/mp4", "mp4
 
 @router.post("", status_code=201)
 async def upload(request: Request, user: Manager) -> dict:
-    """multipart/form-data with file, meeting_type and an optional title; processing starts in the background.
+    """multipart/form-data with file, meeting_type, and optionally minutes_language (the language the minutes are
+    written in, ro by default) and title; processing starts in the background.
     429 while the uploader has MAX_UNFINISHED meetings waiting or processing, 413 over the size or length limit."""
     state = request.app.state
     settings = await run_in_threadpool(_upload_settings, state.db, user)
@@ -47,11 +50,15 @@ async def upload(request: Request, user: Manager) -> dict:
         meeting_type = received.fields.get("meeting_type", "").strip()
         if meeting_type not in MEETING_TYPES:
             raise HTTPException(400, f"meeting_type must be one of: {', '.join(MEETING_TYPES)}")
+        minutes_language = received.fields.get("minutes_language", "ro").strip()
+        if minutes_language not in MINUTES_LANGUAGES:
+            raise HTTPException(400, f"minutes_language must be one of: {', '.join(MINUTES_LANGUAGES)}")
         title = _title(received.fields.get("title", ""), meeting_type)
         duration = await run_in_threadpool(probe, received.path)
         if duration is not None and duration > settings["max_duration_min"] * 60:
             raise HTTPException(413, f"The recording is longer than {settings['max_duration_min']} minutes")
-        meeting = await run_in_threadpool(_create, state.db, user, title, meeting_type, received, duration)
+        meeting = await run_in_threadpool(_create, state.db, user, title, meeting_type, minutes_language, received,
+                                          duration)
     except BaseException:
         received.path.unlink(missing_ok=True)
         raise
@@ -105,14 +112,49 @@ def audio(meeting_id: str, request: Request, user: Manager, db: Db) -> FileRespo
 
 @router.get("/{meeting_id}/minutes")
 def get_minutes(meeting_id: str, user: CurrentUser, db: Db) -> dict:
-    """The edited minutes if there are any, else the draft; a recipient's reading is audited."""
+    """The edited minutes if there are any, else the draft, in the documented shape (older minutes lose fields
+    since removed, e.g. suggestions); a recipient's reading is audited, and gets them as emailed (no "⚠ unverified"
+    notes)."""
+    meeting = _meeting(db, meeting_id, user)
+    if meeting.minutes is None:
+        raise HTTPException(409, "The minutes are not ready yet")
+    if _can_manage(user, meeting):
+        return minutes_doc(meeting.minutes.current)
+    audit(db, "view_minutes", user, meeting.id)
+    db.commit()
+    return for_recipients(minutes_doc(meeting.minutes.current))
+
+
+@router.get("/{meeting_id}/email-preview")
+def email_preview(meeting_id: str, user: Manager, db: Db) -> dict:
+    """The email the minutes are sent as (the note, signed by this user; the PDF of the minutes as they are now, a
+    draft too, is at minutes.pdf): {"subject", "language", "html", "text", "attachment"}, for the moderator to see
+    what they approve."""
+    meeting = _meeting(db, meeting_id, user, manage=True)
+    if meeting.minutes is None:
+        raise HTTPException(409, "The minutes are not ready yet")
+    email = compose(meeting, minutes_doc(meeting.minutes.current), load_settings(db)["mail_from"], [], [],
+                    active_template(db, meeting.meeting_type), signed_by=user.full_name)
+    return {"subject": email.subject, "language": email.language, "html": email.html, "text": email.text,
+            "attachment": pdf_filename(meeting)}
+
+
+@router.get("/{meeting_id}/minutes.pdf")
+def get_minutes_pdf(meeting_id: str, user: CurrentUser, db: Db) -> Response:
+    """The minutes as the PDF that is emailed, laid out by the active template: for the moderator from the draft on,
+    for a recipient once sent (audited, like reading them)."""
     meeting = _meeting(db, meeting_id, user)
     if meeting.minutes is None:
         raise HTTPException(409, "The minutes are not ready yet")
     if not _can_manage(user, meeting):
-        audit(db, "view_minutes", user, meeting.id)
+        audit(db, "view_minutes", user, meeting.id, "pdf")
         db.commit()
-    return meeting.minutes.current
+    pdf = minutes_pdf(meeting, minutes_doc(meeting.minutes.current), active_template(db, meeting.meeting_type))
+    filename = pdf_filename(meeting)
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f"inline; filename*=UTF-8''{quote(filename)}",
+        "Cache-Control": "no-store",  # patient data: not kept by the browser
+    })
 
 
 @router.put("/{meeting_id}/minutes")
@@ -150,8 +192,9 @@ def reopen(meeting_id: str, user: Manager, db: Db) -> dict:
 
 @router.post("/{meeting_id}/send")
 def send(meeting_id: str, body: SendIn, request: Request, user: Manager, db: Db) -> dict:
-    """Emails the approved minutes (n8n or SMTP, see settings); 400 for an address outside the allowed domains,
-    502 if the delivery fails (the details go to the server log only)."""
+    """Emails the approved minutes (n8n or SMTP, see settings), laid out by the active template of the meeting's
+    type; 400 for an address outside the allowed domains, 502 if the delivery fails (the details go to the server
+    log only)."""
     meeting = _meeting(db, meeting_id, user, manage=True)
     _require_status(meeting, "approved")
     to = list(dict.fromkeys(body.to))
@@ -161,7 +204,9 @@ def send(meeting_id: str, body: SendIn, request: Request, user: Manager, db: Db)
         check_recipient_domains([*to, *cc], settings["allowed_recipient_domains"])
     except ValueError as e:
         raise HTTPException(400, str(e)) from None
-    email = compose(meeting, meeting.minutes.current, settings["mail_from"], to, cc)
+    template = active_template(db, meeting.meeting_type)
+    email = compose(meeting, meeting.minutes.current, settings["mail_from"], to, cc, template, pdf=True,
+                    signed_by=user.full_name)
     try:
         request.app.state.mailer.deliver(email, settings)
     except DeliveryError as e:
@@ -171,7 +216,10 @@ def send(meeting_id: str, body: SendIn, request: Request, user: Manager, db: Db)
         raise HTTPException(502, f"The email could not be sent: {e}") from None
     meeting.status, meeting.sent_at = "sent", utcnow()
     meeting.recipients = [Recipient(email=a, kind="to") for a in to] + [Recipient(email=a, kind="cc") for a in cc]
-    audit(db, "send", user, meeting.id, f"to: {', '.join(to)}; cc: {', '.join(cc) or '-'}")
+    detail = f"to: {', '.join(to)}; cc: {', '.join(cc) or '-'}"
+    if template["version"]:  # a saved version, not the built-in template
+        detail += f"; template v{template['version']}"
+    audit(db, "send", user, meeting.id, detail)
     db.commit()
     return meeting_json(meeting)
 
@@ -243,12 +291,12 @@ def _check_queue(db: Session, user: User):
                                  "this one when one of them is done")
 
 
-def _create(db_factory: sessionmaker, user: User, title: str, meeting_type: str, received: Upload,
-            duration: float | None) -> dict:
+def _create(db_factory: sessionmaker, user: User, title: str, meeting_type: str, minutes_language: str,
+            received: Upload, duration: float | None) -> dict:
     with _creating, db_factory() as db:  # one at a time: two uploads finishing together can't both pass the check
         _check_queue(db, user)  # again: more uploads of this user may have arrived meanwhile
-        meeting = Meeting(title=title, meeting_type=meeting_type, created_by_id=user.id,
-                          audio_file=received.path.name, duration_s=duration,
+        meeting = Meeting(title=title, meeting_type=meeting_type, minutes_language=minutes_language,
+                          created_by_id=user.id, audio_file=received.path.name, duration_s=duration,
                           progress_message=STAGE_MESSAGES["queued"])
         db.add(meeting)
         db.flush()

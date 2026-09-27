@@ -1,5 +1,5 @@
-"""Settings the admin changes at runtime (speech engine, models, delivery, recipients, retention, limits), stored
-in the database."""
+"""Settings the admin changes at runtime (speech engine, models, delivery, recipients, retention, limits) and the
+minutes template of each meeting type, stored in the database."""
 from collections.abc import Iterable
 from functools import cache
 from pathlib import Path
@@ -8,9 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from stt.config import ROOT, default_model
+from stt.minutes.markdown import OFF_BY_DEFAULT, SECTIONS, TOPIC_FIELDS
 from stt.minutes.ollama import DEFAULT_MODEL as DEFAULT_LLM
 
-from .db import Setting
+from .db import MinutesTemplate, Setting
+from .serialize import template_json
 
 
 @cache
@@ -50,6 +52,22 @@ def load_settings(db: Session) -> dict:
 def save_settings(db: Session, changes: dict):
     for key, value in changes.items():
         db.merge(Setting(key=key, value=value))
+
+
+def default_template(meeting_type: str) -> dict:
+    """Version 0, the built-in minutes template (never stored): the sections in the default order, the ones for
+    the moderator only (timeline, voices, the automatic check's notes) off; every topic field, no instructions."""
+    return {"meeting_type": meeting_type, "version": 0,
+            "sections": [{"key": key, "enabled": key not in OFF_BY_DEFAULT} for key in SECTIONS],
+            "topic_fields": dict.fromkeys(TOPIC_FIELDS, True), "instructions": "", "note": "", "created_by": None,
+            "created_at": None}
+
+
+def active_template(db: Session, meeting_type: str) -> dict:
+    """The meeting type's minutes template in use: its newest version, else the built-in one."""
+    newest = db.scalar(select(MinutesTemplate).where(MinutesTemplate.meeting_type == meeting_type)
+                       .order_by(MinutesTemplate.version.desc()).limit(1))
+    return template_json(newest) if newest else default_template(meeting_type)
 
 
 def check_recipient_domains(addresses: Iterable[str], allowed: list[str]):

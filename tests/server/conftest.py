@@ -31,7 +31,6 @@ UTTERANCES = [
 MINUTES = {
     "title": "Round <script>alert('title')</script>",
     "summary": "Bed 8 has a fever.\n<img src=x onerror=alert(1)>",
-    "suggestions": ["Check the temperature again tonight"],
     "key_moments": [{"time": "00:04", "moment": "Blood tests ordered — Bed 8"}],
     "topics": [{"name": "Bed 8", "time": "00:00", "status": "fever <b>38.5</b>", "findings": ["38.5 °C"]}],
     "decisions": [{"decision": "Order blood tests", "time": "00:04", "patient": "Bed 8"}],
@@ -54,10 +53,15 @@ class FakePipeline:
         self.gate: threading.Event | None = None
         self.audio: list[Path] = []
         self.minutes_calls = 0
+        self.minutes_languages: list[tuple[str, str]] = []  # (step, minutes_language it was given)
+        self.instructions: list[tuple[str, str]] = []  # (step, the template's instructions it was given)
         self.cancelled = False
 
-    def transcribe(self, audio: Path, settings: dict, on_progress, meeting_type=None) -> Transcription:
+    def transcribe(self, audio: Path, settings: dict, on_progress, meeting_type=None, minutes_language="ro",
+                   instructions="") -> Transcription:
         self.audio.append(audio)
+        self.minutes_languages.append(("transcribe", minutes_language))
+        self.instructions.append(("transcribe", instructions))
         on_progress("converting")
         if self.gate is not None:
             self.gate.wait(WAIT_S)
@@ -69,8 +73,11 @@ class FakePipeline:
             raise self.error
         return Transcription("ro", copy.deepcopy(self.utterances))
 
-    def minutes(self, transcription: Transcription, meeting_type: str, settings: dict) -> dict:
+    def minutes(self, transcription: Transcription, meeting_type: str, settings: dict, minutes_language: str,
+                instructions: str = "") -> dict:
         self.minutes_calls += 1
+        self.minutes_languages.append(("minutes", minutes_language))
+        self.instructions.append(("minutes", instructions))
         return copy.deepcopy(self.minutes_result)
 
     def cancel(self):
@@ -162,13 +169,16 @@ def wav(tmp_path) -> Path:
 
 @pytest.fixture
 def upload(wav):
-    """upload(client, meeting_type=..., title=..., path=...) -> the response of POST /api/meetings."""
+    """upload(client, meeting_type=..., title=..., path=..., minutes_language=...) -> the response of
+    POST /api/meetings (without minutes_language unless it is given)."""
     def send(signed_in: TestClient, meeting_type: str = "medical", title: str = "Medical board",
-             path: Path | None = None, content_type: str = "audio/wav"):
+             path: Path | None = None, content_type: str = "audio/wav", minutes_language: str | None = None):
         path = path or wav
+        data = {"meeting_type": meeting_type, "title": title}
+        if minutes_language is not None:
+            data["minutes_language"] = minutes_language
         with open(path, "rb") as f:
-            return signed_in.post("/api/meetings", files={"file": (path.name, f, content_type)},
-                                  data={"meeting_type": meeting_type, "title": title})
+            return signed_in.post("/api/meetings", files={"file": (path.name, f, content_type)}, data=data)
     return send
 
 

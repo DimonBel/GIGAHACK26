@@ -16,7 +16,7 @@ def _run(monkeypatch, args: list[str], stdin: str) -> int:
 def test_create_admin(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("SECURE_MOM_DATA_DIR", str(tmp_path / "data"))
     args = ["create-admin", "--email", "Boss@Medpark.md", "--name", "Ana Boss", "--position", "Director",
-            "--password-stdin"]
+            "--specialty", "Anesthesiologist", "--job-title", "Medical director", "--password-stdin"]
     assert _run(monkeypatch, args, "a strong password\n") == 0
     assert "Created admin boss@medpark.md" in capsys.readouterr().out
     assert _run(monkeypatch, args, "a strong password\n") == 1
@@ -24,6 +24,7 @@ def test_create_admin(monkeypatch, tmp_path, capsys):
     with connect(tmp_path / "data" / "secure_mom.db")() as db:
         user = db.scalar(select(User))
         assert (user.email, user.role, user.position) == ("boss@medpark.md", "admin", "Director")
+        assert (user.specialty, user.job_title) == ("Anesthesiologist", "Medical director")
         assert user.password_hash.startswith("$argon2id$") and user.must_change_password is False
         assert db.scalar(select(AuditLog.action)) == "user_create"
 

@@ -1,8 +1,8 @@
 """User accounts (admin) and the recipients directory."""
 from fastapi.testclient import TestClient
 
-NEW_USER = {"email": "Doina@Medpark.md", "full_name": "Doina Rusu", "position": "Cardiologist",
-            "role": "moderator", "password": "a long enough password"}
+NEW_USER = {"email": "Doina@Medpark.md", "full_name": "Doina Rusu", "position": "Doctor", "specialty": "Cardiologist",
+            "job_title": " Head of cardiology ", "role": "moderator", "password": "a long enough password"}
 
 
 def test_create_and_list_users(login):
@@ -10,7 +10,8 @@ def test_create_and_list_users(login):
     response = admin.post("/api/users", json=NEW_USER)
     assert response.status_code == 201
     created = response.json()
-    assert created["email"] == "doina@medpark.md" and created["position"] == "Cardiologist"
+    assert created["email"] == "doina@medpark.md" and created["position"] == "Doctor"
+    assert created["specialty"] == "Cardiologist" and created["job_title"] == "Head of cardiology"
     assert created["role"] == "moderator" and created["active"] is True
     assert created["must_change_password"] is True  # the admin chose it
     assert NEW_USER["password"] not in str(created) and "password_hash" not in created
@@ -28,7 +29,7 @@ def test_new_user_can_log_in(app, login):
 def test_invalid_users_are_400(login):
     admin = login("admin")
     for change in ({"password": "short"}, {"email": "not-an-email"}, {"role": "root"}, {"full_name": " "},
-                   {"extra": True}):
+                   {"extra": True}, {"specialty": "x" * 201}, {"job_title": "x" * 201}):
         response = admin.post("/api/users", json={**NEW_USER, **change})
         assert response.status_code == 400, change
     assert "password" in admin.post("/api/users", json={**NEW_USER, "password": "short"}).json()["detail"]
@@ -39,6 +40,11 @@ def test_update_user(login, users):
     response = admin.patch(f"/api/users/{users['user'].id}", json={"position": "Head nurse", "role": "moderator"})
     assert response.status_code == 200
     assert response.json()["position"] == "Head nurse" and response.json()["role"] == "moderator"
+    assert response.json()["specialty"] == response.json()["job_title"] == ""  # none given
+    response = admin.patch(f"/api/users/{users['user'].id}", json={"specialty": "Neurologist",
+                                                                   "job_title": "Vice president"})
+    assert response.status_code == 200 and response.json()["position"] == "Head nurse"
+    assert (response.json()["specialty"], response.json()["job_title"]) == ("Neurologist", "Vice president")
     assert admin.patch("/api/users/9999", json={"position": "x"}).status_code == 404
 
 
@@ -85,10 +91,13 @@ def test_last_admin_cannot_be_removed(login, users):
 def test_directory_lists_active_users(login, users):
     admin, moderator = login("admin"), login("moderator")
     admin.delete(f"/api/users/{users['user2'].id}")
+    admin.patch(f"/api/users/{users['user'].id}", json={"specialty": "Neurologist", "job_title": "Vice president"})
     directory = moderator.get("/api/directory").json()
-    assert {"id", "full_name", "position", "email"} == set(directory[0])
-    emails = [p["email"] for p in directory]
-    assert "ana@medpark.md" in emails and "vlad@medpark.md" not in emails
+    assert {"id", "full_name", "position", "specialty", "job_title", "email"} == set(directory[0])
+    people = {p["email"]: p for p in directory}
+    assert "ana@medpark.md" in people and "vlad@medpark.md" not in people
+    assert (people["ana@medpark.md"]["specialty"], people["ana@medpark.md"]["job_title"]) == ("Neurologist",
+                                                                                              "Vice president")
 
 
 def test_user_changes_are_audited(login):

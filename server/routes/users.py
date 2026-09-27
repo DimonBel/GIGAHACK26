@@ -21,8 +21,9 @@ def list_users(_: Admin, db: Db) -> list[dict]:
 def create_user(body: UserIn, user: Admin, db: Db) -> dict:
     if db.scalar(select(User.id).where(User.email == body.email)) is not None:
         raise HTTPException(409, "A user with this email already exists")
-    new = User(email=body.email, full_name=body.full_name, position=body.position, role=body.role,
-               password_hash=hash_password(body.password), must_change_password=True)
+    new = User(email=body.email, full_name=body.full_name, position=body.position, specialty=body.specialty,
+               job_title=body.job_title, role=body.role, password_hash=hash_password(body.password),
+               must_change_password=True)
     db.add(new)
     db.flush()
     audit(db, "user_create", user, detail=f"{new.email} ({new.role})")
@@ -32,7 +33,8 @@ def create_user(body: UserIn, user: Admin, db: Db) -> dict:
 
 @router.patch("/{user_id}")
 def update_user(user_id: int, body: UserPatch, request: Request, user: Admin, db: Db) -> dict:
-    """Changes any of full_name, position, role, active, password (null or missing: unchanged).
+    """Changes any of full_name, position, specialty, job_title, role, active, password (null or missing:
+    unchanged).
     A new password or deactivation signs the user out everywhere (except the admin's own session)."""
     target = _user(db, user_id)
     changes = body.model_dump(exclude_unset=True, exclude_none=True)

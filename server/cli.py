@@ -1,7 +1,8 @@
 """Accounts from the command line. The first admin can only be created here: there are no default accounts.
 
-    python -m server.cli create-admin --email ana@medpark.md --name "Ana Popescu" [--position "Head of ICU"]
-    python -m server.cli create-user --role moderator --email ion@medpark.md --name "Ion Rusu" [--position ...]
+    python -m server.cli create-admin --email ana@medpark.md --name "Ana Popescu" [--job-title "Head of ICU"]
+    python -m server.cli create-user --role moderator --email ion@medpark.md --name "Ion Rusu" [--position Doctor]
+        [--specialty Cardiologist] [--job-title ...]
 
 The password is asked twice without echo; --password-stdin reads it from standard input instead (scripts). An
 account made with create-user must change it at its first sign-in: whoever ran the command knows it."""
@@ -24,8 +25,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     password = sys.stdin.readline().rstrip("\r\n") if args.password_stdin else _ask_password()
     try:
-        account = UserIn(email=args.email, full_name=args.name, position=args.position,
-                         role=getattr(args, "role", "admin"), password=password)
+        account = UserIn(email=args.email, full_name=args.name, position=args.position, specialty=args.specialty,
+                         job_title=args.job_title, role=getattr(args, "role", "admin"), password=password)
     except ValidationError as e:
         error = e.errors()[0]
         print(f"{error['loc'][0]}: {error['msg'].removeprefix('Value error, ')}", file=sys.stderr)
@@ -37,7 +38,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"A user with the email {account.email} already exists", file=sys.stderr)
             return 1
         user = User(email=account.email, full_name=account.full_name, position=account.position,
-                    role=account.role, password_hash=hash_password(account.password),
+                    specialty=account.specialty, job_title=account.job_title, role=account.role,
+                    password_hash=hash_password(account.password),
                     must_change_password=args.command == "create-user")
         db.add(user)
         db.flush()
@@ -56,7 +58,9 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--role", required=True, choices=ROLES)
         command.add_argument("--email", required=True)
         command.add_argument("--name", required=True, help="full name")
-        command.add_argument("--position", default="", help="e.g. Cardiologist")
+        command.add_argument("--position", default="", help="e.g. Doctor")
+        command.add_argument("--specialty", default="", help="e.g. Cardiologist")
+        command.add_argument("--job-title", default="", help="the function, e.g. Head of ICU")
         command.add_argument("--password-stdin", action="store_true", help="read the password from standard input")
     return parser
 

@@ -1,5 +1,6 @@
 """One transcription in a child process: python -m server.transcribe AUDIO --engine E --model M --language L
-[--minutes TYPE --llm MODEL] (the minutes are then written during the transcription, see stt.pipeline).
+[--minutes TYPE --minutes-language ro|ru|en --llm MODEL [--instructions TEXT]] (the minutes are then written during
+the transcription, see stt.pipeline).
 
 The job worker starts one per meeting. When it exits, all its model and GPU memory goes back to the system
 (MLX and PyTorch keep theirs for the life of a process), so the local LLM has the RAM for the minutes, and a
@@ -18,6 +19,8 @@ import traceback
 from pathlib import Path
 
 from pydantic import ValidationError
+
+from stt.minutes.builder import MINUTES_LANGUAGES
 
 from .settings import model_path
 
@@ -74,7 +77,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", required=True)
     parser.add_argument("--language", default="auto")
     parser.add_argument("--minutes", help="meeting type: also write the minutes, during the transcription")
+    parser.add_argument("--minutes-language", choices=MINUTES_LANGUAGES, default="ro",
+                        help="language the minutes are written in")
     parser.add_argument("--llm", help="Ollama model for the minutes")
+    parser.add_argument("--instructions", default="", help="the meeting type's template instructions for the LLM")
     parser.add_argument("--max-seconds", type=float, help="decode at most this much of the recording")
     args = parser.parse_args(argv)
 
@@ -93,7 +99,9 @@ def main(argv: list[str] | None = None) -> int:
         from stt.pipeline import transcribe_dialog, transcribe_minutes
 
         if args.minutes:
-            language, dialog, minutes = transcribe_minutes(args.audio, args.minutes, args.llm, overlap=True, **options)
+            language, dialog, minutes = transcribe_minutes(args.audio, args.minutes, args.llm, overlap=True,
+                                                           minutes_language=args.minutes_language,
+                                                           instructions=args.instructions, **options)
         else:
             language, dialog = transcribe_dialog(args.audio, **options)
     except Exception as e:
