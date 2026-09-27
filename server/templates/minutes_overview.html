@@ -12,9 +12,9 @@ h1 { font-size: 30pt; }
 .grid, .box { margin-bottom: 9pt; }
 .grid td.cell-head, .box td.cell-head { padding: 5pt 9pt; font-size: 11.5pt; }
 .grid td.cell-body, .box td.cell-body { padding: 7pt 9pt 8pt; }
-ol { margin: 0; padding-left: 15pt; }
 li { margin: 0 0 2.5pt; }
 .more { margin: 3pt 0 0; font-style: italic; }
+.one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }  /* one line per topic */
 </style>
 {% endblock %}
 
@@ -33,7 +33,7 @@ li { margin: 0 0 2.5pt; }
 {% elif cell == "attendees" %}
   <div class="lines">{% for a in items %}<p>{{ a | short(45) }}</p>{% endfor %}</div>
 {% elif cell == "topics" %}
-  <ol>{% for name in items %}<li>{{ name | short(60) }}</li>{% endfor %}</ol>
+  <div class="lines">{% for name in items %}<p class="one-line">{{ loop.index }}. {{ name }}</p>{% endfor %}</div>
 {% elif cell == "decisions" %}
   <ul>{% for d in items %}<li>{{ d | short }}</li>{% endfor %}</ul>
 {% else %}

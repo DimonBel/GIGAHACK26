@@ -211,12 +211,13 @@ def test_the_minutes_are_attached_as_a_pdf(language, labels):
 
 
 def test_the_email_attaches_the_minutes_on_one_page():
-    """What was discussed, decided and is to be done: the topics by name, every decision in one list (not under its
-    topic), the tasks with who does them; each topic's status and findings are in the full minutes only."""
+    """What was discussed, decided and is to be done: one line per topic (its name only), every decision in one
+    list (not under its topic), the tasks with who does them; each topic's status and findings are in the full
+    minutes only."""
     data = _overview()
     assert len(pypdf.PdfReader(io.BytesIO(data)).pages) == 1
     text = _pdf_text(data)
-    for shown in ("Fever.", "Ana Popescu", "Bed 8", "Order tests", "Call cardiology", "nurse", "Blood tests",
+    for shown in ("Fever.", "Ana Popescu", "1. Bed 8", "Order tests", "Call cardiology", "nurse", "Blood tests",
                   "Echo <script>", "Open issues"):
         assert shown in text, shown
     assert text.index("Blood tests") < text.index("Echo")  # high priority first

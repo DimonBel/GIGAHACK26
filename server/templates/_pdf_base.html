@@ -13,34 +13,39 @@
   @bottom-left { content: element(running-footer); }
   @bottom-right {
     content: "{{ labels.page | css }} " counter(page) " {{ labels.of | css }} " counter(pages);
-    font-family: Arial, "Liberation Sans", "DejaVu Sans", sans-serif; font-size: 8pt; color: #8a5a44;
+    font-family: Montserrat, Arial, "Liberation Sans", "DejaVu Sans", sans-serif; font-size: 8pt; color: #757d83;
   }
 }
 @page :first { @top-left { content: none; } }
-html { font-family: Arial, "Liberation Sans", "DejaVu Sans", sans-serif; font-size: 10.5pt; line-height: 1.4;
-       color: #1f1f1f; }
+/* Medpark's colors (medpark.md): teal #00a2a4, dark teal #008286, navy text #000e19, gray #757d83, light gray
+   #f7f8f8, teal tint #e6f6f6; Montserrat when it is installed (the PDF loads no fonts). */
+html { font-family: Montserrat, Arial, "Liberation Sans", "DejaVu Sans", sans-serif; font-size: 10.5pt;
+       line-height: 1.4; color: #000e19; }
 body { margin: 0; }
 p { margin: 0; }
 ul { margin: 0; padding-left: 13pt; }
 li { margin: 0 0 2pt; }
-.running-title { position: running(running-title); font-size: 8pt; color: #8a5a44; }
-.running-footer { position: running(running-footer); font-size: 8pt; color: #8a5a44; }
+.running-title { position: running(running-title); font-size: 8pt; color: #757d83; }
+.running-footer { position: running(running-footer); font-size: 8pt; color: #757d83; }
 
-/* Header: the big title on the left, the meeting's details in cream boxes on the right. */
+/* Header: the big title on the left, the meeting's details in light boxes on the right. */
 .head { width: 100%; border-collapse: collapse; margin: 0 0 16pt; }
 .head td { vertical-align: top; padding: 0; }
 .head td.title-cell { width: 60%; padding-right: 10pt; }
-.kicker { margin: 0 0 2pt; font-size: 8.5pt; letter-spacing: 0.08em; text-transform: uppercase; color: #8a5a44; }
-h1 { margin: 0; font-size: 34pt; line-height: 1.05; font-weight: bold; color: #f0541e; }
-.subtitle { margin: 4pt 0 0; font-size: 14pt; color: #f0541e; }
+.kicker { margin: 0 0 2pt; font-size: 8.5pt; letter-spacing: 0.08em; text-transform: uppercase; color: #757d83; }
+h1 { margin: 0; font-size: 34pt; line-height: 1.05; font-weight: bold; color: #008286; }
+.subtitle { margin: 4pt 0 0; font-size: 14pt; color: #00a2a4; }
 .meta { border-collapse: separate; border-spacing: 0 5pt; margin-left: auto; }
-.meta th { padding: 0 8pt 0 0; text-align: right; font-weight: bold; white-space: nowrap; vertical-align: middle; }
-.meta td { padding: 5pt 9pt; background: #fdf1e8; font-size: 9.5pt; font-weight: bold; min-width: 34mm; }
+.meta th { padding: 0 8pt 0 0; text-align: right; font-weight: bold; white-space: nowrap; vertical-align: middle;
+           color: #008286; }
+.meta td { padding: 5pt 9pt; background: #e6f6f6; font-size: 9.5pt; font-weight: bold; min-width: 34mm;
+           border-left: 2.5pt solid #00a2a4; }
 
-/* The 2x2 grid and the full-width boxes: orange borders, cream heading bars. */
+/* The 2x2 grid and the full-width boxes: teal borders, dark teal heading bars. */
 .grid, .box { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 0 0 12pt; }
-.grid td, .box td { border: 1pt solid #f0541e; vertical-align: top; }
-.grid td.cell-head, .box td.cell-head { padding: 7pt 10pt; background: #fdf1e8; font-size: 13pt; font-weight: bold; }
+.grid td, .box td { border: 1pt solid #00a2a4; vertical-align: top; }
+.grid td.cell-head, .box td.cell-head { padding: 7pt 10pt; background: #008286; border-color: #008286; color: #fff;
+                                        font-size: 13pt; font-weight: bold; }
 .grid tr.head-row, .box tr.head-row { page-break-after: avoid; }
 .box { page-break-inside: avoid; }
 .grid td.cell-body, .box td.cell-body { padding: 9pt 10pt 11pt; }
@@ -50,7 +55,7 @@ h1 { margin: 0; font-size: 34pt; line-height: 1.05; font-weight: bold; color: #f
 .item-name { margin: 0 0 2pt; font-weight: bold; }
 .lines p { margin: 0 0 1.5pt; }
 .pre { white-space: pre-line; }
-.muted { color: #8a5a44; }
+.muted { color: #757d83; }
 .high { font-weight: bold; color: #b42318; }
 .warnings { color: #7a4b00; }
 </style>

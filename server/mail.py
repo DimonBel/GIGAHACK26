@@ -43,8 +43,7 @@ _templates = Environment(loader=FileSystemLoader(Path(__file__).resolve().parent
                          undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True)
 # A fixed text inside a CSS string (the PDF's page numbers): no quote or backslash can end it early.
 _templates.filters["css"] = lambda text: re.sub(r'["\\\n]', " ", str(text))
-_templates.filters["short"] = lambda text, limit=OVERVIEW_TEXT: (
-    text if len(text) <= limit else text[:limit - 1].rstrip() + "…")
+_templates.filters["short"] = lambda text, limit=OVERVIEW_TEXT: _short(text, limit)
 UNSAFE_IN_FILENAMES = re.compile(r'[/\\:*?"<>|\x00-\x1f]+')
 
 
@@ -197,12 +196,17 @@ def _overview(context: dict, limits: dict) -> dict:
     decisions = [d for _, topic_decisions in context["topic_decisions"] for d in topic_decisions]
     if context["show_other_decisions"]:
         decisions += context["other_decisions"]
-    lists = {"attendees": context["attendee_lines"], "topics": [t["name"] for t in m["topics"]],
+    lists = {"attendees": context["attendee_lines"],
+             "topics": [t["name"] for t in m["topics"]],
              "decisions": [d["decision"] for d in decisions], "action_items": context["action_items"],
              "open_issues": m["open_issues"]}
     return {"overview": {key: items[:limits[key]] for key, items in lists.items()},
             "overview_more": {key: max(0, len(items) - limits[key]) for key, items in lists.items()},
             "summary_limit": OVERVIEW_SUMMARY}
+
+
+def _short(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
 
 
 def _render(template: str, context: dict):
