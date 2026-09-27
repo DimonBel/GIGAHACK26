@@ -18,7 +18,7 @@
       "parameters": {
         "width": 620,
         "height": 260,
-        "content": "## Secure MOM delivery\nThe backend posts minutes the moderator approved (automation/README.md).\n1. **Receive minutes** checks `X-Secure-MOM-Token` with its Header Auth credential \"Secure MOM token\" (setup.sh sets it to `SECURE_MOM_N8N_TOKEN`): 403 before the workflow runs.\n2. **Payload complete?** `from`, `to` (a non-empty list), `subject`, `html` and `text` are required, `cc` is a list; else 400.\n3. **Meeting type** adds the subject prefix and footer of medical, executive or administrative meetings; any other type is a 400.\n4. **Send email** goes through MailHog, the local SMTP server (`mailhog:1025`): 200 `{\"sent\": true}`, or 502 if it fails."
+        "content": "## Secure MOM delivery\nThe backend posts minutes the moderator approved (automation/README.md).\n1. **Receive minutes** checks `X-Secure-MOM-Token` with its Header Auth credential \"Secure MOM token\" (setup.sh sets it to `SECURE_MOM_N8N_TOKEN`): 403 before the workflow runs.\n2. **Payload complete?** `from`, `to` (a non-empty list), `subject`, `html`, `text` and `attachment` (`filename` and `data` non-empty strings, `content_type` must be application/pdf if given) are required, `cc` is a list; else 400.\n3. **Meeting type** adds the subject prefix and footer (in the minutes' language) of medical, executive or administrative meetings; any other type is a 400.\n4. **Attachment to file** turns `attachment.data` (base64) into a binary file named `attachment.filename`.\n5. **Send email** goes through MailHog, the local SMTP server (`mailhog:1025`), with the PDF attached: 200 `{\"sent\": true}`, or 502 if it fails."
       }
     },
     {
@@ -117,6 +117,35 @@
                 "operation": "notEmpty",
                 "singleValue": true
               }
+            },
+            {
+              "id": "2a7e12d6-438e-43f8-9188-63b8b34fa7bb",
+              "leftValue": "={{ $json.body.attachment?.filename?.trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b5f0c577-04a4-4917-be0d-2aa985064c62",
+              "leftValue": "={{ $json.body.attachment?.data?.trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "66afd1bd-ba06-4f75-8c13-ff364e5b0ed6",
+              "leftValue": "={{ $json.body.attachment?.content_type ?? 'application/pdf' }}",
+              "rightValue": "application/pdf",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -132,7 +161,7 @@
       "position": [660, 300],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "{\n  \"detail\": \"the payload needs from, to (a non-empty list), cc (a list, optional), subject, html and text\"\n}",
+        "responseBody": "{\n  \"detail\": \"the payload needs from, to (a non-empty list), cc (a list, optional), subject, html, text and attachment (filename and data as non-empty strings; content_type must be application/pdf if given)\"\n}",
         "options": {
           "responseCode": 400
         }
@@ -246,7 +275,7 @@
             {
               "id": "a48f0ba2-f620-410e-b33c-05555b78a85b",
               "name": "footer",
-              "value": "Medical board minutes, approved by the moderator and sent by Secure MOM. Confidential: they contain patient information, do not forward them outside Medpark.",
+              "value": "={{ $json.body.language === 'ro' ? 'Proces-verbal al consiliului medical, aprobat de moderator și trimis de Secure MOM. Confidențial: conține informații despre pacienți, nu îl redirecționați în afara Medpark.' : $json.body.language === 'ru' ? 'Протокол медицинского совещания, утверждённый модератором и отправленный Secure MOM. Конфиденциально: содержит сведения о пациентах, не пересылайте его за пределы Medpark.' : 'Medical board minutes, approved by the moderator and sent by Secure MOM. Confidential: they contain patient information, do not forward them outside Medpark.' }}",
               "type": "string"
             }
           ]
@@ -273,7 +302,7 @@
             {
               "id": "95d01fd6-a24e-48e1-8732-fdbbc5069164",
               "name": "footer",
-              "value": "Executive meeting minutes, approved by the moderator and sent by Secure MOM. Confidential: for the management team only.",
+              "value": "={{ $json.body.language === 'ro' ? 'Proces-verbal al ședinței de conducere, aprobat de moderator și trimis de Secure MOM. Confidențial: doar pentru echipa de conducere.' : $json.body.language === 'ru' ? 'Протокол совещания руководства, утверждённый модератором и отправленный Secure MOM. Конфиденциально: только для руководства.' : 'Executive meeting minutes, approved by the moderator and sent by Secure MOM. Confidential: for the management team only.' }}",
               "type": "string"
             }
           ]
@@ -300,7 +329,7 @@
             {
               "id": "4a5103da-64d9-4bf5-9e66-95efe332deb9",
               "name": "footer",
-              "value": "Administrative meeting minutes, approved by the moderator and sent by Secure MOM. For internal use at Medpark.",
+              "value": "={{ $json.body.language === 'ro' ? 'Proces-verbal al ședinței administrative, aprobat de moderator și trimis de Secure MOM. Pentru uz intern în Medpark.' : $json.body.language === 'ru' ? 'Протокол административного совещания, утверждённый модератором и отправленный Secure MOM. Для внутреннего использования в Medpark.' : 'Administrative meeting minutes, approved by the moderator and sent by Secure MOM. For internal use at Medpark.' }}",
               "type": "string"
             }
           ]
@@ -367,6 +396,12 @@
               "name": "html",
               "value": "={{ $json.body.html.replace(/<\\/body>|$/i, '<hr><p style=\"color:#555;font-size:12px\">' + $json.footer + '</p>$&') }}",
               "type": "string"
+            },
+            {
+              "id": "fda17a1c-5399-4032-a758-5cb1b6511f24",
+              "name": "attachment",
+              "value": "={{ $json.body.attachment }}",
+              "type": "object"
             }
           ]
         },
@@ -374,11 +409,27 @@
       }
     },
     {
+      "id": "13f65d0e-603a-4eb4-ae18-1f479a2445af",
+      "name": "Attachment to file",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [1340, 0],
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "attachment.data",
+        "binaryPropertyName": "attachment",
+        "options": {
+          "fileName": "={{ $json.attachment.filename }}",
+          "mimeType": "application/pdf"
+        }
+      }
+    },
+    {
       "id": "7fc39274-e36a-4cad-b0b1-8c7f61c35e77",
       "name": "Send email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1340, 0],
+      "position": [1560, 0],
       "onError": "continueErrorOutput",
       "credentials": {
         "smtp": {
@@ -387,15 +438,16 @@
         }
       },
       "parameters": {
-        "fromEmail": "={{ $json.from }}",
-        "toEmail": "={{ $json.to }}",
-        "subject": "={{ $json.subject }}",
+        "fromEmail": "={{ $('Compose email').item.json.from }}",
+        "toEmail": "={{ $('Compose email').item.json.to }}",
+        "subject": "={{ $('Compose email').item.json.subject }}",
         "emailFormat": "both",
-        "text": "={{ $json.text }}",
-        "html": "={{ $json.html }}",
+        "text": "={{ $('Compose email').item.json.text }}",
+        "html": "={{ $('Compose email').item.json.html }}",
         "options": {
           "appendAttribution": false,
-          "ccEmail": "={{ $json.cc }}"
+          "ccEmail": "={{ $('Compose email').item.json.cc }}",
+          "fileAttachments": "attachment"
         }
       }
     },
@@ -404,7 +456,7 @@
       "name": "200 sent",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [1560, -100],
+      "position": [1780, -100],
       "parameters": {
         "respondWith": "json",
         "responseBody": "{\n  \"sent\": true\n}",
@@ -418,7 +470,7 @@
       "name": "502 mail server failed",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [1560, 100],
+      "position": [1780, 100],
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ JSON.stringify({ sent: false, detail: 'mail server error: ' + $json.error }) }}",
@@ -456,6 +508,9 @@
       "main": [[{ "node": "Compose email", "type": "main", "index": 0 }]]
     },
     "Compose email": {
+      "main": [[{ "node": "Attachment to file", "type": "main", "index": 0 }]]
+    },
+    "Attachment to file": {
       "main": [[{ "node": "Send email", "type": "main", "index": 0 }]]
     },
     "Send email": {

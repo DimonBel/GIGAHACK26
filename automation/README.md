@@ -35,28 +35,35 @@ The backend (`python -m server`) reads `SECURE_MOM_N8N_TOKEN` from this `.env` u
 
 `n8n/secure-mom.workflow.json`: Receive minutes (webhook with Header Auth: the credential "Secure MOM token"
 holds `SECURE_MOM_N8N_TOKEN`, imported by `setup.sh`) → Payload complete? → Meeting type → subject prefix and
-footer of that type → Compose email → Send email (credential "MailHog SMTP", `n8n/credentials.json`) → answer.
-The request is the one in `docs/api.md` ("n8n delivery"):
+footer of that type → Compose email → Attachment to file (base64 → PDF binary) → Send email (credential
+"MailHog SMTP", `n8n/credentials.json`) → answer. The request is the one in `docs/api.md` ("n8n delivery"):
 
 ```bash
 SECURE_MOM_N8N_TOKEN=$(sed -n 's/^SECURE_MOM_N8N_TOKEN=//p' automation/.env)
 curl -X POST http://127.0.0.1:5678/webhook/secure-mom \
   -H "X-Secure-MOM-Token: $SECURE_MOM_N8N_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"meeting_id": "6f1c", "meeting_type": "medical", "subject": "Medical board 26.09",
+  -d '{"meeting_id": "6f1c", "meeting_type": "medical", "language": "ro", "subject": "Medical board 26.09",
        "to": ["ana@medpark.md"], "cc": ["quality@medpark.md"], "html": "<html><body>…</body></html>",
-       "text": "…", "from": "secure-mom@medpark.local"}'
+       "text": "…", "from": "secure-mom@medpark.local",
+       "attachment": {"filename": "Proces-verbal - Raport de gardă — ATI - 24.09.2026.pdf",
+                       "content_type": "application/pdf", "data": "<base64 of the PDF bytes>"}}'
 ```
 
 | Status | Body | When |
 |---|---|---|
 | 200 | `{"sent": true}` | MailHog accepted the email |
-| 400 | `{"detail": "…"}` | `from`, `to` (non-empty list), `subject`, `html` or `text` missing, `cc` not a list, or `meeting_type` not `medical`, `executive`, `administrative` |
+| 400 | `{"detail": "…"}` | `from`, `to` (non-empty list), `subject`, `html`, `text` or `attachment` (`filename`/`data` non-empty strings, `content_type` `application/pdf` if given) missing, `cc` not a list, or `meeting_type` not `medical`, `executive`, `administrative` |
 | 403 | `Authorization data is wrong!` (text) | missing or wrong token; the workflow does not run |
 | 422 | n8n's own error | the body is not JSON |
 | 502 | `{"sent": false, "detail": "mail server error: …"}` | MailHog is down; this can take ~40 s (TCP timeout), so call with a 60 s timeout |
 
+`attachment.filename` can contain non-ASCII (Romanian diacritics, Cyrillic, an em dash); it must not contain
+`/ \ : * ? " < > |`. `attachment.data` is standard-alphabet base64 with no line breaks; n8n's default 16 MB
+body limit (`N8N_PAYLOAD_SIZE_MAX`) comfortably covers a base64'd PDF (typically 20–200 KB before encoding).
+
 Per type the subject gets `[Medical]`, `[Executive]` or `[Administrative]` in front (unless it already starts
-with it) and a footer: above `</body>` in the HTML, after a `-- ` line in the text.
+with it) and a footer in the minutes' `language` (`ro`, `ru`, else English): above `</body>` in the HTML, after a
+`-- ` line in the text.
 
 ## Test
 
@@ -65,9 +72,10 @@ python3 automation/smoke_test.py
 ```
 
 It checks that MailHog refuses its inbox and its relay API without the login, posts without and with a wrong
-token (403), an unknown type and an empty `to` (400), one email per meeting type (200), then reads MailHog's
-API with the login and checks To, CC, subject prefix, footers, UTF-8 (Romanian and Russian) and that nothing
-else arrived.
+token (403), an unknown type, an empty `to`, a missing `attachment` and an `attachment` with empty `data`
+(400), one email per meeting type (200, each with a hand-built PDF attached, one filename Romanian and one
+Cyrillic), then reads MailHog's API with the login and checks To, CC, subject prefix, footers, UTF-8 (Romanian
+and Russian), the attached PDF (MIME type, decoded filename, exact bytes) and that nothing else arrived.
 
 ## Offline and privacy
 

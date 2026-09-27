@@ -27,14 +27,46 @@ REQUEST_TIMEOUT_S = 60
 MAIL_WAIT_S = 10
 POLL_S = 0.5
 
-# meeting type -> (subject prefix, footer start, To, CC)
+# meeting type -> (subject prefix, footer start, To, CC). The medical minutes are in Romanian, the executive ones in
+# Russian: their footers too; the administrative ones name no language: English.
 EXPECTED = {
-    "medical": ("[Medical]", "Medical board minutes", ["ana.popescu@medpark.md", "ion.rusu@medpark.md"],
+    "medical": ("[Medical]", "Proces-verbal al consiliului medical", ["ana.popescu@medpark.md", "ion.rusu@medpark.md"],
                 ["quality@medpark.md"]),
-    "executive": ("[Executive]", "Executive meeting minutes", ["director@medpark.md"],
+    "executive": ("[Executive]", "Протокол совещания руководства", ["director@medpark.md"],
                   ["finance@medpark.md", "hr@medpark.md"]),
     "administrative": ("[Administrative]", "Administrative meeting minutes", ["admin@medpark.md"], []),
 }
+LANGUAGES = {"medical": "ro", "executive": "ru"}
+
+# meeting type -> attachment filename. Romanian diacritics and Cyrillic exercise non-ASCII filename handling.
+ATTACHMENT_FILENAMES = {
+    "medical": "Proces-verbal - Ședință ATI.pdf",
+    "executive": "Протокол - совещание руководства.pdf",
+    "administrative": "Administrative minutes.pdf",
+}
+
+
+def minimal_pdf() -> bytes:
+    """Builds a small valid one-page PDF by hand, with byte-exact xref offsets."""
+    header = b"%PDF-1.4\n"
+    objects = [
+        b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n",
+        b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n",
+        b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n",
+    ]
+    body = b""
+    offsets = []
+    for obj in objects:
+        offsets.append(len(header) + len(body))
+        body += obj
+    xref_offset = len(header) + len(body)
+    xref = f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
+    xref += "".join(f"{offset:010d} 00000 n \n" for offset in offsets).encode()
+    trailer = f"trailer<</Size {len(objects) + 1}/Root 1 0 R>>\nstartxref\n{xref_offset}\n%%EOF".encode()
+    return header + body + xref + trailer
+
+
+PDF_BYTES = minimal_pdf()
 
 failures: list[str] = []
 
@@ -89,7 +121,7 @@ def minutes(run: str, meeting_type: str) -> dict:
     prefix, _, to, cc = EXPECTED.get(meeting_type, EXPECTED["medical"])
     # The executive subject already carries its prefix: n8n must not add it twice.
     title = f"Smoke test {run} – ședința de dimineață"
-    return {
+    payload = {
         "meeting_id": f"smoke-{run}-{meeting_type}",
         "meeting_type": meeting_type,
         "subject": f"{prefix} {title}" if meeting_type == "executive" else title,
@@ -98,7 +130,15 @@ def minutes(run: str, meeting_type: str) -> dict:
         "html": f"<html><body><h1>{title}</h1><p>Patul 8: consult urologic azi. Анализы готовы.</p></body></html>",
         "text": f"{title}\nPatul 8: consult urologic azi. Анализы готовы.",
         "from": SENDER,
+        "attachment": {
+            "filename": ATTACHMENT_FILENAMES.get(meeting_type, ATTACHMENT_FILENAMES["medical"]),
+            "content_type": "application/pdf",
+            "data": base64.b64encode(PDF_BYTES).decode(),
+        },
     }
+    if meeting_type in LANGUAGES:
+        payload["language"] = LANGUAGES[meeting_type]
+    return payload
 
 
 def caught(run: str, expected_count: int, login: str) -> list[EmailMessage]:
@@ -135,6 +175,16 @@ def check_email(message: EmailMessage, meeting_type: str, run: str) -> None:
     check("n8n" not in text + html, f"{meeting_type}: no n8n attribution")
 
 
+def check_attachment(message: EmailMessage, meeting_type: str) -> None:
+    """Checks the PDF attachment: exactly one application/pdf part, its filename and its exact bytes."""
+    pdfs = [part for part in message.iter_attachments() if part.get_content_type() == "application/pdf"]
+    check(len(pdfs) == 1, f"{meeting_type}: one application/pdf attachment ({len(pdfs)} found)")
+    if pdfs:
+        check(pdfs[0].get_filename() == ATTACHMENT_FILENAMES[meeting_type],
+              f"{meeting_type}: attachment filename {pdfs[0].get_filename()!r}")
+        check(pdfs[0].get_content() == PDF_BYTES, f"{meeting_type}: attachment bytes match the one sent")
+
+
 def main() -> None:
     secrets = read_secrets()
     token, login = secrets["SECURE_MOM_N8N_TOKEN"], f"{secrets['MAILHOG_USER']}:{secrets['MAILHOG_PASSWORD']}"
@@ -156,6 +206,14 @@ def main() -> None:
     check(status == 400, f"meeting_type 'finance' -> {status}")
     status, _ = post({**minutes(run, "medical"), "to": []}, token)
     check(status == 400, f"empty 'to' -> {status}")
+    payload = minutes(run, "medical")
+    del payload["attachment"]
+    status, _ = post(payload, token)
+    check(status == 400, f"missing 'attachment' -> {status}")
+    payload = minutes(run, "medical")
+    payload["attachment"]["data"] = ""
+    status, _ = post(payload, token)
+    check(status == 400, f"'attachment' with empty data -> {status}")
 
     for meeting_type in EXPECTED:
         status, answer = post(minutes(run, meeting_type), token)
@@ -170,6 +228,7 @@ def main() -> None:
             check(False, f"subject without a meeting type prefix: {message['Subject']!r}")
         else:
             check_email(message, meeting_type, run)
+            check_attachment(message, meeting_type)
 
     print(f"\n{len(failures)} failed" if failures else "\nall checks passed")
     sys.exit(1 if failures else 0)
