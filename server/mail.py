@@ -63,30 +63,39 @@ class Email:
 
 
 def compose(meeting: Meeting, minutes: dict, sender: str, to: list[str], cc: list[str],
-            template: dict | None = None, pdf: bool = False, signed_by: str = "") -> Email:
-    """The email of the meeting's approved minutes: a short note in the language of the minutes (LABELS), signed by
-    who sends it, and, with pdf, the minutes themselves as the attached PDF (minutes_pdf), laid out by the template
-    of the meeting type. The subject keeps the English type ("[Medical] ..."), as the web app shows it."""
-    labels = LABELS[meeting.minutes_language]
-    title = _one_line(meeting.title)
-    note = {
-        "lang": meeting.minutes_language,
-        "labels": labels,
-        "title": title,
-        "cover": labels["cover"].format(meeting=title, date=_local_day(meeting.created_at)),
-        "approved": labels["cover_approved"].format(name=meeting.approved_by.full_name) if meeting.approved_by else "",
-        "signed_by": _one_line(signed_by),
-    }
-    paragraphs = [labels["greeting"], " ".join(filter(None, [note["cover"], note["approved"]]))]
-    if note["signed_by"]:
-        paragraphs.append(f"{labels['regards']}\n{note['signed_by']}")
+            template: dict | None = None, pdf: bool = False, signed_by: str = "", note: str = "") -> Email:
+    """The email of the meeting's approved minutes: a short note (the default one in the language of the minutes,
+    LABELS, signed by who sends it, or the moderator's own note) and, with pdf, the minutes themselves as the
+    attached PDF (minutes_pdf), laid out by the template of the meeting type. The subject keeps the English type
+    ("[Medical] ..."), as the web app shows it."""
+    paragraphs = _paragraphs(note) or default_note(meeting, signed_by)
     attachment = None
     if pdf:
         attachment = Attachment(pdf_filename(meeting), "application/pdf", minutes_pdf(meeting, minutes, template))
+    html = _templates.get_template("minutes_email.html").render(
+        lang=meeting.minutes_language, title=_one_line(meeting.title),
+        paragraphs=[paragraph.split("\n") for paragraph in paragraphs])
     return Email(meeting_id=meeting.id, meeting_type=meeting.meeting_type, language=meeting.minutes_language,
                  subject=_one_line(f"[{meeting.meeting_type.capitalize()}] {meeting.title}"), to=to, cc=cc,
-                 html=_templates.get_template("minutes_email.html").render(**note),
-                 text="\n\n".join(paragraphs) + "\n", sender=sender, attachment=attachment)
+                 html=html, text="\n\n".join(paragraphs) + "\n", sender=sender, attachment=attachment)
+
+
+def default_note(meeting: Meeting, signed_by: str = "") -> list[str]:
+    """The note's paragraphs: a greeting, what is attached (and who approved it), then the sender's name."""
+    labels = LABELS[meeting.minutes_language]
+    title = _one_line(meeting.title)
+    cover = labels["cover"].format(meeting=title, date=_local_day(meeting.created_at))
+    approved = labels["cover_approved"].format(name=meeting.approved_by.full_name) if meeting.approved_by else ""
+    paragraphs = [labels["greeting"], " ".join(filter(None, [cover, approved]))]
+    if _one_line(signed_by):
+        paragraphs.append(f"{labels['regards']}\n{_one_line(signed_by)}")
+    return paragraphs
+
+
+def _paragraphs(note: str) -> list[str]:
+    """A note typed by the moderator: its paragraphs (split at blank lines), each line without trailing spaces."""
+    lines = [line.rstrip() for line in note.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    return [paragraph.strip("\n") for paragraph in re.split(r"\n{2,}", "\n".join(lines).strip()) if paragraph.strip()]
 
 
 def minutes_pdf(meeting: Meeting, minutes: dict, template: dict | None = None) -> bytes:

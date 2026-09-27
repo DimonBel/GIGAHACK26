@@ -105,6 +105,30 @@ def test_lifecycle(login, upload, wait, mailer):
     assert audit[1]["user"] == "ion@medpark.md" and "quality@medpark.md" in audit[1]["detail"]
 
 
+def test_the_processing_shows_what_it_heard_and_found_so_far(login, upload, wait, pipeline):
+    """While processing: the newest lines and the minutes' topics, for the moderator only; kept in memory, gone once
+    the meeting is processed."""
+    line = {"start": 0.5, "end": 4.2, "speaker": "", "languages": ["ro"], "accent": "", "text": "Pacientul din patul 8."}
+    pipeline.live_updates = [{"lines": [line], "total": 1, "speakers": False},
+                             {"topics": ["Patul 8"], "decisions": 1, "tasks": 2}]
+    pipeline.gate = threading.Event()
+    moderator = login("moderator")
+    path = f"/api/meetings/{upload(moderator).json()['id']}"
+    wait(moderator, path.rsplit("/", 1)[1], statuses=("processing",))
+    live = moderator.get(path + "/live").json()
+    for _ in range(100):  # the worker reports right before it waits at the gate
+        if live["total"]:
+            break
+        time.sleep(0.02)
+        live = moderator.get(path + "/live").json()
+    assert live == {"lines": [line], "total": 1, "speakers": False, "topics": ["Patul 8"], "decisions": 1, "tasks": 2}
+    assert login("user").get(path + "/live").status_code in (403, 404)
+    pipeline.gate.set()
+    assert wait(moderator, path.rsplit("/", 1)[1])["status"] == "ready"
+    assert moderator.get(path + "/live").json() == {"lines": [], "total": 0, "speakers": False, "topics": [],
+                                                    "decisions": 0, "tasks": 0}
+
+
 def test_one_meeting_at_a_time(login, upload, wait, pipeline):
     pipeline.gate = threading.Event()
     moderator = login("moderator")
@@ -233,6 +257,21 @@ def test_a_recipient_reads_the_minutes_without_the_notes_for_the_moderator(ready
     assert "unverified" not in email.html and "unverified" not in email.text
 
 
+def test_the_moderator_writes_the_email_note(ready, mailer, login):
+    """The note they typed is the email's text (the minutes are still the PDF); the audit log says it was theirs."""
+    moderator, meeting = ready
+    path = f"/api/meetings/{meeting['id']}"
+    assert moderator.post(path + "/approve").status_code == 200
+    too_long = moderator.post(path + "/send", json={"to": ["ana@medpark.md"], "note": "x" * 5001})
+    assert too_long.status_code == 400
+    note = "Stimați colegi,\n\nVă trimit procesul-verbal de azi.\n\nIon"
+    assert moderator.post(path + "/send", json={"to": ["ana@medpark.md"], "note": note}).status_code == 200
+    [email] = mailer.sent
+    assert email.text == note + "\n" and email.attachment.content_type == "application/pdf"
+    audit = login("admin").get("/api/audit", params={"meeting_id": meeting["id"]}).json()
+    assert audit[0]["action"] == "send" and audit[0]["detail"].endswith("; own note")
+
+
 def test_send_checks_the_recipients(ready, mailer):
     moderator, meeting = ready
     path = f"/api/meetings/{meeting['id']}"
@@ -300,8 +339,11 @@ def test_uploads_per_moderator_are_limited(login, upload, wait, pipeline, config
 
 
 def test_default_title(login, upload):
-    created = upload(login("moderator"), meeting_type="executive", title="  ").json()
-    assert created["title"].startswith("Executive meeting ")
+    """The meeting type in the language of the minutes, and when it was uploaded."""
+    moderator = login("moderator")
+    assert upload(moderator, meeting_type="executive", title="  ").json()["title"].startswith("Ședință de conducere ")
+    english = upload(moderator, meeting_type="administrative", title="", minutes_language="en").json()
+    assert english["title"].startswith("Administrative meeting ")
 
 
 def test_restart_requeues_interrupted_meetings(app, config, pipeline, mailer, users, wav):
@@ -419,7 +461,8 @@ def test_scratch_files_are_deleted_after_each_meeting(config, login, upload, wai
     """A child killed while it transcribes (out of memory) leaves the decoded recording behind."""
     transcribe = pipeline.transcribe
 
-    def killed_child(audio, settings, on_progress, meeting_type=None, minutes_language="ro", instructions=""):
+    def killed_child(audio, settings, on_progress, meeting_type=None, minutes_language="ro", instructions="",
+                     on_live=None):
         (config.temp_dir / "tmpabc123").mkdir()
         (config.temp_dir / "tmpabc123" / "input.wav").write_bytes(b"RIFF")
         return transcribe(audio, settings, on_progress, meeting_type, minutes_language, instructions)
@@ -453,7 +496,8 @@ def test_minutes_written_during_the_transcription_are_used(login, upload, wait, 
     """The child writes the minutes while it transcribes; they are not written again here."""
     transcribe = pipeline.transcribe
 
-    def with_minutes(audio, settings, on_progress, meeting_type=None, minutes_language="ro", instructions=""):
+    def with_minutes(audio, settings, on_progress, meeting_type=None, minutes_language="ro", instructions="",
+                     on_live=None):
         transcription = transcribe(audio, settings, on_progress, meeting_type, minutes_language, instructions)
         on_progress("minutes")
         transcription.minutes = {"title": "Written during the transcription", "summary": "Bed 8 is stable."}
@@ -510,7 +554,21 @@ def test_the_real_pipeline_gets_the_minutes_language(tmp_path, monkeypatch):
     monkeypatch.setattr("stt.pipeline.meeting_minutes", lambda dialog, *args: calls.append(args) or {"title": "t"})
     said = Transcription("ro", [{"start": 0.5, "end": 4.2, "speaker": "SPEAKER 1", "text": "Bine."}])
     assert SttPipeline(tmp_path).minutes(said, "executive", settings, "en") == {"title": "t"}
-    assert calls == [("executive", "gemma4:e4b", "en", "")]  # no template instructions
+    assert calls == [("executive", "gemma4:e4b", "en", "", None)]  # no template instructions
+
+
+def test_the_real_pipeline_passes_on_what_the_child_heard_and_found(tmp_path, monkeypatch):
+    """The child's live lines and the minutes found so far reach on_live, in the order they came."""
+    line = {"start": 0.5, "end": 4.2, "speaker": "", "languages": ["ro"], "accent": "", "text": "Bine."}
+    said = [{"live": {"lines": [line], "total": 1, "speakers": False}},
+            {"found": {"topics": ["Patul 8"], "decisions": 0, "tasks": 1}},
+            {"result": {"language": "ro", "utterances": [], "minutes": None}}]
+    script = "; ".join(f"print({json.dumps(message)!r}, flush=True)" for message in said)
+    popen = subprocess.Popen
+    monkeypatch.setattr(subprocess, "Popen", lambda command, **kwargs: popen([sys.executable, "-c", script], **kwargs))
+    heard = []
+    SttPipeline(tmp_path).transcribe(tmp_path / "a.wav", CHILD_SETTINGS, lambda *progress: None, on_live=heard.append)
+    assert heard == [said[0]["live"], said[1]["found"]]
 
 
 def test_the_real_pipeline_gets_the_template_instructions(tmp_path, monkeypatch):
@@ -530,7 +588,7 @@ def test_the_real_pipeline_gets_the_template_instructions(tmp_path, monkeypatch)
     monkeypatch.setattr("stt.pipeline.meeting_minutes", lambda dialog, *args: calls.append(args) or {"title": "t"})
     said = Transcription("ro", [{"start": 0.5, "end": 4.2, "speaker": "SPEAKER 1", "text": "Bine."}])
     SttPipeline(tmp_path).minutes(said, "medical", settings, "ro", instructions)
-    assert calls == [("medical", "gemma4:e4b", "ro", instructions)]
+    assert calls == [("medical", "gemma4:e4b", "ro", instructions, None)]
 
 
 def test_has_audio_until_the_retention_deletes_the_recording(app, login, upload, wait, config, monkeypatch):

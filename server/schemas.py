@@ -12,6 +12,7 @@ from stt.minutes.markdown import SECTIONS
 MIN_PASSWORD = 12
 MAX_PASSWORD = 256
 MAX_EMAIL = 254
+MAX_NOTE = 5000  # the email's note, when the moderator writes their own
 MAX_DOMAIN = 253
 MAX_DOMAINS = 100  # allowed recipient domains
 MAX_DURATION_MIN = 24 * 60
@@ -149,6 +150,7 @@ class SettingsIn(Input):
 class SendIn(Input):
     to: list[Email] = Field(min_length=1, max_length=MAX_RECIPIENTS)
     cc: list[Email] = Field(default_factory=list, max_length=MAX_RECIPIENTS)
+    note: str = Field("", max_length=MAX_NOTE)  # the moderator's own email text; empty: the default note
 
 
 class SectionIn(Input):

@@ -5,8 +5,10 @@ the transcription, see stt.pipeline).
 The job worker starts one per meeting. When it exits, all its model and GPU memory goes back to the system
 (MLX and PyTorch keep theirs for the life of a process), so the local LLM has the RAM for the minutes, and a
 crash in native code can't take the web server down. stdout carries JSON lines only: {"progress": [stage, done,
-total]}, then {"result": {"language", "utterances"}} or {"error": message, "trace": traceback}. Everything the
-pipeline prints (every transcript line) goes to stderr, which the server discards. The server starts it as the
+total]}, {"live": {"lines", "total", "speakers"}} (the newest lines heard so far, to show the transcription as it
+happens), {"found": {"topics", "decisions", "tasks"}} (what the minutes have so far), then {"result": {"language",
+"utterances"}} or {"error": message, "trace": traceback}. Everything the pipeline prints (every transcript line)
+goes to stderr, which the server discards. The server starts it as the
 leader of a process group: when the server goes, so does everything the transcription started (whisper-server)."""
 import argparse
 import json
@@ -23,6 +25,8 @@ from pydantic import ValidationError
 from stt.minutes.builder import MINUTES_LANGUAGES
 
 from .settings import model_path
+
+LIVE_LINES = 40  # the newest lines sent while transcribing: enough to show, small on every chunk
 
 # What the moderator reads for the pipeline's known failures, by the start of the error's text. Their details
 # (paths, URLs) go to the server log only; so does everything about an unknown failure.
@@ -88,12 +92,20 @@ def main(argv: list[str] | None = None) -> int:
     os.dup2(sys.stderr.fileno(), sys.stdout.fileno())  # stray output, even from native code, goes to stderr
     _exit_with_parent()
 
+    written = threading.Lock()  # the minutes report from their own thread
+
     def emit(**message):
-        protocol.write(json.dumps(message, ensure_ascii=False) + "\n")
-        protocol.flush()
+        line = json.dumps(message, ensure_ascii=False) + "\n"
+        with written:
+            protocol.write(line)
+            protocol.flush()
+
+    def live(lines, speakers):
+        emit(live={"lines": [utterance_json(u) for u in lines[-LIVE_LINES:]], "total": len(lines),
+                   "speakers": speakers})
 
     options = dict(model=model_path(args.model), language=args.language, engine=args.engine, max_seconds=args.max_seconds,
-                   on_progress=lambda stage, done=0, total=0: emit(progress=[stage, done, total]))
+                   on_progress=lambda stage, done=0, total=0: emit(progress=[stage, done, total]), on_live=live)
     minutes = None
     try:
         from stt.pipeline import transcribe_dialog, transcribe_minutes
@@ -101,7 +113,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.minutes:
             language, dialog, minutes = transcribe_minutes(args.audio, args.minutes, args.llm, overlap=True,
                                                            minutes_language=args.minutes_language,
-                                                           instructions=args.instructions, **options)
+                                                           instructions=args.instructions,
+                                                           on_found=lambda found: emit(found=found), **options)
         else:
             language, dialog = transcribe_dialog(args.audio, **options)
     except Exception as e:

@@ -35,6 +35,8 @@ RETENTION_CHECK_S = 3600
 ORPHAN_AGE_S = 3600  # an audio file no meeting refers to (a crashed upload) is deleted after this
 STOP_WAIT_S = 5
 INTERRUPTED = "Processing was interrupted by a server restart. Upload the recording again."
+# What GET /api/meetings/{id}/live answers before anything was heard, or once the meeting is no longer processing.
+NOTHING_LIVE = {"lines": [], "total": 0, "speakers": False, "topics": [], "decisions": 0, "tasks": 0}
 STAGE_MESSAGES = {"queued": "Waiting in the queue", "converting": "Converting the audio",
                   "transcribing": "Transcribing", "speakers": "Finding the speakers",
                   "minutes": "Writing the minutes", "done": "Done"}
@@ -48,13 +50,15 @@ class Transcription:
 
 
 class Pipeline(Protocol):
-    """instructions: those of the meeting type's minutes template, for the LLM that writes the minutes."""
+    """instructions: those of the meeting type's minutes template, for the LLM that writes the minutes. on_live(part
+    of NOTHING_LIVE's keys) as the transcription and the minutes go: the newest lines heard, what the minutes found."""
 
     def transcribe(self, audio: Path, settings: dict, on_progress: Callable, meeting_type: str | None = None,
-                   minutes_language: str = "ro", instructions: str = "") -> Transcription: ...
+                   minutes_language: str = "ro", instructions: str = "",
+                   on_live: Callable | None = None) -> Transcription: ...
 
     def minutes(self, transcription: Transcription, meeting_type: str, settings: dict, minutes_language: str,
-                instructions: str = "") -> dict: ...
+                instructions: str = "", on_live: Callable | None = None) -> dict: ...
 
     def cancel(self):
         """Stops a transcription that is running (the server is stopping)."""
@@ -73,7 +77,8 @@ class SttPipeline:
         self._lock = threading.Lock()  # the group is killed only before the child is reaped: then its id is free
 
     def transcribe(self, audio: Path, settings: dict, on_progress: Callable, meeting_type: str | None = None,
-                   minutes_language: str = "ro", instructions: str = "") -> Transcription:
+                   minutes_language: str = "ro", instructions: str = "",
+                   on_live: Callable | None = None) -> Transcription:
         command = [sys.executable, "-m", "server.transcribe", str(audio), f"--engine={settings['asr_engine']}",
                    f"--model={settings['asr_model']}", f"--language={settings['language']}"]
         if settings.get("max_duration_min"):  # enforced while decoding too, in case the file lies about its length
@@ -95,6 +100,9 @@ class SttPipeline:
                     message = json.loads(line)
                     if "progress" in message:
                         on_progress(*message["progress"])
+                    elif "live" in message or "found" in message:
+                        if on_live:
+                            on_live(message.get("live") or message["found"])
                     elif "error" in message:
                         log.error("Transcription failed: %s", message["trace"])
                         error = message["error"]
@@ -115,12 +123,12 @@ class SttPipeline:
                 _kill_group(self._child)
 
     def minutes(self, transcription: Transcription, meeting_type: str, settings: dict, minutes_language: str,
-                instructions: str = "") -> dict:
+                instructions: str = "", on_live: Callable | None = None) -> dict:
         from stt.pipeline import meeting_minutes
         from stt.speakers.dialog import Utterance
 
         dialog = [Utterance(u["start"], u["end"], u["speaker"], u["text"]) for u in transcription.utterances]
-        return meeting_minutes(dialog, meeting_type, settings["llm_model"], minutes_language, instructions)
+        return meeting_minutes(dialog, meeting_type, settings["llm_model"], minutes_language, instructions, on_live)
 
 
 class JobRunner:
@@ -131,6 +139,8 @@ class JobRunner:
         self.queue: queue.Queue[str | None] = queue.Queue()
         self.thread = threading.Thread(target=self._run, name="meeting-jobs", daemon=True)
         self.stopping = threading.Event()
+        self._live: dict[str, dict] = {}  # meeting id -> what its processing heard and found so far (memory only)
+        self._live_lock = threading.Lock()
 
     def start(self):
         _empty(self.config.temp_dir)  # what a transcription interrupted by a stop or crash left behind
@@ -148,6 +158,11 @@ class JobRunner:
 
     def submit(self, meeting_id: str):
         self.queue.put(meeting_id)
+
+    def live(self, meeting_id: str) -> dict:
+        """What the processing of the meeting heard and found so far (NOTHING_LIVE once it is no longer running)."""
+        with self._live_lock:
+            return {**NOTHING_LIVE, **self._live.get(meeting_id, {})}
 
     def _run(self):
         self._purge_audio()
@@ -188,15 +203,19 @@ class JobRunner:
                     ready.append(time.perf_counter())
                 self._progress(meeting_id, stage, done, total)
 
+            def live(update: dict):
+                with self._live_lock:
+                    self._live[meeting_id] = {**self._live.get(meeting_id, {}), **update}
+
             transcription = self.pipeline.transcribe(audio, settings, progress, meeting_type, minutes_language,
-                                                     instructions)
+                                                     instructions, on_live=live)
             transcribed = ready[0] if ready else time.perf_counter()
             self._save_transcript(meeting_id, transcription, transcribed - started)
             if transcription.minutes is not None:
                 minutes = minutes_doc(transcription.minutes)
             elif transcription.utterances:
                 minutes = minutes_doc(self.pipeline.minutes(transcription, meeting_type, settings, minutes_language,
-                                                            instructions))
+                                                            instructions, on_live=live))
             else:  # nothing for the LLM to summarize: it would invent minutes
                 minutes = minutes_doc({"title": "No speech detected",
                                        "summary": "The recording contains no speech that could be transcribed.",
@@ -211,6 +230,8 @@ class JobRunner:
                 log.exception("Meeting %s failed", meeting_id)
                 self._fail(meeting_id, readable_error(e))
         finally:
+            with self._live_lock:
+                self._live.pop(meeting_id, None)  # the transcript and minutes are saved (or it failed)
             _empty(self.config.temp_dir)  # a killed child (out of memory) can't clean up after itself
 
     def _progress(self, meeting_id: str, stage: str, done: int = 0, total: int = 0):

@@ -56,13 +56,16 @@ class FakePipeline:
         self.minutes_languages: list[tuple[str, str]] = []  # (step, minutes_language it was given)
         self.instructions: list[tuple[str, str]] = []  # (step, the template's instructions it was given)
         self.cancelled = False
+        self.live_updates: list[dict] = []  # reported (on_live) before the gate: what it has heard and found
 
     def transcribe(self, audio: Path, settings: dict, on_progress, meeting_type=None, minutes_language="ro",
-                   instructions="") -> Transcription:
+                   instructions="", on_live=None) -> Transcription:
         self.audio.append(audio)
         self.minutes_languages.append(("transcribe", minutes_language))
         self.instructions.append(("transcribe", instructions))
         on_progress("converting")
+        for update in self.live_updates:
+            on_live(update)
         if self.gate is not None:
             self.gate.wait(WAIT_S)
         if self.cancelled:
@@ -74,7 +77,7 @@ class FakePipeline:
         return Transcription("ro", copy.deepcopy(self.utterances))
 
     def minutes(self, transcription: Transcription, meeting_type: str, settings: dict, minutes_language: str,
-                instructions: str = "") -> dict:
+                instructions: str = "", on_live=None) -> dict:
         self.minutes_calls += 1
         self.minutes_languages.append(("minutes", minutes_language))
         self.instructions.append(("minutes", instructions))

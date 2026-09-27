@@ -93,6 +93,21 @@ def test_the_email_is_a_short_note_in_the_minutes_language(language, note):
     assert email.subject == "[Medical] Board 26.09 Bcc: spy@example.com"  # the web app shows the English type
 
 
+def test_the_moderator_can_write_the_note_themselves():
+    """Their text replaces the default note: paragraphs at blank lines, line breaks kept, escaped in the HTML."""
+    note = "Stimați colegi,\r\n\r\nAtașat: procesul-verbal <b>de azi</b>.\nVă rog să confirmați.  \n\n\nDr. Ana Popescu\n"
+    email = compose(_meeting(minutes_language="ro"), MINUTES, "secure-mom@medpark.local", ["ana@medpark.md"], [],
+                    signed_by="Ana Popescu", note=note)
+    assert email.text == ("Stimați colegi,\n\nAtașat: procesul-verbal <b>de azi</b>.\nVă rog să confirmați.\n\n"
+                          "Dr. Ana Popescu\n")
+    assert '<p style="margin:0 0 14px;">Atașat: procesul-verbal &lt;b&gt;de azi&lt;/b&gt;.<br>Vă rog să confirmați.</p>' \
+        in email.html
+    assert "Vă transmitem" not in email.text  # not the default note
+    blank = compose(_meeting(minutes_language="ro"), MINUTES, "secure-mom@medpark.local", ["ana@medpark.md"], [],
+                    note=" \n \n")
+    assert blank.text.startswith("Bună ziua,\n\nVă transmitem atașat")  # nothing written: the default note
+
+
 def test_the_pdf_shows_what_was_typed_as_text():
     text = _minutes()
     assert "Round <script>alert('title')</script>" in text and "<b>stable</b>" in text  # text, never markup

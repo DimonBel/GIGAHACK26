@@ -14,6 +14,7 @@ from sqlalchemy import false, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from stt.minutes.builder import MEETING_TYPES, MINUTES_LANGUAGES
+from stt.minutes.labels import LABELS
 from stt.minutes.markdown import for_recipients
 
 from ..db import AuditLog, Db, Meeting, Recipient, User, audit, checkpoint, utcnow
@@ -53,7 +54,7 @@ async def upload(request: Request, user: Manager) -> dict:
         minutes_language = received.fields.get("minutes_language", "ro").strip()
         if minutes_language not in MINUTES_LANGUAGES:
             raise HTTPException(400, f"minutes_language must be one of: {', '.join(MINUTES_LANGUAGES)}")
-        title = _title(received.fields.get("title", ""), meeting_type)
+        title = _title(received.fields.get("title", ""), meeting_type, minutes_language)
         duration = await run_in_threadpool(probe, received.path)
         if duration is not None and duration > settings["max_duration_min"] * 60:
             raise HTTPException(413, f"The recording is longer than {settings['max_duration_min']} minutes")
@@ -108,6 +109,14 @@ def audio(meeting_id: str, request: Request, user: Manager, db: Db) -> FileRespo
         audit(db, "view_audio", user, meeting.id)
         db.commit()
     return FileResponse(path, media_type=AUDIO_TYPES.get(path.suffix.lstrip("."), "application/octet-stream"))
+
+
+@router.get("/{meeting_id}/live")
+def get_live(meeting_id: str, request: Request, user: Manager, db: Db) -> dict:
+    """While the meeting is processing, what it heard and found so far: the newest transcript lines (speakers once
+    known) and the minutes' topics and counts, to show the processing as it happens. Kept in memory only."""
+    meeting = _meeting(db, meeting_id, user, manage=True)
+    return request.app.state.jobs.live(meeting.id)
 
 
 @router.get("/{meeting_id}/minutes")
@@ -206,7 +215,7 @@ def send(meeting_id: str, body: SendIn, request: Request, user: Manager, db: Db)
         raise HTTPException(400, str(e)) from None
     template = active_template(db, meeting.meeting_type)
     email = compose(meeting, meeting.minutes.current, settings["mail_from"], to, cc, template, pdf=True,
-                    signed_by=user.full_name)
+                    signed_by=user.full_name, note=body.note)
     try:
         request.app.state.mailer.deliver(email, settings)
     except DeliveryError as e:
@@ -217,6 +226,8 @@ def send(meeting_id: str, body: SendIn, request: Request, user: Manager, db: Db)
     meeting.status, meeting.sent_at = "sent", utcnow()
     meeting.recipients = [Recipient(email=a, kind="to") for a in to] + [Recipient(email=a, kind="cc") for a in cc]
     detail = f"to: {', '.join(to)}; cc: {', '.join(cc) or '-'}"
+    if body.note.strip():
+        detail += "; own note"
     if template["version"]:  # a saved version, not the built-in template
         detail += f"; template v{template['version']}"
     audit(db, "send", user, meeting.id, detail)
@@ -261,10 +272,11 @@ def _require_status(meeting: Meeting, status: str):
         raise HTTPException(409, f"Not possible while the meeting is {meeting.status} (needs {status})")
 
 
-def _title(value: str, meeting_type: str) -> str:
-    """The title on one line without control characters; by default "<Type> meeting <date>"."""
+def _title(value: str, meeting_type: str, language: str) -> str:
+    """The title on one line without control characters; by default the meeting type in the minutes' language and
+    when it was uploaded ("Ședință administrativă 27.09.2026 10:49")."""
     title = " ".join("".join(c if c.isprintable() else " " for c in value).split())[:MAX_TITLE]
-    return title or f"{meeting_type.capitalize()} meeting {datetime.now():%d.%m.%Y %H:%M}"
+    return title or f"{LABELS[language][meeting_type]} {datetime.now():%d.%m.%Y %H:%M}"
 
 
 def _upload_settings(db_factory: sessionmaker, user: User) -> dict:
