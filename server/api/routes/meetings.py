@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from ..db import Store
 from ..deps import current_user, get_runner, get_settings, get_store, moderator
 from ..jobs import JobRunner
-from ..schemas import Language, Meeting, MeetingType, Progress
+from ..schemas import Language, Meeting, MeetingType, Progress, RedoIn
 from ..settings import Settings
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
@@ -121,6 +121,26 @@ def retry(meeting_id: int, _: dict = Depends(moderator), store: Store = Depends(
         raise HTTPException(409, "Only a failed meeting can be retried")
     # With the transcript already saved, only the minutes are made again.
     runner.submit(meeting_id, minutes_only=(settings.meeting_dir(meeting_id) / "transcript.json").exists())
+    return meeting_out(store.meeting(meeting_id), runner, settings)
+
+
+@router.post("/{meeting_id}/redo-minutes", response_model=Meeting)
+def redo_minutes(meeting_id: int, body: RedoIn, _: dict = Depends(moderator), store: Store = Depends(get_store),
+                 runner: JobRunner = Depends(get_runner), settings: Settings = Depends(get_settings)):
+    """Make the minutes again from the saved transcript, e.g. with the right meeting type. The moderator's edits
+    to the minutes are replaced; attendees and the next meeting are kept."""
+    m = store.meeting(meeting_id)
+    if not m:
+        raise HTTPException(404, "Meeting not found")
+    if m["status"] not in ("draft", "failed"):
+        raise HTTPException(409, "Only draft or failed minutes can be made again")
+    folder = settings.meeting_dir(meeting_id)
+    if not (folder / "transcript.json").exists():
+        raise HTTPException(409, "There is no transcript yet; use Retry")
+    if body.type != m["type"]:
+        (folder / "speakers.json").unlink(missing_ok=True)  # the roles are guessed for the meeting type
+    store.update_meeting(meeting_id, type=body.type)
+    runner.submit(meeting_id, minutes_only=True)
     return meeting_out(store.meeting(meeting_id), runner, settings)
 
 

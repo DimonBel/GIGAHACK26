@@ -267,6 +267,32 @@ Measured end to end (`bench/eval_live_minutes.py`):
 | 60 min | speaker-labelled lines (before) | 666 s | 412 s | 1078 s | 16 |
 | 60 min | **Whisper's text at once** | 839 s | **177 s** | **1016 s** | 19 |
 
+### Meeting types and topics
+
+The meeting type decides how the minutes are split into topics: at a **medical** meeting a topic starts where the
+speakers move to another bed or room ("patul 9", "boxa", "койка 3"); at **executive / administrative** meetings
+only agenda-item cues count ("punctul 3", "item 4", "пункт 2") and every topic gets a short title from the model
+("Staff reports", "Municipal survey results feedback"), so an English "box" never becomes a patient. A wrong type
+at upload can be fixed in the editor: click the type in the header, the minutes are made again from the saved
+transcript (`POST /api/meetings/{id}/redo-minutes`, ~4 min for 64 min of audio; attendees and next meeting are
+kept). Empty model answers ("None stated.", "No decisions.") are dropped.
+
+### Tried and not used (measured)
+
+- **Language ID** (`lid_mac_test/`: SpeechBrain VoxLingua107 ECAPA + a ro/ru/en head trained with Moldovan
+  speakers, ~0.01 x real time alone on an M4 CPU). Wired in as: main language from the first 2 min of speech,
+  then stretches heard in another language re-transcribed in it, keeping the version Whisper is more confident in.
+  On the synthesized three-language handover (`lid_mac_test/TEST_SCRIPT.md`, macOS voices, clean and with crowd
+  noise) 16/16 lines came out in the right language instead of 10/16 (Russian had been transliterated gibberish,
+  English translated into Romanian). But on the all-Romanian Medpark meeting it re-transcribed 4 Moldovan-Romanian
+  stretches into wrong Russian / English (Whisper is confident in a forced language too) and made the run 106 ->
+  172 s (next to Whisper and pyannote the language ID took 53 s). Removed; worth revisiting as an opt-in setting
+  for meetings that really switch language, once real recordings of such meetings exist.
+- **Coarser pyannote segmentation step** (default: 10 s window moved by 1 s; voice embeddings are 95% of its time).
+  On Medpark alone: step 1 s 56 s, 3 speakers; 2 s 32 s; 3 s 24 s; 5 s 15 s — but every larger step merged the
+  third (short) speaker into another voice and gave 5-8% of the words another speaker. Kept at 1 s; a possible
+  opt-in "fast" setting for long meetings (~3 of pyannote's ~5 min per hour of audio saved).
+
 ## Medical dictionaries: ICD-10 (RO / RU / EN) and DRG
 
 `mom/medical/data/icd10.tsv` (11,998 ICD-10 codes with Romanian, Russian and English names) and `drg.tsv`
@@ -375,6 +401,7 @@ password from `SEED_PASSWORD` in `.env` (default `demo`) — change it before re
 | `GET /api/meetings` · `GET /api/meetings/{id}` | everyone | participants only see ready minutes |
 | `GET /api/meetings/{id}/progress?after=N` | moderator | stages, % transcribed, transcript lines after N |
 | `POST /api/meetings/{id}/retry` · `DELETE /api/meetings/{id}` | moderator | after a failure (only the minutes are redone when the transcript exists) |
+| `POST /api/meetings/{id}/redo-minutes` `{type}` | moderator | draft minutes made again from the saved transcript, e.g. with the right meeting type (editor: click the type in the header); edits are replaced, attendees and next meeting kept |
 | `GET` / `PUT /api/meetings/{id}/minutes` | read: everyone · save: moderator | the editable document; `PUT` needs the current `version` (409 otherwise) |
 | `POST /api/meetings/{id}/approve` | moderator | locks the minutes and emails the attendees |
 | `GET /api/meetings/{id}/deliveries` · `POST …/deliveries/retry` | moderator | email status per attendee, resend failed |
@@ -432,6 +459,7 @@ server/
 ├── scripts/                  mailpit.sh (local mail catcher) · build_turbo_md.sh (fine-tuned Whisper -> models/) ·
 │                             build_medical_dicts.py (ICD-10 / DRG dictionaries -> mom/medical/data/)
 ├── turbo-md-adapter/         LoRA adapter + training / evaluation scripts of the fine-tuned Whisper
+├── lid_mac_test/             stand-alone language ID test package for testers (not used by the pipeline)
 ├── storage/                  web app data: app.db + meetings/<id>/ (gitignored, patient data)
 ├── pyproject.toml            pytest settings
 ├── requirements.txt

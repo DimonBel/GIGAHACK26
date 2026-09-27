@@ -151,6 +151,21 @@ describe("minutes store", () => {
     expect(state().deliveries[0]?.status).toBe("sent");
   });
 
+  it("makes the minutes again with another type, dropping unsaved edits", async () => {
+    await open();
+    state().updateDoc({ summary: "Edited" });
+    vi.mocked(meetingsApi.redoMinutes).mockResolvedValue(meeting({ status: "queued" }));
+    vi.mocked(meetingsApi.getMeeting).mockResolvedValue(
+      meeting({ status: "queued", type: "Administrative" }),
+    );
+    expect(await state().redo("Administrative")).toBe(true);
+    expect(meetingsApi.redoMinutes).toHaveBeenCalledWith(7, "Administrative");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(minutesApi.saveMinutes).not.toHaveBeenCalled();
+    expect(state()).toMatchObject({ save: "saved", editing: false });
+    expect(state().meeting?.status).toBe("queued");
+  });
+
   it("saves pending edits before approving", async () => {
     await open();
     vi.mocked(minutesApi.saveMinutes).mockResolvedValue({ version: 2 });

@@ -47,7 +47,7 @@ from one part of the transcript. Translate everything into {language}; write sho
 """ + GLOSSARY + """
 
 topics: {topics_hint} For each:
-- name: the bed / room exactly as said (e.g. "Bed 9"), or "" if not said.
+- name: {name_hint}
 - status: {status_hint}
 - findings: {findings_hint}
 - decisions: what was decided or done in this meeting: {decisions_hint}
@@ -61,6 +61,7 @@ values exact. Leave out words you cannot understand instead of copying or guessi
 
 HINTS = {
     "medical": dict(
+        name_hint='the bed / room exactly as said (e.g. "Bed 9"), or "" if not said.',
         topics_hint="one entry per patient discussed in this part, in order. Start a new entry only when the "
                     "speakers clearly move to another bed / patient.",
         status_hint="diagnosis, history and current state (therapy running with doses, consciousness), at "
@@ -72,11 +73,13 @@ HINTS = {
         decisions_hint="the treatment plan: drugs started, stopped, changed (with the dose) or continued, "
                        "procedures, lines, scans, transfusions, consults ordered."),
     "executive": dict(
+        name_hint="a short title of the agenda item, at most 6 words (e.g. \"Q4 budget\").",
         topics_hint="one entry per agenda item, in order.",
         status_hint="where it stands, with key figures, at most 35 words.",
         findings_hint="every figure, result or fact reported.",
         decisions_hint="what was approved, rejected or changed."),
     "administrative": dict(
+        name_hint="a short title of the agenda item, at most 6 words (e.g. \"Night shift rota\").",
         topics_hint="one entry per agenda item, in order.",
         status_hint="where it stands, at most 35 words.",
         findings_hint="every figure, result or fact reported.",

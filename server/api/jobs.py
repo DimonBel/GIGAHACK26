@@ -195,6 +195,11 @@ class JobRunner:
             write_json(roles_file, minutes["participants"])
             write_json(folder / "minutes.raw.json", minutes)
             doc = MinutesDoc.model_validate(minutes_doc(minutes, mtype))
+            previous = folder / "minutes.json"
+            if previous.exists():  # minutes made again (other meeting type): keep what the moderator chose
+                old = MinutesDoc.model_validate(read_json(previous))
+                doc.attendees, doc.next = old.attendees, old.next
+                doc.version = old.version + 1  # an editor still open on the old minutes cannot save over these
             # The moderator's title wins; the AI's is used only when none was given at upload.
             title = doc.title.strip() if meeting["title_auto"] and doc.title.strip() else meeting["title"]
             doc.title = title

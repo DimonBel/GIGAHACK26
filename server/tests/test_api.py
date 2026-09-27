@@ -299,3 +299,36 @@ def test_old_database_gets_new_columns(tmp_path, pipeline):
     conn.close()
     app = create_app(Settings(storage_dir=tmp_path, seed_password="pw"), pipeline, smtp=FakeSMTP)
     assert processed(app, client(app, ELENA))
+
+
+def test_redo_minutes_with_another_type(app, pipeline):
+    c = client(app, ELENA)
+    mid = processed(app, c)
+    doc = c.get(f"/api/meetings/{mid}/minutes").json()
+    doc["attendees"] = [3]
+    doc["next"]["place"] = "Sala 2"
+    doc["topics"][0]["blocks"] = []  # a moderator edit that the new minutes replace
+    assert c.put(f"/api/meetings/{mid}/minutes", json=doc).status_code == 200
+    storage = app.state.settings.meeting_dir(mid)
+    assert (storage / "speakers.json").exists()
+
+    r = c.post(f"/api/meetings/{mid}/redo-minutes", json={"type": "administrative"})
+    assert r.status_code == 200 and r.json()["type"] == "administrative"
+    assert not (storage / "speakers.json").exists()  # roles guessed again for the new type
+    assert app.state.runner.wait_idle()
+    assert pipeline.transcribed == 1  # transcript reused
+    meeting = c.get(f"/api/meetings/{mid}").json()
+    assert meeting["status"] == "draft" and meeting["type"] == "administrative"
+    new = c.get(f"/api/meetings/{mid}/minutes").json()
+    assert new["attendees"] == [3] and new["next"]["place"] == "Sala 2"
+    assert new["version"] == 3 and new["topics"][0]["blocks"]  # fresh minutes, newer than the edited ones
+    assert c.put(f"/api/meetings/{mid}/minutes", json=doc).status_code == 409  # the old editor cannot overwrite
+
+
+def test_redo_minutes_refused_when_approved_or_by_participant(app):
+    c = client(app, ELENA)
+    mid = processed(app, c)
+    assert client(app, NATALIA).post(f"/api/meetings/{mid}/redo-minutes", json={"type": "executive"}).status_code == 403
+    assert c.post(f"/api/meetings/{mid}/redo-minutes", json={"type": "bogus"}).status_code == 422
+    assert c.post(f"/api/meetings/{mid}/approve").status_code == 200
+    assert c.post(f"/api/meetings/{mid}/redo-minutes", json={"type": "executive"}).status_code == 409

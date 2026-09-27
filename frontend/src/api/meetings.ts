@@ -46,4 +46,8 @@ export const getProgress = (id: number, after: number) =>
 export const retryMeeting = (id: number) =>
   request<ApiMeeting>("POST", `/meetings/${id}/retry`).then(fromApi);
 
+/** Make the minutes again from the saved transcript, as this meeting type (edits to the minutes are replaced). */
+export const redoMinutes = (id: number, type: MeetingType) =>
+  request<ApiMeeting>("POST", `/meetings/${id}/redo-minutes`, { type: TO_API[type] }).then(fromApi);
+
 export const deleteMeeting = (id: number) => request<void>("DELETE", `/meetings/${id}`);

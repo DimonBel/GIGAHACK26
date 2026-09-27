@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { ApiError } from "@/api/client";
-import { getMeeting, type Meeting } from "@/api/meetings";
+import { getMeeting, redoMinutes, type Meeting } from "@/api/meetings";
 import * as minutesApi from "@/api/minutes";
 import type {
   Attendee,
@@ -20,7 +20,7 @@ import type {
   User,
 } from "@/api/types";
 import { listUsers } from "@/api/users";
-import type { MinutesSection } from "@/shared/types/domain";
+import type { MeetingType, MinutesSection } from "@/shared/types/domain";
 
 const AUTOSAVE_MS = 800;
 
@@ -207,6 +207,8 @@ interface MinutesState {
   retryDeliveries: () => Promise<void>;
 
   saveNow: () => Promise<void>;
+  /** Make the minutes again as `type` from the saved transcript; the page shows the processing until done. */
+  redo: (type: MeetingType) => Promise<boolean>;
   approve: () => Promise<boolean>;
   acceptSuggestion: (suggestionId: number, target: string | null) => void;
   declineSuggestion: (suggestionId: number) => void;
@@ -439,6 +441,20 @@ export const useMinutesStore = create<MinutesState>()((set, get) => {
       saveRunning = runSave().finally(() => (saveRunning = null));
       await saveRunning;
       if (get().save === "dirty") await get().saveNow();
+    },
+    redo: async (type) => {
+      const { meetingId } = get();
+      if (meetingId === null) return false;
+      clearTimeout(saveTimer); // the edits are replaced anyway: nothing left to save
+      try {
+        await redoMinutes(meetingId, type);
+      } catch (e) {
+        set({ saveError: message(e, "Could not make the minutes again.") });
+        return false;
+      }
+      set({ editing: false, save: "saved", saveError: null, section: { kind: "overview" } });
+      await get().load(meetingId);
+      return true;
     },
     approve: async () => {
       const { meetingId } = get();

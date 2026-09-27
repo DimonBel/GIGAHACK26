@@ -42,7 +42,8 @@ participants (voices the moderator can name), topics, next meeting. Each topic i
 text, list, tasks or codes — that the moderator renames, reorders, adds and deletes in edit mode
 (`features/minutes/blocks/`). Edits autosave 800 ms after the last change with the document's version; a newer
 version on the server stops saving and offers a reload. Times in the minutes open the topic's transcript at that
-line. Approving locks the document and emails it to the attendees chosen in Participants (through the server's
+line. A wrong meeting type is fixed by clicking the type in the header: the minutes are made again from the
+saved transcript (the processing view shows the progress). Approving locks the document and emails it to the attendees chosen in Participants (through the server's
 local Mailpit; the header shows when every email was sent, and offers a retry if one failed).
 
 ## Design rules

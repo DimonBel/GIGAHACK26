@@ -66,3 +66,13 @@ def test_formatters():
     d = [Utterance(61.5, 62.0, "SPEAKER 1", "Salut")]
     assert to_text(d) == "[00:01:01 - 00:01:02] SPEAKER 1: Salut"
     assert "00:01:01,500 --> 00:01:02,000\nSPEAKER 1: Salut" in to_srt(d)
+
+
+def test_bed_and_room_cues_only_at_medical_meetings():
+    from mom.minutes.cues import cue_name
+    assert cue_name("Pacientul de pe patul nouă.") == "Bed 9"
+    assert cue_name("Boxa?") == "Box"
+    assert cue_name("Put it in the box, please.", "administrative") is None
+    assert cue_name("Pacientul de pe patul nouă.", "executive") is None
+    assert cue_name("Trecem la punctul 3.", "administrative") == "Item 3"
+    assert cue_name("Переходим к пункту 4.", "executive") == "Item 4"

@@ -74,7 +74,7 @@ class MinutesBuilder:
         prefix, text = line.split(": ", 1)
         sentences = SENTENCE.split(text)
         for i, sentence in enumerate(sentences):
-            name = cue_name(sentence) if self.cut_at_cues else None
+            name = cue_name(sentence, self.meeting_type) if self.cut_at_cues else None
             if name and name != self.current_name:
                 # Cut exactly at the sentence that moves on, even in the middle of a long utterance.
                 if i:
@@ -106,7 +106,8 @@ class MinutesBuilder:
             return
         continues = self.submitted > 0 and not self.starts_new_topic
         if continues:
-            note = (f'The first lines continue the discussion of {self.label or "the previous patient"}: make it '
+            previous = "the previous patient" if self.meeting_type == "medical" else "the previous agenda item"
+            note = (f'The first lines continue the discussion of {self.label or previous}: make it '
                     f'the first topic and report only what is new.\n\n')
         elif self.next_name:
             note = f"This part starts with {self.next_name}.\n\n"

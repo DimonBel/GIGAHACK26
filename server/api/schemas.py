@@ -196,6 +196,10 @@ class MinutesDoc(Api):
     attendees: list[int] = []
 
 
+class RedoIn(Api):
+    type: MeetingType
+
+
 class Saved(Api):
     version: int
 

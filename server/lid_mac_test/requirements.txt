@@ -1,0 +1,5 @@
+torch>=2.2,<2.9
+torchaudio>=2.2,<2.9
+speechbrain>=1.0,<2
+numpy
+soundfile

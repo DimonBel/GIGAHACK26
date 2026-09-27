@@ -4,7 +4,8 @@ import unicodedata
 
 from .lexicon import CANONICAL
 
-EMPTY = re.compile(r"^(none|n/?a|nothing|not (specified|mentioned|said|stated)|unknown|-+)?\W*$", re.I)
+EMPTY = re.compile(r"^((none|nothing|no \w+)( (stated|mentioned|said|specified|discussed|made|given)"
+                   r"( in this part| here)?)?|n/?a|not (specified|mentioned|said|stated)|unknown|-+)?\W*$", re.I)
 # Sentences a model writes instead of leaving a field empty ("Patient status not fully detailed.").
 FILLER = re.compile(r"[^.;]*\b(not (fully )?(detailed|specified|mentioned|discussed|said)|no (details|information)|unclear|"
                     r"discussion (revolves|about|regarding))\b[^.;]*[.;]?\s*", re.I)
