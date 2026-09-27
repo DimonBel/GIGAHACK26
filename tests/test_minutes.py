@@ -89,6 +89,31 @@ def test_unnamed_topics_are_numbered_in_the_minutes_language():
     assert minutes_builder.topics[0]["name"] == "Пациент 1"
 
 
+def test_topics_nothing_was_kept_for_are_left_out(monkeypatch):
+    """The model names a topic but says nothing about it (or every fact fails the checks): no empty topic in the
+    minutes, and the numbered ones after it are numbered again, their decisions and tasks too."""
+    parts = iter([
+        {"topics": [{"name": "", "status": "Stabil", "findings": [], "decisions": [], "tasks": [], "open": []}]},
+        {"topics": [{"name": "", "status": "", "findings": [], "decisions": [], "tasks": [], "open": []}]},
+        {"topics": [{"name": "", "status": "", "findings": [], "decisions": ["Externare mâine"],
+                     "tasks": [{"task": "Scrisoare de externare", "owner": "Dr. Rusu", "deadline": "",
+                                "priority": "low"}], "open": []}]},
+    ])
+
+    def chat(model, system, user, schema, **options):
+        return copy.deepcopy(next(parts) if schema is builder.CHUNK_SCHEMA else HEADER), dict(STATS)
+
+    monkeypatch.setattr(builder, "chat", chat)
+    minutes_builder = MinutesBuilder("medical", "gemma", "ro", verbose=False)
+    minutes_builder.pool.shutdown()
+    minutes_builder.pool = builder.ThreadPoolExecutor(1)
+    for lines in (["[00:10] S1: Următorul."], ["[01:10] S1: Următorul."], ["[02:10] S1: Următorul."]):
+        minutes_builder._merge(chat("", "", "", builder.CHUNK_SCHEMA)[0], lines, continues=False, cue_name=None)
+    minutes = minutes_builder.finalize()
+    assert [t["name"] for t in minutes["topics"]] == ["Pacientul 1", "Pacientul 2"]
+    assert minutes["decisions"][0]["patient"] == minutes["action_items"][0]["patient"] == "Pacientul 2"
+
+
 @pytest.mark.parametrize("filler", ["Not specified", "N/A", "nespecificat", "Nu este menționat.", "necunoscută",
                                     "Nu a fost precizat", "Не указано", "нет данных", "Неизвестно", "Н/Д"])
 def test_filler_in_any_language_is_empty(filler):

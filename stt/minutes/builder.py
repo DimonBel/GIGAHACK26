@@ -656,6 +656,7 @@ class MinutesBuilder:
         self.pool.shutdown()
         for entry in self.decisions + self.actions + self.issues:  # patients can be renamed after recording
             entry["patient"] = self.topics[entry.pop("_topic")]["name"]
+        self._drop_empty_topics()
         stats["step"] = "finalize"
         self.calls.append(stats)
         if self.verbose:
@@ -667,6 +668,23 @@ class MinutesBuilder:
                 "open_issues": [f"{i['patient']}: {i['issue']}" for i in self.issues], "warnings": self.warnings,
                 "attendees": []}  # who was present: the moderator adds them
 
+
+    def _drop_empty_topics(self):
+        """Leaves out the topics nothing was kept for (the model named one, but said nothing about it or every fact
+        failed the checks): "Pacientul 4" with "nothing was recorded" helps no one. The numbered ones ("Pacientul
+        5") are numbered again by their place, as when they were made, unless another topic has that name."""
+        used = {entry["patient"] for entry in self.decisions + self.actions + self.issues}
+        self.topics = [t for t in self.topics if t["status"] or t["findings"] or t["name"] in used]
+        numbered = re.compile(re.escape(self.words["patient"]).replace(re.escape("{n}"), r"\d+") + "$")
+        names = {t["name"] for t in self.topics}
+        for place, topic in enumerate(self.topics, 1):
+            new = self.words["patient"].format(n=place)
+            if numbered.match(topic["name"]) and topic["name"] != new and new not in names:
+                names = (names - {topic["name"]}) | {new}
+                for entry in self.decisions + self.actions + self.issues:
+                    if entry["patient"] == topic["name"]:
+                        entry["patient"] = new
+                topic["name"] = new
 
     def _title(self, title: str) -> str:
         """The model's title, or, when it only names the document, the meeting type and its first topics."""
