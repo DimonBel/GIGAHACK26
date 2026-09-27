@@ -44,6 +44,7 @@ models/mlx-*/
 # --- Tools ---
 .omc/
 .claude/settings.local.json
+.claude/project-map/
 
 # --- OS / editors ---
 .DS_Store
@@ -57,3 +58,13 @@ web/dist/
 automation/.env
 automation/n8n_data/
 server/.env
+
+# --- Local models, experiments and data (large; the database and outputs may contain patient data) ---
+server/models/
+server/turbo-md-adapter/
+server/bench/
+server/build/
+server/lid_mac_test/
+server/out/
+server/storage/
+frontend/node_modules/
