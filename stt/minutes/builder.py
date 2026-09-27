@@ -3,7 +3,8 @@
   1. map: the transcript is cut where the speakers move to another bed / patient / agenda item; each part's
      facts are extracted by the LLM (JSON schema), filed per patient.
   2. merge: code joins the parts (same patient -> one entry, duplicates dropped, unverified numbers flagged).
-  3. finalize: key moments are picked in code; one short LLM call writes title, summary and suggestions."""
+  3. finalize: key moments are picked in code; one short LLM call writes the title and summary.
+Everything is written in the language chosen for the minutes (MINUTES_LANGUAGES), what code adds (WORDS) too."""
 import json
 import queue
 import re
@@ -17,6 +18,22 @@ from pathlib import Path
 from .ollama import DEFAULT_MODEL, chat
 
 MEETING_TYPES = ("medical", "executive", "administrative")
+MINUTES_LANGUAGES = {"ro": "Romanian", "ru": "Russian", "en": "English"}  # code -> name in the prompts
+# What code writes into the minutes itself, per language of the minutes.
+WORDS = {
+    "en": {"bed": "Bed {n}", "box": "Box", "admissions": "Expected admissions", "item": "Item {n}",
+           "patient": "Patient {n}", "icu_team": "ICU team", "team": "Team", "no_deadline": "Not specified",
+           "unverified": "⚠ unverified: {values}",
+           "not_found": "value(s) {values} not found in the transcript: {text}"},
+    "ro": {"bed": "Patul {n}", "box": "Boxa", "admissions": "Internări așteptate", "item": "Punctul {n}",
+           "patient": "Pacientul {n}", "icu_team": "Echipa ATI", "team": "Echipa", "no_deadline": "Nespecificat",
+           "unverified": "⚠ de verificat: {values}",
+           "not_found": "valori negăsite în transcriere: {values} — {text}"},
+    "ru": {"bed": "Койка {n}", "box": "Бокс", "admissions": "Ожидаемые поступления", "item": "Пункт {n}",
+           "patient": "Пациент {n}", "icu_team": "Команда ОРИТ", "team": "Команда", "no_deadline": "Не указан",
+           "unverified": "⚠ не проверено: {values}",
+           "not_found": "значения, не найденные в транскрипте: {values} — {text}"},
+}
 LINE = re.compile(r"\[(?P<start>[\d:]+) - (?P<end>[\d:]+)\] (?P<speaker>[^:\[]+?)(?: \[[^\]]*\])?: (?P<text>.*)")
 
 # Spoken numbers (Romanian, Russian), used to read and to verify bed numbers.
@@ -31,14 +48,14 @@ WORD_TO_NUMBER = {w: n for n, words in NUMBER_WORDS.items() for w in words.split
 _NUM = r"\d{1,2}|" + "|".join(sorted(WORD_TO_NUMBER, key=len, reverse=True))
 
 # A sentence that names another bed / room starts a new patient. Code, not the model, owns patient identity:
-# the chunk is cut there and the patient is named from the cue. ASR mangles "patul 9" into "pipatu nouă",
+# the chunk is cut there and the patient is named from the cue (WORDS). ASR mangles "patul 9" into "pipatu nouă",
 # "apatul, nouă" or "patru opt", hence the loose prefix and suffix.
 NAME_CUES = [
-    (re.compile(rf"\b\w{{0,2}}pat(?:ul|u|ului|ru)?\b[\s,.]+(?:de\s+|nr\.?\s*)?(?P<n>{_NUM})\b", re.I), "Bed {n}"),
-    (re.compile(rf"\b(?:койк\w*|палат\w*)\s+(?:№\s*)?(?P<n>{_NUM})\b", re.I), "Bed {n}"),
-    (re.compile(r"\bbox\w*", re.I), "Box"),
-    (re.compile(r"\b(?:primir\w*|internăr\w*|admissions?)\b", re.I), "Expected admissions"),
-    (re.compile(rf"\b(?:punctul|item)\s+(?P<n>{_NUM})\b", re.I), "Item {n}"),
+    (re.compile(rf"\b\w{{0,2}}pat(?:ul|u|ului|ru)?\b[\s,.]+(?:de\s+|nr\.?\s*)?(?P<n>{_NUM})\b", re.I), "bed"),
+    (re.compile(rf"\b(?:койк\w*|палат\w*)\s+(?:№\s*)?(?P<n>{_NUM})\b", re.I), "bed"),
+    (re.compile(r"\bbox\w*", re.I), "box"),
+    (re.compile(r"\b(?:primir\w*|internăr\w*|admissions?)\b", re.I), "admissions"),
+    (re.compile(rf"\b(?:punctul|item)\s+(?P<n>{_NUM})\b", re.I), "item"),
 ]
 # Weaker hints of a new topic: only used to prefer a cut there once a chunk is long; the chunk still continues
 # the current patient ("pacientul" is also said mid-discussion).
@@ -96,9 +113,8 @@ FINAL_SCHEMA = {
     "properties": {
         "title": _text(80),
         "summary": _text(600),
-        "suggestions": _strs(2, max_len=120),
     },
-    "required": ["title", "summary", "suggestions"],
+    "required": ["title", "summary"],
 }
 
 # Known ASR errors and ICU slang, fixed in the transcript before any LLM call: small models copy misspelled
@@ -159,7 +175,7 @@ from one part of the transcript. Translate everything into {language}; write sho
 """ + GLOSSARY + """
 
 topics: {topics_hint} For each:
-- name: the bed / room exactly as said (e.g. "Bed 9"), or "" if not said.
+- name: the bed / room exactly as said (e.g. "{name_example}"), or "" if not said.
 - status: {status_hint}
 - findings: {findings_hint}
 - decisions: what was decided or done in this meeting: {decisions_hint}
@@ -199,24 +215,43 @@ FINAL_SYSTEM = """You write the header of the Minutes of a {meeting_type} meetin
 {language}, from the facts already extracted below. Use only these facts.
 - title: short, specific.
 - summary: 2-3 sentences for a reader who missed the meeting: who was discussed and the main decisions.
-- suggestions: at most 2 follow-ups the team may have overlooked (not already an open issue), based only \
-on these facts, at most 12 words each.
 Never add details that are not in the facts (no age, sex, diagnoses or numbers of your own)."""
+
+# Appended to both system prompts: the instructions of the meeting type's template, set by the hospital's admin.
+HOSPITAL_INSTRUCTIONS = "\n\nAdditional instructions from the hospital: {}"
 
 # Small models translate the same drug differently from chunk to chunk; one name per drug lets duplicates merge.
 CANONICAL = [
     (r"\bnorepinephrine\b", "noradrenaline"),
     (r"\bnoradrenalin(?!e)\b", "noradrenaline"),
+    (r"\bnorepinefrin", "noradrenalin"),  # Romanian, the ending stays: "norepinefrina" -> "noradrenalina"
+    (r"\bнор[эе]пинефрин", "норадреналин"),  # Russian, the ending stays
 ]
-EMPTY = re.compile(r"^(none|n/?a|nothing|not (specified|mentioned|said|stated)|unknown|-+)?\W*$", re.I)
+# The patterns below read the model's output in English, Romanian (ț/ș with a comma or a cedilla) or Russian.
+EMPTY = re.compile(r"^(none|n/?a|nothing|not (specified|mentioned|said|stated)|unknown|-+|"
+                   r"nimic|niciun\w*|ne(specificat|precizat|cunoscut|men[țţt]ionat)\w*|"
+                   r"nu (este|a fost|s-a|se) (specific|preciz|men[țţt]ion)\w*|nu (este cazul|se aplic[ăa])|"
+                   r"нет( данных)?|ничего|н/?[ад]|неизвестн\w*|не (указ|упом|уточн|сообщ)\w*)?\W*$", re.I)
 # Sentences a model writes instead of leaving a field empty ("Patient status not fully detailed.").
 FILLER = re.compile(r"[^.;]*\b(not (fully )?(detailed|specified|mentioned|discussed|said)|no (details|information)|unclear|"
-                    r"discussion (revolves|about|regarding))\b[^.;]*[.;]?\s*", re.I)
+                    r"discussion (revolves|about|regarding)|"
+                    r"nu (a fost |au fost |este |sunt |s-a |se )?(complet )?"
+                    r"(detaliat|specificat|men[țţt]ionat|discutat|precizat)\w*|"
+                    r"f[ăa]r[ăa] (detalii|informa[țţt]ii)|neclar\w*|discu[țţt]ia (despre|privind|se refer[ăa])|"
+                    r"не (был[аио]? )?(полностью )?(детализир|указ|упом|обсужд|уточн)\w*|"
+                    r"нет (данных|информации|подробностей|сведений)|неясн\w*|"
+                    r"обсуждение (касается|касалось|было посвящено))\b[^.;]*[.;]?\s*", re.I)
 # Plan items that change nothing: kept under the patient, but they are not key moments.
-UNCHANGED = re.compile(r"^(continu|maintain|keep|consider|plan)\w*\b", re.I)
+UNCHANGED = re.compile(r"^(se )?(continu|maintain|keep|consider|plan|men[țţt]in|p[ăa]str|"
+                       r"продолж|сохран|оставить|оставл|рассмотр|план)\w*\b", re.I)
 # Items that change the patient's care rank first among key moments.
 ACTION = re.compile(r"\b(start|stop|order|plac|insert|transfus|call|consult|increas|reduc|decreas|switch|chang|"
-                    r"set|adjust|introduc|discontinu|withdr)\w*", re.I)
+                    r"set|adjust|introduc|discontinu|withdr|"
+                    r"[îi]ncep|[îi]ni[țţt]i|opr|sist[aă]|suspend|[îi]ntrerup|comand|solicit|transfuz|chem[aăe]|"
+                    r"cre[sșş]t|cresc|sc[aă]d|schimb|ajust|trec[ei]|administr|plas|mont|"
+                    r"нача[лт]|начин|назнач|отмен|останов|прекрат|введ|ввест|ввод|перелив|трансфуз|вызв|вызов|"
+                    r"консульт|увелич|повыс|уменьш|сниз|смен|замен|перевод|перевест|корректир|скорректир|коррекц|"
+                    r"постав|установ)\w*", re.I)
 MAX_IN_FLIGHT = 2  # chunks sent to Ollama at once: 1.4x faster on an M4 with OLLAMA_NUM_PARALLEL=2, 4 is slower
 
 
@@ -275,13 +310,14 @@ def parse_dialog(path: Path) -> list:
     return lines
 
 
-def _cue_name(sentence: str):
-    """Name of the bed / room / item a sentence moves to ("da pacientul de pipatu nouă" -> "Bed 9"), or None."""
-    for pattern, name in NAME_CUES:
+def _cue_name(sentence: str, language: str):
+    """Name of the bed / room / item a sentence moves to, in the minutes' language ("da pacientul de pipatu nouă"
+    -> "Bed 9", "Patul 9", "Койка 9"), or None."""
+    for pattern, word in NAME_CUES:
         m = pattern.search(sentence)
         if m:
             n = m.groupdict().get("n")
-            return name.format(n=WORD_TO_NUMBER.get(n.lower(), n) if n else "")
+            return WORDS[language][word].format(n=WORD_TO_NUMBER.get(n.lower(), n) if n else "")
     return None
 
 
@@ -311,19 +347,14 @@ def _similar(a: str, b: str) -> bool:
     return bool(wa and wb) and len(wa & wb) / min(len(wa), len(wb)) >= 0.75
 
 
-def _overlaps(a: str, b: str) -> bool:
-    """Looser than _similar, for an AI suggestion that restates an open issue in other words."""
-    wa, wb = _stems(a), _stems(b)
-    return bool(wa and wb) and len(wa & wb) / min(len(wa), len(wb)) >= 0.5
-
-
 def _stems(text: str) -> set:
-    """Language-independent word keys: numbers plus the first 5 letters of longer words, without diacritics.
+    """Language-independent word keys: numbers plus the first 5 letters of longer (Latin or Cyrillic) words,
+    without diacritics.
 
     "noradrenaline 0.22" (English item) and "noradrenalină 0,22" (Romanian transcript) share {"norad", "0.22"}.
     """
     plain = "".join(c for c in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(c))
-    return ({w[:5] for w in re.findall(r"[a-z]{5,}", plain)} |
+    return ({w[:5] for w in re.findall(r"[a-zа-я]{5,}", plain)} |
             {n.replace(",", ".") for n in NUMBER.findall(plain)})
 
 
@@ -362,18 +393,23 @@ def _same(x, y) -> bool:
 
 
 class MinutesBuilder:
-    """Incremental minutes: feed transcript lines as they arrive, then finalize()."""
+    """Incremental minutes: feed transcript lines as they arrive, then finalize(). language: of the minutes, a
+    key of MINUTES_LANGUAGES; instructions: the hospital's own for this meeting type, added to every prompt."""
 
-    def __init__(self, meeting_type="medical", model=DEFAULT_MODEL, language="English", num_thread=10,
-                 verbose=True, final_model=None, samples=1):
+    def __init__(self, meeting_type="medical", model=DEFAULT_MODEL, language="en", num_thread=10,
+                 verbose=True, final_model=None, samples=1, instructions=""):
         self.meeting_type, self.model, self.language = meeting_type, model, language
+        self.instructions = HOSPITAL_INSTRUCTIONS.format(instructions.strip()) if instructions.strip() else ""
+        self.words = WORDS[language]
         self.samples = max(1, min(samples, len(SAMPLE_TEMPERATURES) + 1))
         self.final_model = final_model or model
-        self.default_owner = "ICU team" if meeting_type == "medical" else "Team"
+        self.default_owner = self.words["icu_team" if meeting_type == "medical" else "team"]
         self.num_thread, self.verbose = num_thread, verbose
         # The system prompt is identical for every chunk (the per-chunk note goes into the user message),
         # so Ollama reuses its cached prompt instead of re-reading it on every call.
-        self.system = CHUNK_SYSTEM.format(meeting_type=meeting_type, language=language, **HINTS[meeting_type])
+        self.system = CHUNK_SYSTEM.format(meeting_type=meeting_type, language=MINUTES_LANGUAGES[language],
+                                          name_example=self.words["bed"].format(n=9),
+                                          **HINTS[meeting_type]) + self.instructions
         self.buffer, self.buffer_words = [], 0
         self.starts_new_topic, self.next_name = True, None  # what the current buffer starts with
         self.current_name = None  # the bed / room the speakers are on, from the last name cue
@@ -388,7 +424,7 @@ class MinutesBuilder:
         prefix, text = line.split(": ", 1)
         sentences = SENTENCE.split(text)
         for i, sentence in enumerate(sentences):
-            name = _cue_name(sentence)
+            name = _cue_name(sentence, self.language)
             if name and name != self.current_name:
                 # Cut exactly at the sentence that moves on, even in the middle of a long utterance.
                 if i:
@@ -475,11 +511,11 @@ class MinutesBuilder:
 
     def _check(self, text: str, source_numbers: set, chunk_time: str) -> str:
         """Flag doses / lab values that do not occur in the transcript chunk they were extracted from."""
-        missing = sorted(_key_numbers(text) - source_numbers)
+        missing = ", ".join(sorted(_key_numbers(text) - source_numbers))
         if not missing:
             return text
-        self.warnings.append(f"[{chunk_time}] value(s) {', '.join(missing)} not found in the transcript: {text}")
-        return f"{text} ⚠ unverified: {', '.join(missing)}"
+        self.warnings.append(f"[{chunk_time}] " + self.words["not_found"].format(values=missing, text=text))
+        return f"{text} " + self.words["unverified"].format(values=missing)
 
     def _checked_name(self, name: str, chunk_text: str) -> str:
         """The model's topic name, or "" when it is doubtful: small models often invent or reuse bed numbers.
@@ -506,7 +542,7 @@ class MinutesBuilder:
         if i == 0 and continues:
             idx = len(self.topics) - 1
             name = self._checked_name(t["name"], chunk_text)
-            if name and self.topics[idx]["name"].startswith("Patient "):
+            if name and self.topics[idx]["name"].startswith(self.words["patient"].format(n="")):
                 self.topics[idx]["name"] = name
             return idx
         if i == 0 and cue_name:
@@ -514,7 +550,7 @@ class MinutesBuilder:
                 if topic["name"] == cue_name:
                     return idx
         name = (cue_name if i == 0 else None) or self._checked_name(t["name"], chunk_text)
-        self.topics.append({"name": name or f"Patient {len(self.topics) + 1}", "time": chunk_time,
+        self.topics.append({"name": name or self.words["patient"].format(n=len(self.topics) + 1), "time": chunk_time,
                             "status": "", "findings": []})
         return len(self.topics) - 1
 
@@ -543,7 +579,7 @@ class MinutesBuilder:
                 task = checked(a["task"])
                 if task and not any(_similar(task, x["task"]) for x in self.actions if x["_topic"] == idx):
                     self.actions.append({"task": task, "owner": _clean(a["owner"]) or self.default_owner,
-                                         "deadline": _clean(a["deadline"]) or "Not specified",
+                                         "deadline": _clean(a["deadline"]) or self.words["no_deadline"],
                                          "priority": a["priority"], "time": _locate(task, lines, chunk_time),
                                          "_topic": idx})
             for o in map(_clean, t["open"]):
@@ -581,10 +617,11 @@ class MinutesBuilder:
         return sorted(picked, key=lambda m: m["time"])
 
     def finalize(self) -> dict:
-        system = FINAL_SYSTEM.format(meeting_type=self.meeting_type, language=self.language)
+        system = FINAL_SYSTEM.format(meeting_type=self.meeting_type,
+                                     language=MINUTES_LANGUAGES[self.language]) + self.instructions
         self._merge_ready(wait=True)
         if self.topics and self.buffer:
-            # The header (title / summary / suggestions) is written from everything before the last chunk,
+            # The header (title / summary) is written from everything before the last chunk,
             # concurrently with extracting that last chunk (needs OLLAMA_NUM_PARALLEL >= samples + 1). The last
             # minutes are usually wrap-up, and key moments / tables below still include them.
             header = self.pool.submit(chat, self.final_model, system, self._facts_text(), FINAL_SCHEMA,
@@ -605,12 +642,10 @@ class MinutesBuilder:
         if self.verbose:
             print(f"  finalize: {stats['wall']}s ({stats['prompt_tokens']} in / {stats['output_tokens']} out)",
                   file=sys.stderr, flush=True)
-        known = [i["issue"] for i in self.issues] + [a["task"] for a in self.actions]
-        suggestions = [x for x in map(_clean, head["suggestions"]) if x and not any(_overlaps(x, k) for k in known)]
-        return {**head, "suggestions": suggestions,
-                "key_moments": self._key_moments(), "topics": self.topics, "decisions": self.decisions,
+        return {**head, "key_moments": self._key_moments(), "topics": self.topics, "decisions": self.decisions,
                 "action_items": self.actions,
-                "open_issues": [f"{i['patient']}: {i['issue']}" for i in self.issues], "warnings": self.warnings}
+                "open_issues": [f"{i['patient']}: {i['issue']}" for i in self.issues], "warnings": self.warnings,
+                "attendees": []}  # who was present: the moderator adds them
 
 
 class LiveMinutes:

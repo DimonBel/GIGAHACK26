@@ -2,10 +2,10 @@
 import re
 import sys
 
-from ..minutes.builder import _text
+from ..minutes.builder import EMPTY, MINUTES_LANGUAGES, _text
 from ..minutes.ollama import DEFAULT_MODEL, chat
 
-MAIN_SECONDS = 30   # speakers who talk less get "speaks briefly" without asking the LLM
+MAIN_SECONDS = 30   # speakers who talk less get "speaks briefly" (in the minutes' language) without asking the LLM
 LINES_PER_SPEAKER = 8
 LINE_CHARS = 200
 PROMPT_CHARS = 7000  # fits the minutes' 4096-token context: a different num_ctx makes Ollama reload the model,
@@ -15,13 +15,21 @@ LEGEND = re.compile(r"^# (?P<speaker>SPEAKER \d+) = (?P<role>.*?)(?: \((?P<name>
 
 SYSTEM = """You identify the participants of a {meeting_type} meeting at Medpark hospital (Moldova) from a \
 noisy speech-recognition transcript in Romanian. Speaker labels come from voice detection. For each speaker:
-- role: their function in this meeting in a few English words, from what they do (who asks and decides, who \
-reports patients, who answers about one topic), e.g. "leads the round", "presents patients", "nurse", \
-"cardiologist (consultant)". "unclear" if you cannot tell.
+- role: their function in this meeting in a few {language} words, from what they do (who asks and decides, who \
+reports patients, who answers about one topic), e.g. {examples}. "{unclear}" if you cannot tell.
 - name: the speaker's own name only if another speaker addresses them by it or they introduce themselves, \
 else "". A name that is only mentioned (e.g. a colleague to call) is not the speaker's name.
-- evidence: a short reason, at most 15 words.
+- evidence: a short reason in {language}, at most 15 words.
 Use only the transcript. Do not invent names."""
+# What label_roles writes itself, and the prompt's examples, per language of the minutes.
+ROLE_WORDS = {
+    "en": {"briefly": "speaks briefly", "unclear": "unclear",
+           "examples": '"leads the round", "presents patients", "nurse", "cardiologist (consultant)"'},
+    "ro": {"briefly": "vorbește puțin", "unclear": "neclar",
+           "examples": '"conduce vizita", "prezintă pacienții", "asistent medical", "cardiolog (consultant)"'},
+    "ru": {"briefly": "говорит мало", "unclear": "неясно",
+           "examples": '"ведёт обход", "докладывает о пациентах", "медсестра", "кардиолог (консультант)"'},
+}
 
 
 def talk_time(utterances: list) -> dict:
@@ -31,14 +39,17 @@ def talk_time(utterances: list) -> dict:
     return seconds
 
 
-def label_roles(utterances: list, meeting_type: str = "medical", model: str = DEFAULT_MODEL) -> dict:
-    """{speaker: {"role", "name", "evidence", "seconds"}} for every speaker of the dialog.
+def label_roles(utterances: list, meeting_type: str = "medical", model: str = DEFAULT_MODEL,
+                language: str = "en") -> dict:
+    """{speaker: {"role", "name", "evidence", "seconds"}} for every speaker of the dialog, the roles written in
+    language (ro, ru or en).
 
     Returns {} (after a warning) when Ollama is not available, so the transcript is never lost over it.
     """
+    words = ROLE_WORDS[language]
     seconds = talk_time(utterances)
     main = sorted((s for s, v in seconds.items() if v >= MAIN_SECONDS), key=lambda s: -seconds[s])
-    roles = {s: {"role": "speaks briefly", "name": "", "evidence": "", "seconds": round(v)}
+    roles = {s: {"role": words["briefly"], "name": "", "evidence": "", "seconds": round(v)}
              for s, v in seconds.items() if s not in main}
     if not main:
         return roles
@@ -55,20 +66,22 @@ def label_roles(utterances: list, meeting_type: str = "medical", model: str = DE
     schema = {"type": "object", "required": ["speakers"],
               "properties": {"speakers": {"type": "array", "items": item, "minItems": len(main),
                                           "maxItems": len(main)}}}
+    system = SYSTEM.format(meeting_type=meeting_type, language=MINUTES_LANGUAGES[language],
+                           examples=words["examples"], unclear=words["unclear"])
     try:
-        answer, _ = chat(model, SYSTEM.format(meeting_type=meeting_type), "\n\n".join(parts), schema,
-                          num_predict=60 * len(main) + 100, retry=False, timeout=TIMEOUT)
+        answer, _ = chat(model, system, "\n\n".join(parts), schema, num_predict=60 * len(main) + 100, retry=False,
+                          timeout=TIMEOUT)
     except (RuntimeError, ValueError) as e:  # Ollama down, model missing, or no valid JSON after a retry
         print(f"Warning: speaker roles skipped ({str(e).splitlines()[0]})", file=sys.stderr)
         return {}
     for a in answer["speakers"]:
         if a["speaker"] in main and a["speaker"] not in roles:
             name = a["name"].strip()
-            roles[a["speaker"]] = {"role": a["role"].strip() or "unclear", "evidence": a["evidence"].strip(),
-                                   "name": name if name.lower() not in ("", "unknown", "n/a", "none") else "",
+            roles[a["speaker"]] = {"role": a["role"].strip() or words["unclear"], "evidence": a["evidence"].strip(),
+                                   "name": "" if EMPTY.match(name) else name,  # "unknown", "necunoscut", ...
                                    "seconds": round(seconds[a["speaker"]])}
     for s in main:
-        roles.setdefault(s, {"role": "unclear", "name": "", "evidence": "", "seconds": round(seconds[s])})
+        roles.setdefault(s, {"role": words["unclear"], "name": "", "evidence": "", "seconds": round(seconds[s])})
     return dict(sorted(roles.items(), key=lambda x: -x[1]["seconds"]))
 
 

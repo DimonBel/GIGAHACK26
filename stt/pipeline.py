@@ -53,11 +53,12 @@ def transcribe_dialog(audio: Path, model: Path = DEFAULT_MODEL, language: str = 
 
 
 def transcribe_minutes(audio: Path, meeting_type: str = "medical", llm: str = DEFAULT_LLM, overlap: bool = None,
-                       **options) -> tuple:
-    """(language, dialog, minutes or None without speech) for any audio/video file. With overlap (default: on
-    machines with enough memory, see config.overlap_minutes) the minutes are written while Whisper still
-    transcribes, from the speakers' turns on. on_progress gets the "minutes" stage once the transcript is ready.
-    options: those of transcribe_dialog."""
+                       minutes_language: str = "ro", instructions: str = "", **options) -> tuple:
+    """(language, dialog, minutes or None without speech) for any audio/video file, the minutes written in
+    minutes_language (ro, ru or en), following instructions (the hospital's own for the meeting type, if any). With
+    overlap (default: on machines with enough memory, see config.overlap_minutes) the minutes are written while
+    Whisper still transcribes, from the speakers' turns on. on_progress gets the "minutes" stage once the
+    transcript is ready. options: those of transcribe_dialog."""
     from .minutes.builder import LiveMinutes, MinutesBuilder
     from .speakers.roles import label_roles
 
@@ -68,7 +69,7 @@ def transcribe_minutes(audio: Path, meeting_type: str = "medical", llm: str = DE
         _free_gpu_memory()
         if options.get("on_progress"):
             options["on_progress"]("minutes")
-        return language, dialog, meeting_minutes(dialog, meeting_type, llm)
+        return language, dialog, meeting_minutes(dialog, meeting_type, llm, minutes_language, instructions)
 
     live, fed = None, 0
 
@@ -76,7 +77,7 @@ def transcribe_minutes(audio: Path, meeting_type: str = "medical", llm: str = DE
         nonlocal live, fed
         ready = dialog if final else dialog[:-1]  # the newest line may still grow
         for utterance in ready[fed:]:
-            live = live or LiveMinutes(MinutesBuilder(meeting_type, llm))
+            live = live or LiveMinutes(MinutesBuilder(meeting_type, llm, minutes_language, instructions=instructions))
             live.feed(utterance)
         fed = max(fed, len(ready))
 
@@ -87,38 +88,42 @@ def transcribe_minutes(audio: Path, meeting_type: str = "medical", llm: str = DE
     if options.get("on_progress"):
         options["on_progress"]("minutes")
     with ThreadPoolExecutor(max_workers=1) as pool:
-        roles = pool.submit(label_roles, dialog, meeting_type, llm)
+        roles = pool.submit(label_roles, dialog, meeting_type, llm, minutes_language)
         minutes = live.finish()
         minutes["participants"] = roles.result()
     return language, dialog, minutes
 
 
-def meeting_minutes(dialog: list, meeting_type: str = "medical", model: str = DEFAULT_LLM) -> dict:
-    """Minutes for dialog utterances; the speakers' roles are guessed at the same time."""
+def meeting_minutes(dialog: list, meeting_type: str = "medical", model: str = DEFAULT_LLM,
+                    language: str = "ro", instructions: str = "") -> dict:
+    """Minutes for dialog utterances, written in language (ro, ru or en) following instructions (if any); the
+    speakers' roles are guessed at the same time."""
     from .minutes.builder import dialog_lines
     from .speakers.roles import label_roles
 
     with ThreadPoolExecutor(max_workers=1) as pool:
-        roles = pool.submit(label_roles, dialog, meeting_type, model)
-        result = _minutes(dialog_lines(dialog), meeting_type, model)
+        roles = pool.submit(label_roles, dialog, meeting_type, model, language)
+        result = _minutes(dialog_lines(dialog), meeting_type, model, language, instructions)
         result["participants"] = roles.result()
     return result
 
 
-def minutes_from_file(path: Path, meeting_type: str = "medical", model: str = DEFAULT_LLM) -> dict:
-    """Minutes for a dialog .txt written by the dialog command."""
+def minutes_from_file(path: Path, meeting_type: str = "medical", model: str = DEFAULT_LLM,
+                      language: str = "ro", instructions: str = "") -> dict:
+    """Minutes, written in language (ro, ru or en) following instructions (if any), for a dialog .txt written by
+    the dialog command."""
     from .minutes.builder import parse_dialog
     from .speakers.roles import read_legend
 
-    result = _minutes(parse_dialog(Path(path)), meeting_type, model)
+    result = _minutes(parse_dialog(Path(path)), meeting_type, model, language, instructions)
     result["participants"] = read_legend(Path(path).read_text(encoding="utf-8"))
     return result
 
 
-def _minutes(lines: list, meeting_type: str, model: str) -> dict:
+def _minutes(lines: list, meeting_type: str, model: str, language: str, instructions: str) -> dict:
     from .minutes.builder import MinutesBuilder
 
-    builder = MinutesBuilder(meeting_type, model)
+    builder = MinutesBuilder(meeting_type, model, language, instructions=instructions)
     for line in lines:
         builder.add_line(line)
     return builder.finalize()

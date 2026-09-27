@@ -13,7 +13,7 @@ from pathlib import Path  # noqa: E402
 
 from stt.asr import mlx  # noqa: E402
 from stt.config import default_model  # noqa: E402
-from stt.minutes.builder import MEETING_TYPES  # noqa: E402
+from stt.minutes.builder import MEETING_TYPES, MINUTES_LANGUAGES  # noqa: E402
 from stt.minutes.ollama import DEFAULT_MODEL as DEFAULT_LLM  # noqa: E402
 
 
@@ -61,18 +61,19 @@ def run_dialog(audio: Path, args):
 
 def run_minutes(source: Path, args):
     """Audio -> dialog -> minutes, or minutes only from a dialog .txt."""
-    from stt.minutes.markdown import to_markdown
+    from stt.minutes.markdown import SECTIONS, to_markdown
     from stt.pipeline import minutes_from_file, transcribe_minutes
     from stt.speakers import dialog as fmt
 
     prefix = args.out or str(Path("out") / source.stem)
     t0 = time.time()
     if source.suffix == ".txt":
-        minutes = minutes_from_file(source, args.type, args.llm)
+        minutes = minutes_from_file(source, args.type, args.llm, args.minutes_lang, args.instructions)
     else:
-        _, dialog, minutes = transcribe_minutes(source, args.type, args.llm, **asr_options(args))
+        _, dialog, minutes = transcribe_minutes(source, args.type, args.llm, minutes_language=args.minutes_lang,
+                                                instructions=args.instructions, **asr_options(args))
         save(prefix + ".dialog.txt", fmt.to_text(dialog) + "\n")
-    md = to_markdown(minutes, args.type)
+    md = to_markdown(minutes, args.type, args.minutes_lang, SECTIONS)  # all of it: the CLI user checks the minutes
     print(md)
     save(prefix + ".minutes.md", md)
     save(prefix + ".minutes.json", json.dumps(minutes, ensure_ascii=False, indent=2))
@@ -96,6 +97,10 @@ def main():
     minutes = argparse.ArgumentParser(add_help=False)
     minutes.add_argument("--type", choices=MEETING_TYPES, default="medical", help="meeting type")
     minutes.add_argument("--llm", default=DEFAULT_LLM, help="Ollama model for the minutes")
+    minutes.add_argument("--minutes-lang", choices=MINUTES_LANGUAGES, default="ro",
+                         help="language the minutes are written in (default: ro, Romanian)")
+    minutes.add_argument("--instructions", default="",
+                         help="extra instructions for the LLM, like a meeting type's template in the web app")
 
     sub.add_parser("transcribe", parents=[common], help="audio/video file -> transcript").add_argument("file")
     sub.add_parser("dialog", parents=[common], help="audio/video file -> who said what").add_argument("file")
